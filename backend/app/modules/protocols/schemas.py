@@ -261,3 +261,21 @@ class VersionConflict(BaseModel):
 
     error: dict
     current: TourOut
+
+
+# --- Shares ---
+
+
+class ShareIn(BaseModel):
+    user_id: uuid.UUID = Field(description="Found with /users/lookup")
+    permission: Literal["read", "edit"]
+
+
+class SharePatch(BaseModel):
+    permission: Literal["read", "edit"]
+
+
+class ShareOut(BaseModel):
+    user: TourOwner
+    permission: Literal["read", "edit"]
+    created_at: datetime

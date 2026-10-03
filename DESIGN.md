@@ -278,7 +278,7 @@ Lokale Änderungen mit `updated_at`/`deleted_at` und Basis-`version`; Konfliktre
 - `edit`: Textfelder (Titel, Fazit, Beschreibungen), Listen (Ausrüstung, Essen, Partner, Gipfel, Wegpunkte) und **Fotos** (hinzufügen, entfernen, Beschriftung, Titelbild, Position).
 - `edit` darf **nicht**: GPX/Track und Start-/Endpunkte ändern, Freigaben und Links verwalten, Tour löschen.
 - `read`: nur lesen.
-Empfänger sehen die Tour im Tab „Mit mir geteilt“. Entfernen des Teilens wirkt sofort serverseitig; die lokale Kopie wird beim nächsten Sync gelöscht.
+Empfänger sehen die Tour im Tab „Mit mir geteilt“ und können die Freigabe selbst wieder ablegen. Freigaben und Links sind kein Teil der Tour-Historie. Entfernen des Teilens wirkt sofort serverseitig; die lokale Kopie wird beim nächsten Sync gelöscht.
 
 **Teilen per Link**
 `https://hiker.lacasa.internal/p/<token>`, Token = zufälliges UUIDv4. Nur lesend, widerrufbar, optional befristet, ohne Login, `noindex`, Rate-Limit, ohne E-Mail-Adressen oder interne IDs. Optional: genauen Start verbergen, Foto-GPS entfernen. Die Basis-URL kommt aus der Konfiguration (`PUBLIC_BASE_URL`).
@@ -306,8 +306,8 @@ Versioniertes Schema (`schema_version`): Tour, Ausrüstung (Snapshots), Essen, P
 | GET | /tours/{id}/revisions, /revisions/{rev} | Historie (Liste mit Paging, neueste zuerst / eine Revision mit Snapshot und Diff; `rev` = Versionsnummer) |
 | GET | /tours/{id}/revisions/{rev}/compare/{other} | Diff zwischen zwei Versionen |
 | POST | /tours/{id}/revisions/{rev}/restore | Wiederherstellen |
-| POST | /tours/{id}/shares | Teilen (`read`/`edit`) |
-| PATCH, DELETE | /tours/{id}/shares/{user_id} | Recht ändern / entfernen |
+| GET, POST | /tours/{id}/shares | Freigaben listen / teilen (`read`/`edit`, Nutzer per `/users/lookup` gefunden); nur Owner |
+| PATCH, DELETE | /tours/{id}/shares/{user_id} | Recht ändern (Owner) / entfernen (Owner oder der betroffene Nutzer selbst) |
 | POST, DELETE | /tours/{id}/public-link, …/{link_id} | Link erzeugen / widerrufen |
 | GET | /public/tours/{token} | Öffentliche Ansicht |
 | PUT | /tours/{id}/gpx | GPX hochladen, auswerten (nur Owner) |

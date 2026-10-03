@@ -8,11 +8,14 @@ from app.core.deps import DbSession
 from app.core.errors import error_responses
 from app.core.pagination import Page, Paging
 from app.modules.auth.deps import CurrentUser
-from app.modules.protocols import history, service
+from app.modules.protocols import history, service, sharing
 from app.modules.protocols.schemas import (
     RevisionComparison,
     RevisionListItem,
     RevisionOut,
+    ShareIn,
+    ShareOut,
+    SharePatch,
     TourCreate,
     TourListItem,
     TourOut,
@@ -201,3 +204,44 @@ def restore_revision(version: int, access: EditableTour, db: DbSession):
     """
     history.restore(db, access, history.get_revision(db, access.tour, version))
     return service.tour_out(db, access)
+
+
+# --- Shares ---
+
+
+@router.get(
+    "/tours/{tour_id}/shares", response_model=list[ShareOut], responses=error_responses(403, 404)
+)
+def list_shares(access: OwnedTour, db: DbSession):
+    return sharing.list_shares(db, access.tour)
+
+
+@router.post(
+    "/tours/{tour_id}/shares",
+    response_model=ShareOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(403, 404, 409),
+)
+def create_share(body: ShareIn, access: OwnedTour, db: DbSession):
+    """Share the tour with another user (`read` or `edit`)."""
+    return sharing.create_share(db, access.tour, body.user_id, body.permission)
+
+
+@router.patch(
+    "/tours/{tour_id}/shares/{user_id}",
+    response_model=ShareOut,
+    responses=error_responses(403, 404),
+)
+def update_share(user_id: uuid.UUID, body: SharePatch, access: OwnedTour, db: DbSession):
+    return sharing.update_share(db, access.tour, user_id, body.permission)
+
+
+@router.delete(
+    "/tours/{tour_id}/shares/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(403, 404),
+)
+def delete_share(user_id: uuid.UUID, access: ReadableTour, db: DbSession):
+    """Remove a share. The owner removes any, other users only their own."""
+    sharing.require_owner_or_self(access, user_id)
+    sharing.delete_share(db, access.tour, user_id)

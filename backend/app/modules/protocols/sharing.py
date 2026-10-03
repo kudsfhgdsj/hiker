@@ -17,10 +17,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.deps import DbSession
-from app.core.errors import ForbiddenError, NotFoundError
+from app.core.errors import ConflictError, ForbiddenError, NotFoundError, UnprocessableError
+from app.modules.auth import service as auth_service
 from app.modules.auth.deps import CurrentUser
 from app.modules.auth.models import User
 from app.modules.protocols.models import PERMISSION_EDIT, PERMISSION_READ, Tour, TourShare
+from app.modules.protocols.schemas import ShareOut, TourOwner
 
 OWNER = "owner"
 _RANK = {PERMISSION_READ: 1, PERMISSION_EDIT: 2, OWNER: 3}
@@ -92,3 +94,61 @@ def check_owner_only_fields(access: TourAccess, values: dict) -> None:
         raise ForbiddenError(
             f"Only the owner can change: {', '.join(changed)}", code="owner_only_field"
         )
+
+
+# --- Managing shares ---
+
+
+def require_owner_or_self(access: TourAccess, user_id: uuid.UUID) -> None:
+    """Shares are managed by the owner; everyone may give up their own share."""
+    if not access.is_owner and user_id != access.user.id:
+        raise ForbiddenError(
+            "This action needs the 'owner' permission", code="insufficient_permission"
+        )
+
+
+def _share_out(share: TourShare, names: dict) -> ShareOut:
+    user = TourOwner(id=share.user_id, display_name=names.get(share.user_id))
+    return ShareOut(user=user, permission=share.permission, created_at=share.created_at)
+
+
+def list_shares(db: Session, tour: Tour) -> list[ShareOut]:
+    shares = db.scalars(
+        select(TourShare).where(TourShare.tour_id == tour.id).order_by(TourShare.created_at)
+    ).all()
+    names = auth_service.get_display_names(db, {share.user_id for share in shares})
+    return [_share_out(share, names) for share in shares]
+
+
+def _get_share(db: Session, tour: Tour, user_id: uuid.UUID) -> TourShare:
+    share = db.get(TourShare, (tour.id, user_id))
+    if share is None:
+        raise NotFoundError("Share not found")
+    return share
+
+
+def create_share(db: Session, tour: Tour, user_id: uuid.UUID, permission: str) -> ShareOut:
+    names = auth_service.get_display_names(db, {user_id})
+    if user_id not in names:
+        raise UnprocessableError("Unknown user", code="unknown_user")
+    if user_id == tour.owner_id:
+        raise UnprocessableError("The owner already has full access", code="share_with_owner")
+    if db.get(TourShare, (tour.id, user_id)) is not None:
+        raise ConflictError("The tour is already shared with this user", code="already_shared")
+    share = TourShare(tour_id=tour.id, user_id=user_id, permission=permission)
+    db.add(share)
+    db.commit()
+    return _share_out(share, names)
+
+
+def update_share(db: Session, tour: Tour, user_id: uuid.UUID, permission: str) -> ShareOut:
+    share = _get_share(db, tour, user_id)
+    share.permission = permission
+    db.commit()
+    return _share_out(share, auth_service.get_display_names(db, {user_id}))
+
+
+def delete_share(db: Session, tour: Tour, user_id: uuid.UUID) -> None:
+    """Takes effect at once: access is checked on every request."""
+    db.delete(_get_share(db, tour, user_id))
+    db.commit()

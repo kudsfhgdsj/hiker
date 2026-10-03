@@ -930,3 +930,92 @@ def test_concurrent_writes_cannot_both_succeed(client, session_factory, anna):
             select(TourRevision.version).where(TourRevision.tour_id == tour_id)
         ).all()
         assert sorted(versions) == [1, 2]
+
+
+# --- Shares ---
+
+
+def shares_url(tour, person=None):
+    return f"{TOURS}/{tour['id']}/shares" + (f"/{person.id}" if person else "")
+
+
+def test_owner_shares_changes_and_removes_access(client, anna, bea):
+    tour = create_tour(client, anna)
+    tour_url = f"{TOURS}/{tour['id']}"
+
+    created = client.post(
+        shares_url(tour), json={"user_id": bea.id, "permission": "read"}, headers=anna.headers
+    )
+
+    assert created.status_code == 201
+    assert created.json()["user"] == {"id": bea.id, "display_name": "Bea"}
+    assert created.json()["permission"] == "read"
+    assert client.get(tour_url, headers=bea.headers).json()["permission"] == "read"
+    assert client.get(shares_url(tour), headers=anna.headers).json() == [created.json()]
+    assert "email" not in created.text
+
+    patched = client.patch(shares_url(tour, bea), json={"permission": "edit"}, headers=anna.headers)
+
+    assert patched.json()["permission"] == "edit"
+    assert client.get(tour_url, headers=bea.headers).json()["permission"] == "edit"
+    assert client.get(TOURS, params={"scope": "shared"}, headers=bea.headers).json()["total"] == 1
+
+    assert client.delete(shares_url(tour, bea), headers=anna.headers).status_code == 204
+
+    assert client.get(tour_url, headers=bea.headers).status_code == 404
+    assert client.get(TOURS, headers=bea.headers).json()["total"] == 0
+    assert client.get(shares_url(tour), headers=anna.headers).json() == []
+    # Managing shares is not part of the tour history.
+    assert revisions(client, anna, tour)["total"] == 1
+
+
+def test_share_rejects_invalid_targets(client, anna, bea):
+    tour = create_tour(client, anna)
+
+    def post(user_id, permission="read"):
+        body = {"user_id": user_id, "permission": permission}
+        return client.post(shares_url(tour), json=body, headers=anna.headers)
+
+    assert post(str(uuid.uuid4())).json()["error"]["code"] == "unknown_user"
+    assert post(anna.id).json()["error"]["code"] == "share_with_owner"
+    assert post(bea.id, "owner").status_code == 422
+    assert post(bea.id).status_code == 201
+    assert post(bea.id, "edit").json()["error"]["code"] == "already_shared"
+    missing = client.patch(
+        shares_url(tour) + f"/{uuid.uuid4()}", json={"permission": "edit"}, headers=anna.headers
+    )
+    assert missing.status_code == 404
+
+
+def test_only_the_owner_manages_shares(client, people, shared_tour):
+    dora = people["dora"]
+    body = {"user_id": dora.id, "permission": "read"}
+
+    for name in ("bea", "cleo"):
+        headers = people[name].headers
+        assert client.get(shares_url(shared_tour), headers=headers).status_code == 403
+        assert client.post(shares_url(shared_tour), json=body, headers=headers).status_code == 403
+        patch = client.patch(
+            shares_url(shared_tour, people["cleo"]), json={"permission": "edit"}, headers=headers
+        )
+        assert patch.status_code == 403
+    assert client.get(shares_url(shared_tour), headers=dora.headers).status_code == 404
+    assert client.post(shares_url(shared_tour), json=body, headers=dora.headers).status_code == 404
+    bea_removes_cleo = client.delete(
+        shares_url(shared_tour, people["cleo"]), headers=people["bea"].headers
+    )
+    assert bea_removes_cleo.status_code == 403
+    owner_view = client.get(shares_url(shared_tour), headers=people["anna"].headers).json()
+    assert {share["user"]["display_name"]: share["permission"] for share in owner_view} == {
+        "Bea": "edit",
+        "Cleo": "read",
+    }
+
+
+def test_users_may_give_up_their_own_share(client, anna, cleo, shared_tour):
+    response = client.delete(shares_url(shared_tour, cleo), headers=cleo.headers)
+
+    assert response.status_code == 204
+    assert client.get(f"{TOURS}/{shared_tour['id']}", headers=cleo.headers).status_code == 404
+    remaining = client.get(shares_url(shared_tour), headers=anna.headers).json()
+    assert [share["user"]["display_name"] for share in remaining] == ["Bea"]
