@@ -316,6 +316,7 @@ Versioniertes Schema (`schema_version`): Tour, Ausrüstung (Snapshots), Essen, P
 | GET | /gear/catalog?q= | Freigegebene Katalogeinträge durchsuchen |
 | GET | /gear/catalog/{id}/image | Bild eines Katalogeintrags |
 | POST | /gear/items/{id}/propose-to-catalog | Katalogvorschlag |
+| GET | /gear/catalog/mine | Eigene Vorschläge mit Status (`pending`, `approved`, `rejected`) |
 | GET | /gear/catalog/pending | Offene Vorschläge (admin) |
 | PATCH | /gear/catalog/{id} | Freigeben, ablehnen, Produktdaten korrigieren (admin) |
 | GET, POST | /gear/types | Kategorien (Standard + eigene) / anlegen |

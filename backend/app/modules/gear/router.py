@@ -248,6 +248,13 @@ def search_catalog(
     return Page(items=items, total=total, limit=paging.limit, offset=paging.offset)
 
 
+@router.get("/catalog/mine", response_model=Page[CatalogItemOut])
+def list_own_proposals(user: CurrentUser, db: DbSession, paging: Paging):
+    """The user's own proposals with their status (pending, approved, rejected)."""
+    items, total = catalog.list_own_proposals(db, user, limit=paging.limit, offset=paging.offset)
+    return Page(items=items, total=total, limit=paging.limit, offset=paging.offset)
+
+
 @router.get("/catalog/pending", response_model=Page[CatalogItemOut], responses=error_responses(403))
 def list_pending_catalog_items(_admin: AdminUser, db: DbSession, paging: Paging):
     items, total = catalog.list_pending(db, limit=paging.limit, offset=paging.offset)

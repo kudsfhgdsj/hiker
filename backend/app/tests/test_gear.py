@@ -843,3 +843,26 @@ def test_summary_is_private_and_ignores_deleted_items(client, anna, bea, gear_se
     assert summary(client, anna)["total"]["item_count"] == 3
     assert client.get(SUMMARY).status_code == 401
     assert client.get(SUMMARY, params={"group_by": "color"}, headers=anna).status_code == 422
+
+
+def test_users_see_the_status_of_their_own_proposals(client, admin, anna, bea):
+    open_entry = propose(client, anna, create_item(client, anna, name="Offen")["id"]).json()
+    approved = propose(client, anna, create_item(client, anna, name="Frei")["id"]).json()
+    rejected = propose(client, anna, create_item(client, anna, name="Abgelehnt")["id"]).json()
+    propose(client, bea, create_item(client, bea, name="Von Bea")["id"])
+    approve(client, admin, approved["id"])
+    client.patch(f"{CATALOG}/{rejected['id']}", json={"status": "rejected"}, headers=admin)
+
+    response = client.get(f"{CATALOG}/mine", headers=anna)
+
+    assert response.status_code == 200
+    page = response.json()
+    assert page["total"] == 3
+    assert {row["id"]: row["status"] for row in page["items"]} == {
+        open_entry["id"]: "pending",
+        approved["id"]: "approved",
+        rejected["id"]: "rejected",
+    }
+    assert client.get(f"{CATALOG}/mine", headers=bea).json()["total"] == 1
+    assert client.get(f"{CATALOG}/mine", headers=admin).json()["total"] == 0
+    assert client.get(f"{CATALOG}/mine").status_code == 401

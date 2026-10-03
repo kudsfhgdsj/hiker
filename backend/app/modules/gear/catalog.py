@@ -54,6 +54,13 @@ def list_pending(db: Session, *, limit: int, offset: int):
     return _page(db, conditions, (GearCatalogItem.created_at, GearCatalogItem.id), limit, offset)
 
 
+def list_own_proposals(db: Session, user: User, *, limit: int, offset: int):
+    """Everything the user proposed, whatever its status, newest first."""
+    conditions = [GearCatalogItem.created_by == user.id]
+    order_by = (GearCatalogItem.created_at.desc(), GearCatalogItem.id)
+    return _page(db, conditions, order_by, limit, offset)
+
+
 def propose(db: Session, storage: Storage, user: User, item: GearItem) -> GearCatalogItem:
     """Copy the product data of an item into a pending catalog entry."""
     linked = db.get(GearCatalogItem, item.catalog_id) if item.catalog_id else None
