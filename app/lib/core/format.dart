@@ -25,6 +25,29 @@ class Format {
 
   static String date(DateTime date) => _date.format(date.toLocal());
 
+  static final _dateTime = DateFormat('dd.MM.yyyy HH:mm', 'de');
+
+  static String dateTime(DateTime date) => _dateTime.format(date.toLocal());
+
+  /// 135 → "2 h 15 min".
+  static String duration(int? minutes) {
+    if (minutes == null) return '–';
+    final hours = minutes ~/ 60;
+    final rest = minutes % 60;
+    if (hours == 0) return '$rest min';
+    return rest == 0 ? '$hours h' : '$hours h $rest min';
+  }
+
+  /// 1112 → "1,1 km", 450 → "450 m".
+  static String distance(num? meters) {
+    if (meters == null) return '–';
+    if (meters < 1000) return '${_decimal.format(meters.round())} m';
+    return '${_oneDecimal.format(meters / 1000)} km';
+  }
+
+  static String meters(num? value) =>
+      value == null ? '–' : '${_decimal.format(value.round())} m';
+
   /// Text of a number field → number; accepts a comma as decimal separator.
   static double? parseNumber(String text) =>
       double.tryParse(text.trim().replaceAll(',', '.'));

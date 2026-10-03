@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiker/app.dart';
 import 'package:hiker/core/db/app_database.dart';
+import 'package:hiker/core/map/map_view.dart';
 import 'package:hiker/core/modules/feature_module.dart';
 import 'package:hiker/core/network/api_client.dart';
 import 'package:hiker/core/storage/key_value_store.dart';
@@ -157,3 +158,24 @@ Future<ProviderContainer> pumpApp(
 }
 
 Finder field(String label) => find.widgetWithText(TextFormField, label);
+
+/// Stands in for the real map, which needs the platform. It shows the markers
+/// as plain widgets and remembers what the screen asked the map to show.
+class FakeMap {
+  MapContent? content;
+
+  Override get override => mapViewBuilderProvider.overrideWithValue((content) {
+    this.content = content;
+    return Wrap(
+      children: [
+        const Text('MAP'),
+        for (final marker in content.markers)
+          GestureDetector(
+            key: ValueKey('marker-${marker.id}'),
+            onTap: marker.onTap,
+            child: SizedBox.square(dimension: 24, child: marker.child),
+          ),
+      ],
+    );
+  });
+}

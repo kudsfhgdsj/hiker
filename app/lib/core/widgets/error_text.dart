@@ -19,6 +19,13 @@ String describeError(AppLocalizations l10n, Object error) {
     'invalid_image' => l10n.errorInvalidImage,
     'already_in_catalog' => l10n.gearAlreadyInCatalog,
     'barcode_in_catalog' => l10n.errorBarcodeInCatalog,
+    'invalid_gpx' => l10n.errorInvalidGpx,
+    'owner_only_field' || 'insufficient_permission' => l10n.errorOwnerOnly,
+    'points_from_track' => l10n.errorPointsFromTrack,
+    'no_sample_points' => l10n.errorNoSamplePoints,
+    'no_profile' => l10n.tourNoEstimateProfile,
+    'no_track' => l10n.tourNoEstimateTrack,
+    'no_duration' => l10n.tourNoEstimateDuration,
     'source_unavailable' => l10n.foodSourceUnavailable,
     _ => switch (error.statusCode) {
       403 => l10n.errorForbidden,

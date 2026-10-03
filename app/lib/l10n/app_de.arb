@@ -206,5 +206,205 @@
   "foodCatalogTitle": "Katalog",
   "foodScannerUnavailable": "Der Kamera-Scanner steht hier nicht zur Verfügung. Bitte den Barcode eintippen.",
   "foodScannerHint": "Barcode in den Rahmen halten",
-  "errorBarcodeInCatalog": "Im Katalog gibt es schon ein Produkt mit diesem Barcode."
+  "errorBarcodeInCatalog": "Im Katalog gibt es schon ein Produkt mit diesem Barcode.",
+  "toursTitle": "Touren",
+  "toursMine": "Meine",
+  "toursShared": "Mit mir geteilt",
+  "toursEmpty": "Noch keine Tour.",
+  "toursSharedEmpty": "Mit dir wurde noch keine Tour geteilt.",
+  "tourNew": "Neue Tour",
+  "tourEdit": "Tour bearbeiten",
+  "tourSearchHint": "Titel oder Fazit",
+  "tourTitleField": "Titel",
+  "tourSummary": "Fazit",
+  "tourSharedBy": "von {name}",
+  "@tourSharedBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "tourStart": "Start",
+  "tourEnd": "Ende",
+  "tourDuration": "Dauer",
+  "tourDurationMinutes": "Dauer (Minuten)",
+  "tourDurationHint": "Leer = aus Start und Ende berechnet",
+  "tourPackWeight": "Startgewicht",
+  "tourPackWeightField": "Startgewicht (g)",
+  "tourPackWeightHint": "Leer = aus Ausrüstung und Essen berechnet",
+  "tourCaloriesBurned": "Verbrauch",
+  "tourCaloriesBurnedField": "Kalorienverbrauch (kcal)",
+  "tourCaloriesBurnedHint": "Leer = Schätzung",
+  "tourCaloriesEaten": "Gegessen",
+  "tourEstimated": "geschätzt",
+  "tourKcal": "{value} kcal",
+  "@tourKcal": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "tourEstimateHeartRate": "Schätzung aus Herzfrequenz, Gewicht und Alter (Keytel et al. 2005).",
+  "tourEstimateWalking": "Schätzung aus Distanz, Höhenmetern, Dauer und Körper- plus Rucksackgewicht (ACSM-Gehformel). Der Abstieg zählt dabei nicht.",
+  "tourNoEstimateProfile": "Für eine Schätzung fehlt das Gewicht im Profil.",
+  "tourNoEstimateTrack": "Für eine Schätzung fehlt ein Track.",
+  "tourNoEstimateDuration": "Für eine Schätzung fehlt die Dauer.",
+  "tourOwnerOnly": "Zeiten und Zahlenwerte kann nur der Besitzer der Tour ändern.",
+  "tourFacts": "Eckdaten",
+  "tourTrack": "Track",
+  "tourDistance": "Distanz",
+  "tourAscent": "Aufstieg",
+  "tourDescent": "Abstieg",
+  "tourHighest": "Höchster Punkt",
+  "tourMovingTime": "In Bewegung",
+  "tourHeartRate": "Herzfrequenz",
+  "tourHeartRateValue": "Ø {avg} · max. {max}",
+  "@tourHeartRateValue": {
+    "placeholders": {
+      "avg": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "tourNoTrack": "Noch kein Track.",
+  "tourGear": "Ausrüstung",
+  "tourFood": "Essen",
+  "tourPeaks": "Gipfel",
+  "tourPartners": "Partner",
+  "tourWeather": "Wetter",
+  "tourPhotos": "Fotos",
+  "tourNothing": "Nichts eingetragen.",
+  "tourCarried": "Mitgenommen",
+  "tourEaten": "Gegessen",
+  "tourAmountG": "Menge (g)",
+  "tourAddGear": "Ausrüstung hinzufügen",
+  "tourAddFood": "Essen hinzufügen",
+  "tourAddPeak": "Gipfel hinzufügen",
+  "tourAddPartner": "Partner hinzufügen",
+  "tourPeakName": "Name des Gipfels",
+  "tourPeakElevation": "Höhe (m)",
+  "tourNewContact": "Neuer Kontakt",
+  "tourWeatherOutdated": "Punkte oder Zeiten haben sich geändert.",
+  "tourWeatherRefresh": "Wetter neu abrufen",
+  "tourWeatherNone": "Noch kein Wetter. Dafür braucht die Tour Start oder Ende und eine Zeit.",
+  "weatherStart": "Start",
+  "weatherSummit": "Gipfel",
+  "weatherEnd": "Ende",
+  "weatherManual": "Eigener Punkt",
+  "weatherLine": "{temp} °C · Wind {wind} km/h · {clouds} % Wolken",
+  "@weatherLine": {
+    "placeholders": {
+      "temp": {
+        "type": "String"
+      },
+      "wind": {
+        "type": "String"
+      },
+      "clouds": {
+        "type": "String"
+      }
+    }
+  },
+  "tourHistory": "Verlauf",
+  "tourShare": "Teilen",
+  "tourUploadGpx": "GPX hochladen",
+  "tourDrawTrack": "Track zeichnen",
+  "tourRemoveTrack": "Track entfernen",
+  "tourSetPoints": "Start und Ende setzen",
+  "tourAddPhotos": "Fotos hinzufügen",
+  "tourWaypointsFromPhotos": "Wegpunkte aus Fotos",
+  "tourWaypointsCreated": "{count, plural, =0{Keine neuen Wegpunkte} =1{1 Wegpunkt angelegt} other{{count} Wegpunkte angelegt}}",
+  "@tourWaypointsCreated": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tourPhotoOffset": "Zeitversatz der Kamera",
+  "tourPhotoOffsetField": "Versatz in Minuten",
+  "tourPhotoOffsetHint": "Kameras speichern oft die Ortszeit ohne Zeitzone. Für Sommerzeit in Mitteleuropa: −120.",
+  "tourPhotoCaption": "Beschriftung",
+  "tourPhotoCover": "Als Titelbild",
+  "tourPhotoIsCover": "Titelbild",
+  "tourPhotoNoPosition": "Ohne Position",
+  "tourPhotoShowOnMap": "Auf Karte zeigen",
+  "tourConflictTitle": "Die Tour wurde inzwischen geändert",
+  "tourConflictBody": "Deine Änderungen wurden mit dem neuen Stand zusammengeführt. Bei diesen Feldern haben beide etwas geändert – welcher Stand soll gelten?",
+  "tourConflictMine": "Meine Änderung",
+  "tourConflictTheirs": "Neuer Stand",
+  "tourConflictMerged": "Die Tour wurde inzwischen geändert. Deine Änderungen wurden zusammengeführt.",
+  "tourDrawHint": "Auf die Karte tippen, um Punkte zu setzen.",
+  "tourDrawUndo": "Letzten Punkt entfernen",
+  "tourDrawPoints": "{count} Punkte",
+  "@tourDrawPoints": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tourPointsHint": "Erst den Start, dann das Ende antippen.",
+  "tourPointsFromTrack": "Start und Ende folgen dem Track.",
+  "historyCreated": "Angelegt",
+  "historyUpdated": "Geändert",
+  "historyRestored": "Wiederhergestellt",
+  "historyDeleted": "Gelöscht",
+  "historyRestore": "Diesen Stand wiederherstellen",
+  "historyVersion": "Version {version}",
+  "@historyVersion": {
+    "placeholders": {
+      "version": {
+        "type": "int"
+      }
+    }
+  },
+  "historyUnknownAuthor": "Entfernter Nutzer",
+  "historyRestoreConfirm": "Die Tour wird auf diesen Stand zurückgesetzt. Der Verlauf bleibt erhalten.",
+  "historyChanges": "Änderungen",
+  "historyNoChanges": "Keine Änderungen an den Feldern.",
+  "historyAdded": "hinzugefügt",
+  "historyRemoved": "entfernt",
+  "historyChanged": "geändert",
+  "shareWithUser": "Mit Nutzer teilen",
+  "shareEmailHint": "E-Mail-Adresse des Nutzers",
+  "shareUserNotFound": "Kein Nutzer mit dieser E-Mail-Adresse.",
+  "shareRead": "Lesen",
+  "shareEditPermission": "Bearbeiten",
+  "shareNone": "Mit niemandem geteilt.",
+  "sharePublicLinks": "Öffentliche Links",
+  "shareNewLink": "Neuer Link",
+  "shareLinkHideStart": "Genauen Start verbergen",
+  "shareLinkStripGps": "Fotopositionen ausblenden",
+  "shareLinkHealth": "Gesundheitsdaten zeigen",
+  "shareLinkRevoke": "Widerrufen",
+  "shareLinkRevoked": "widerrufen",
+  "shareLinkExpired": "abgelaufen",
+  "shareLinkCopied": "Link kopiert",
+  "shareLinkHint": "Wer den Link kennt, kann die Tour ohne Anmeldung lesen.",
+  "shareNoLinks": "Kein öffentlicher Link.",
+  "fieldTitle": "Titel",
+  "fieldSummary": "Fazit",
+  "fieldStartTime": "Startzeit",
+  "fieldEndTime": "Endzeit",
+  "fieldDuration": "Dauer",
+  "fieldPackWeight": "Startgewicht",
+  "fieldCaloriesBurned": "Kalorienverbrauch",
+  "fieldGear": "Ausrüstung",
+  "fieldFood": "Essen",
+  "fieldPeaks": "Gipfel",
+  "fieldPartners": "Partner",
+  "fieldWaypoints": "Wegpunkte",
+  "fieldPhotos": "Fotos",
+  "fieldTrack": "Track",
+  "fieldOther": "Weiteres",
+  "errorInvalidGpx": "Die Datei ist keine lesbare GPX-Datei.",
+  "errorOwnerOnly": "Das kann nur der Besitzer der Tour ändern.",
+  "errorPointsFromTrack": "Start und Ende folgen dem Track.",
+  "errorNoSamplePoints": "Die Tour braucht erst Start oder Ende mit einer Zeit."
 }

@@ -11,10 +11,15 @@ import 'features/auth/presentation/auth_form_screen.dart';
 import 'features/auth/presentation/profile_screen.dart';
 import 'features/gear/gear_module.dart';
 import 'features/nutrition/nutrition_module.dart';
+import 'features/protocols/protocols_module.dart';
 import 'l10n/app_localizations.dart';
 
 /// The features built into the app. A feature is added or removed here only.
-final List<FeatureModule> builtInModules = [gearModule, nutritionModule];
+final List<FeatureModule> builtInModules = [
+  protocolsModule,
+  gearModule,
+  nutritionModule,
+];
 
 /// Wires the features into core. Tests pass their own list of modules.
 List<Override> appOverrides({List<FeatureModule>? modules}) => [

@@ -1125,6 +1125,858 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Im Katalog gibt es schon ein Produkt mit diesem Barcode.'**
   String get errorBarcodeInCatalog;
+
+  /// No description provided for @toursTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Touren'**
+  String get toursTitle;
+
+  /// No description provided for @toursMine.
+  ///
+  /// In de, this message translates to:
+  /// **'Meine'**
+  String get toursMine;
+
+  /// No description provided for @toursShared.
+  ///
+  /// In de, this message translates to:
+  /// **'Mit mir geteilt'**
+  String get toursShared;
+
+  /// No description provided for @toursEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch keine Tour.'**
+  String get toursEmpty;
+
+  /// No description provided for @toursSharedEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Mit dir wurde noch keine Tour geteilt.'**
+  String get toursSharedEmpty;
+
+  /// No description provided for @tourNew.
+  ///
+  /// In de, this message translates to:
+  /// **'Neue Tour'**
+  String get tourNew;
+
+  /// No description provided for @tourEdit.
+  ///
+  /// In de, this message translates to:
+  /// **'Tour bearbeiten'**
+  String get tourEdit;
+
+  /// No description provided for @tourSearchHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Titel oder Fazit'**
+  String get tourSearchHint;
+
+  /// No description provided for @tourTitleField.
+  ///
+  /// In de, this message translates to:
+  /// **'Titel'**
+  String get tourTitleField;
+
+  /// No description provided for @tourSummary.
+  ///
+  /// In de, this message translates to:
+  /// **'Fazit'**
+  String get tourSummary;
+
+  /// No description provided for @tourSharedBy.
+  ///
+  /// In de, this message translates to:
+  /// **'von {name}'**
+  String tourSharedBy(String name);
+
+  /// No description provided for @tourStart.
+  ///
+  /// In de, this message translates to:
+  /// **'Start'**
+  String get tourStart;
+
+  /// No description provided for @tourEnd.
+  ///
+  /// In de, this message translates to:
+  /// **'Ende'**
+  String get tourEnd;
+
+  /// No description provided for @tourDuration.
+  ///
+  /// In de, this message translates to:
+  /// **'Dauer'**
+  String get tourDuration;
+
+  /// No description provided for @tourDurationMinutes.
+  ///
+  /// In de, this message translates to:
+  /// **'Dauer (Minuten)'**
+  String get tourDurationMinutes;
+
+  /// No description provided for @tourDurationHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Leer = aus Start und Ende berechnet'**
+  String get tourDurationHint;
+
+  /// No description provided for @tourPackWeight.
+  ///
+  /// In de, this message translates to:
+  /// **'Startgewicht'**
+  String get tourPackWeight;
+
+  /// No description provided for @tourPackWeightField.
+  ///
+  /// In de, this message translates to:
+  /// **'Startgewicht (g)'**
+  String get tourPackWeightField;
+
+  /// No description provided for @tourPackWeightHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Leer = aus Ausrüstung und Essen berechnet'**
+  String get tourPackWeightHint;
+
+  /// No description provided for @tourCaloriesBurned.
+  ///
+  /// In de, this message translates to:
+  /// **'Verbrauch'**
+  String get tourCaloriesBurned;
+
+  /// No description provided for @tourCaloriesBurnedField.
+  ///
+  /// In de, this message translates to:
+  /// **'Kalorienverbrauch (kcal)'**
+  String get tourCaloriesBurnedField;
+
+  /// No description provided for @tourCaloriesBurnedHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Leer = Schätzung'**
+  String get tourCaloriesBurnedHint;
+
+  /// No description provided for @tourCaloriesEaten.
+  ///
+  /// In de, this message translates to:
+  /// **'Gegessen'**
+  String get tourCaloriesEaten;
+
+  /// No description provided for @tourEstimated.
+  ///
+  /// In de, this message translates to:
+  /// **'geschätzt'**
+  String get tourEstimated;
+
+  /// No description provided for @tourKcal.
+  ///
+  /// In de, this message translates to:
+  /// **'{value} kcal'**
+  String tourKcal(String value);
+
+  /// No description provided for @tourEstimateHeartRate.
+  ///
+  /// In de, this message translates to:
+  /// **'Schätzung aus Herzfrequenz, Gewicht und Alter (Keytel et al. 2005).'**
+  String get tourEstimateHeartRate;
+
+  /// No description provided for @tourEstimateWalking.
+  ///
+  /// In de, this message translates to:
+  /// **'Schätzung aus Distanz, Höhenmetern, Dauer und Körper- plus Rucksackgewicht (ACSM-Gehformel). Der Abstieg zählt dabei nicht.'**
+  String get tourEstimateWalking;
+
+  /// No description provided for @tourNoEstimateProfile.
+  ///
+  /// In de, this message translates to:
+  /// **'Für eine Schätzung fehlt das Gewicht im Profil.'**
+  String get tourNoEstimateProfile;
+
+  /// No description provided for @tourNoEstimateTrack.
+  ///
+  /// In de, this message translates to:
+  /// **'Für eine Schätzung fehlt ein Track.'**
+  String get tourNoEstimateTrack;
+
+  /// No description provided for @tourNoEstimateDuration.
+  ///
+  /// In de, this message translates to:
+  /// **'Für eine Schätzung fehlt die Dauer.'**
+  String get tourNoEstimateDuration;
+
+  /// No description provided for @tourOwnerOnly.
+  ///
+  /// In de, this message translates to:
+  /// **'Zeiten und Zahlenwerte kann nur der Besitzer der Tour ändern.'**
+  String get tourOwnerOnly;
+
+  /// No description provided for @tourFacts.
+  ///
+  /// In de, this message translates to:
+  /// **'Eckdaten'**
+  String get tourFacts;
+
+  /// No description provided for @tourTrack.
+  ///
+  /// In de, this message translates to:
+  /// **'Track'**
+  String get tourTrack;
+
+  /// No description provided for @tourDistance.
+  ///
+  /// In de, this message translates to:
+  /// **'Distanz'**
+  String get tourDistance;
+
+  /// No description provided for @tourAscent.
+  ///
+  /// In de, this message translates to:
+  /// **'Aufstieg'**
+  String get tourAscent;
+
+  /// No description provided for @tourDescent.
+  ///
+  /// In de, this message translates to:
+  /// **'Abstieg'**
+  String get tourDescent;
+
+  /// No description provided for @tourHighest.
+  ///
+  /// In de, this message translates to:
+  /// **'Höchster Punkt'**
+  String get tourHighest;
+
+  /// No description provided for @tourMovingTime.
+  ///
+  /// In de, this message translates to:
+  /// **'In Bewegung'**
+  String get tourMovingTime;
+
+  /// No description provided for @tourHeartRate.
+  ///
+  /// In de, this message translates to:
+  /// **'Herzfrequenz'**
+  String get tourHeartRate;
+
+  /// No description provided for @tourHeartRateValue.
+  ///
+  /// In de, this message translates to:
+  /// **'Ø {avg} · max. {max}'**
+  String tourHeartRateValue(String avg, String max);
+
+  /// No description provided for @tourNoTrack.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch kein Track.'**
+  String get tourNoTrack;
+
+  /// No description provided for @tourGear.
+  ///
+  /// In de, this message translates to:
+  /// **'Ausrüstung'**
+  String get tourGear;
+
+  /// No description provided for @tourFood.
+  ///
+  /// In de, this message translates to:
+  /// **'Essen'**
+  String get tourFood;
+
+  /// No description provided for @tourPeaks.
+  ///
+  /// In de, this message translates to:
+  /// **'Gipfel'**
+  String get tourPeaks;
+
+  /// No description provided for @tourPartners.
+  ///
+  /// In de, this message translates to:
+  /// **'Partner'**
+  String get tourPartners;
+
+  /// No description provided for @tourWeather.
+  ///
+  /// In de, this message translates to:
+  /// **'Wetter'**
+  String get tourWeather;
+
+  /// No description provided for @tourPhotos.
+  ///
+  /// In de, this message translates to:
+  /// **'Fotos'**
+  String get tourPhotos;
+
+  /// No description provided for @tourNothing.
+  ///
+  /// In de, this message translates to:
+  /// **'Nichts eingetragen.'**
+  String get tourNothing;
+
+  /// No description provided for @tourCarried.
+  ///
+  /// In de, this message translates to:
+  /// **'Mitgenommen'**
+  String get tourCarried;
+
+  /// No description provided for @tourEaten.
+  ///
+  /// In de, this message translates to:
+  /// **'Gegessen'**
+  String get tourEaten;
+
+  /// No description provided for @tourAmountG.
+  ///
+  /// In de, this message translates to:
+  /// **'Menge (g)'**
+  String get tourAmountG;
+
+  /// No description provided for @tourAddGear.
+  ///
+  /// In de, this message translates to:
+  /// **'Ausrüstung hinzufügen'**
+  String get tourAddGear;
+
+  /// No description provided for @tourAddFood.
+  ///
+  /// In de, this message translates to:
+  /// **'Essen hinzufügen'**
+  String get tourAddFood;
+
+  /// No description provided for @tourAddPeak.
+  ///
+  /// In de, this message translates to:
+  /// **'Gipfel hinzufügen'**
+  String get tourAddPeak;
+
+  /// No description provided for @tourAddPartner.
+  ///
+  /// In de, this message translates to:
+  /// **'Partner hinzufügen'**
+  String get tourAddPartner;
+
+  /// No description provided for @tourPeakName.
+  ///
+  /// In de, this message translates to:
+  /// **'Name des Gipfels'**
+  String get tourPeakName;
+
+  /// No description provided for @tourPeakElevation.
+  ///
+  /// In de, this message translates to:
+  /// **'Höhe (m)'**
+  String get tourPeakElevation;
+
+  /// No description provided for @tourNewContact.
+  ///
+  /// In de, this message translates to:
+  /// **'Neuer Kontakt'**
+  String get tourNewContact;
+
+  /// No description provided for @tourWeatherOutdated.
+  ///
+  /// In de, this message translates to:
+  /// **'Punkte oder Zeiten haben sich geändert.'**
+  String get tourWeatherOutdated;
+
+  /// No description provided for @tourWeatherRefresh.
+  ///
+  /// In de, this message translates to:
+  /// **'Wetter neu abrufen'**
+  String get tourWeatherRefresh;
+
+  /// No description provided for @tourWeatherNone.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch kein Wetter. Dafür braucht die Tour Start oder Ende und eine Zeit.'**
+  String get tourWeatherNone;
+
+  /// No description provided for @weatherStart.
+  ///
+  /// In de, this message translates to:
+  /// **'Start'**
+  String get weatherStart;
+
+  /// No description provided for @weatherSummit.
+  ///
+  /// In de, this message translates to:
+  /// **'Gipfel'**
+  String get weatherSummit;
+
+  /// No description provided for @weatherEnd.
+  ///
+  /// In de, this message translates to:
+  /// **'Ende'**
+  String get weatherEnd;
+
+  /// No description provided for @weatherManual.
+  ///
+  /// In de, this message translates to:
+  /// **'Eigener Punkt'**
+  String get weatherManual;
+
+  /// No description provided for @weatherLine.
+  ///
+  /// In de, this message translates to:
+  /// **'{temp} °C · Wind {wind} km/h · {clouds} % Wolken'**
+  String weatherLine(String temp, String wind, String clouds);
+
+  /// No description provided for @tourHistory.
+  ///
+  /// In de, this message translates to:
+  /// **'Verlauf'**
+  String get tourHistory;
+
+  /// No description provided for @tourShare.
+  ///
+  /// In de, this message translates to:
+  /// **'Teilen'**
+  String get tourShare;
+
+  /// No description provided for @tourUploadGpx.
+  ///
+  /// In de, this message translates to:
+  /// **'GPX hochladen'**
+  String get tourUploadGpx;
+
+  /// No description provided for @tourDrawTrack.
+  ///
+  /// In de, this message translates to:
+  /// **'Track zeichnen'**
+  String get tourDrawTrack;
+
+  /// No description provided for @tourRemoveTrack.
+  ///
+  /// In de, this message translates to:
+  /// **'Track entfernen'**
+  String get tourRemoveTrack;
+
+  /// No description provided for @tourSetPoints.
+  ///
+  /// In de, this message translates to:
+  /// **'Start und Ende setzen'**
+  String get tourSetPoints;
+
+  /// No description provided for @tourAddPhotos.
+  ///
+  /// In de, this message translates to:
+  /// **'Fotos hinzufügen'**
+  String get tourAddPhotos;
+
+  /// No description provided for @tourWaypointsFromPhotos.
+  ///
+  /// In de, this message translates to:
+  /// **'Wegpunkte aus Fotos'**
+  String get tourWaypointsFromPhotos;
+
+  /// No description provided for @tourWaypointsCreated.
+  ///
+  /// In de, this message translates to:
+  /// **'{count, plural, =0{Keine neuen Wegpunkte} =1{1 Wegpunkt angelegt} other{{count} Wegpunkte angelegt}}'**
+  String tourWaypointsCreated(int count);
+
+  /// No description provided for @tourPhotoOffset.
+  ///
+  /// In de, this message translates to:
+  /// **'Zeitversatz der Kamera'**
+  String get tourPhotoOffset;
+
+  /// No description provided for @tourPhotoOffsetField.
+  ///
+  /// In de, this message translates to:
+  /// **'Versatz in Minuten'**
+  String get tourPhotoOffsetField;
+
+  /// No description provided for @tourPhotoOffsetHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Kameras speichern oft die Ortszeit ohne Zeitzone. Für Sommerzeit in Mitteleuropa: −120.'**
+  String get tourPhotoOffsetHint;
+
+  /// No description provided for @tourPhotoCaption.
+  ///
+  /// In de, this message translates to:
+  /// **'Beschriftung'**
+  String get tourPhotoCaption;
+
+  /// No description provided for @tourPhotoCover.
+  ///
+  /// In de, this message translates to:
+  /// **'Als Titelbild'**
+  String get tourPhotoCover;
+
+  /// No description provided for @tourPhotoIsCover.
+  ///
+  /// In de, this message translates to:
+  /// **'Titelbild'**
+  String get tourPhotoIsCover;
+
+  /// No description provided for @tourPhotoNoPosition.
+  ///
+  /// In de, this message translates to:
+  /// **'Ohne Position'**
+  String get tourPhotoNoPosition;
+
+  /// No description provided for @tourPhotoShowOnMap.
+  ///
+  /// In de, this message translates to:
+  /// **'Auf Karte zeigen'**
+  String get tourPhotoShowOnMap;
+
+  /// No description provided for @tourConflictTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Tour wurde inzwischen geändert'**
+  String get tourConflictTitle;
+
+  /// No description provided for @tourConflictBody.
+  ///
+  /// In de, this message translates to:
+  /// **'Deine Änderungen wurden mit dem neuen Stand zusammengeführt. Bei diesen Feldern haben beide etwas geändert – welcher Stand soll gelten?'**
+  String get tourConflictBody;
+
+  /// No description provided for @tourConflictMine.
+  ///
+  /// In de, this message translates to:
+  /// **'Meine Änderung'**
+  String get tourConflictMine;
+
+  /// No description provided for @tourConflictTheirs.
+  ///
+  /// In de, this message translates to:
+  /// **'Neuer Stand'**
+  String get tourConflictTheirs;
+
+  /// No description provided for @tourConflictMerged.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Tour wurde inzwischen geändert. Deine Änderungen wurden zusammengeführt.'**
+  String get tourConflictMerged;
+
+  /// No description provided for @tourDrawHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Auf die Karte tippen, um Punkte zu setzen.'**
+  String get tourDrawHint;
+
+  /// No description provided for @tourDrawUndo.
+  ///
+  /// In de, this message translates to:
+  /// **'Letzten Punkt entfernen'**
+  String get tourDrawUndo;
+
+  /// No description provided for @tourDrawPoints.
+  ///
+  /// In de, this message translates to:
+  /// **'{count} Punkte'**
+  String tourDrawPoints(int count);
+
+  /// No description provided for @tourPointsHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Erst den Start, dann das Ende antippen.'**
+  String get tourPointsHint;
+
+  /// No description provided for @tourPointsFromTrack.
+  ///
+  /// In de, this message translates to:
+  /// **'Start und Ende folgen dem Track.'**
+  String get tourPointsFromTrack;
+
+  /// No description provided for @historyCreated.
+  ///
+  /// In de, this message translates to:
+  /// **'Angelegt'**
+  String get historyCreated;
+
+  /// No description provided for @historyUpdated.
+  ///
+  /// In de, this message translates to:
+  /// **'Geändert'**
+  String get historyUpdated;
+
+  /// No description provided for @historyRestored.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiederhergestellt'**
+  String get historyRestored;
+
+  /// No description provided for @historyDeleted.
+  ///
+  /// In de, this message translates to:
+  /// **'Gelöscht'**
+  String get historyDeleted;
+
+  /// No description provided for @historyRestore.
+  ///
+  /// In de, this message translates to:
+  /// **'Diesen Stand wiederherstellen'**
+  String get historyRestore;
+
+  /// No description provided for @historyVersion.
+  ///
+  /// In de, this message translates to:
+  /// **'Version {version}'**
+  String historyVersion(int version);
+
+  /// No description provided for @historyUnknownAuthor.
+  ///
+  /// In de, this message translates to:
+  /// **'Entfernter Nutzer'**
+  String get historyUnknownAuthor;
+
+  /// No description provided for @historyRestoreConfirm.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Tour wird auf diesen Stand zurückgesetzt. Der Verlauf bleibt erhalten.'**
+  String get historyRestoreConfirm;
+
+  /// No description provided for @historyChanges.
+  ///
+  /// In de, this message translates to:
+  /// **'Änderungen'**
+  String get historyChanges;
+
+  /// No description provided for @historyNoChanges.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Änderungen an den Feldern.'**
+  String get historyNoChanges;
+
+  /// No description provided for @historyAdded.
+  ///
+  /// In de, this message translates to:
+  /// **'hinzugefügt'**
+  String get historyAdded;
+
+  /// No description provided for @historyRemoved.
+  ///
+  /// In de, this message translates to:
+  /// **'entfernt'**
+  String get historyRemoved;
+
+  /// No description provided for @historyChanged.
+  ///
+  /// In de, this message translates to:
+  /// **'geändert'**
+  String get historyChanged;
+
+  /// No description provided for @shareWithUser.
+  ///
+  /// In de, this message translates to:
+  /// **'Mit Nutzer teilen'**
+  String get shareWithUser;
+
+  /// No description provided for @shareEmailHint.
+  ///
+  /// In de, this message translates to:
+  /// **'E-Mail-Adresse des Nutzers'**
+  String get shareEmailHint;
+
+  /// No description provided for @shareUserNotFound.
+  ///
+  /// In de, this message translates to:
+  /// **'Kein Nutzer mit dieser E-Mail-Adresse.'**
+  String get shareUserNotFound;
+
+  /// No description provided for @shareRead.
+  ///
+  /// In de, this message translates to:
+  /// **'Lesen'**
+  String get shareRead;
+
+  /// No description provided for @shareEditPermission.
+  ///
+  /// In de, this message translates to:
+  /// **'Bearbeiten'**
+  String get shareEditPermission;
+
+  /// No description provided for @shareNone.
+  ///
+  /// In de, this message translates to:
+  /// **'Mit niemandem geteilt.'**
+  String get shareNone;
+
+  /// No description provided for @sharePublicLinks.
+  ///
+  /// In de, this message translates to:
+  /// **'Öffentliche Links'**
+  String get sharePublicLinks;
+
+  /// No description provided for @shareNewLink.
+  ///
+  /// In de, this message translates to:
+  /// **'Neuer Link'**
+  String get shareNewLink;
+
+  /// No description provided for @shareLinkHideStart.
+  ///
+  /// In de, this message translates to:
+  /// **'Genauen Start verbergen'**
+  String get shareLinkHideStart;
+
+  /// No description provided for @shareLinkStripGps.
+  ///
+  /// In de, this message translates to:
+  /// **'Fotopositionen ausblenden'**
+  String get shareLinkStripGps;
+
+  /// No description provided for @shareLinkHealth.
+  ///
+  /// In de, this message translates to:
+  /// **'Gesundheitsdaten zeigen'**
+  String get shareLinkHealth;
+
+  /// No description provided for @shareLinkRevoke.
+  ///
+  /// In de, this message translates to:
+  /// **'Widerrufen'**
+  String get shareLinkRevoke;
+
+  /// No description provided for @shareLinkRevoked.
+  ///
+  /// In de, this message translates to:
+  /// **'widerrufen'**
+  String get shareLinkRevoked;
+
+  /// No description provided for @shareLinkExpired.
+  ///
+  /// In de, this message translates to:
+  /// **'abgelaufen'**
+  String get shareLinkExpired;
+
+  /// No description provided for @shareLinkCopied.
+  ///
+  /// In de, this message translates to:
+  /// **'Link kopiert'**
+  String get shareLinkCopied;
+
+  /// No description provided for @shareLinkHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Wer den Link kennt, kann die Tour ohne Anmeldung lesen.'**
+  String get shareLinkHint;
+
+  /// No description provided for @shareNoLinks.
+  ///
+  /// In de, this message translates to:
+  /// **'Kein öffentlicher Link.'**
+  String get shareNoLinks;
+
+  /// No description provided for @fieldTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Titel'**
+  String get fieldTitle;
+
+  /// No description provided for @fieldSummary.
+  ///
+  /// In de, this message translates to:
+  /// **'Fazit'**
+  String get fieldSummary;
+
+  /// No description provided for @fieldStartTime.
+  ///
+  /// In de, this message translates to:
+  /// **'Startzeit'**
+  String get fieldStartTime;
+
+  /// No description provided for @fieldEndTime.
+  ///
+  /// In de, this message translates to:
+  /// **'Endzeit'**
+  String get fieldEndTime;
+
+  /// No description provided for @fieldDuration.
+  ///
+  /// In de, this message translates to:
+  /// **'Dauer'**
+  String get fieldDuration;
+
+  /// No description provided for @fieldPackWeight.
+  ///
+  /// In de, this message translates to:
+  /// **'Startgewicht'**
+  String get fieldPackWeight;
+
+  /// No description provided for @fieldCaloriesBurned.
+  ///
+  /// In de, this message translates to:
+  /// **'Kalorienverbrauch'**
+  String get fieldCaloriesBurned;
+
+  /// No description provided for @fieldGear.
+  ///
+  /// In de, this message translates to:
+  /// **'Ausrüstung'**
+  String get fieldGear;
+
+  /// No description provided for @fieldFood.
+  ///
+  /// In de, this message translates to:
+  /// **'Essen'**
+  String get fieldFood;
+
+  /// No description provided for @fieldPeaks.
+  ///
+  /// In de, this message translates to:
+  /// **'Gipfel'**
+  String get fieldPeaks;
+
+  /// No description provided for @fieldPartners.
+  ///
+  /// In de, this message translates to:
+  /// **'Partner'**
+  String get fieldPartners;
+
+  /// No description provided for @fieldWaypoints.
+  ///
+  /// In de, this message translates to:
+  /// **'Wegpunkte'**
+  String get fieldWaypoints;
+
+  /// No description provided for @fieldPhotos.
+  ///
+  /// In de, this message translates to:
+  /// **'Fotos'**
+  String get fieldPhotos;
+
+  /// No description provided for @fieldTrack.
+  ///
+  /// In de, this message translates to:
+  /// **'Track'**
+  String get fieldTrack;
+
+  /// No description provided for @fieldOther.
+  ///
+  /// In de, this message translates to:
+  /// **'Weiteres'**
+  String get fieldOther;
+
+  /// No description provided for @errorInvalidGpx.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Datei ist keine lesbare GPX-Datei.'**
+  String get errorInvalidGpx;
+
+  /// No description provided for @errorOwnerOnly.
+  ///
+  /// In de, this message translates to:
+  /// **'Das kann nur der Besitzer der Tour ändern.'**
+  String get errorOwnerOnly;
+
+  /// No description provided for @errorPointsFromTrack.
+  ///
+  /// In de, this message translates to:
+  /// **'Start und Ende folgen dem Track.'**
+  String get errorPointsFromTrack;
+
+  /// No description provided for @errorNoSamplePoints.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Tour braucht erst Start oder Ende mit einer Zeit.'**
+  String get errorNoSamplePoints;
 }
 
 class _AppLocalizationsDelegate
