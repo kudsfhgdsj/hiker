@@ -113,7 +113,12 @@ def test_app_loads_modules_from_settings(client):
     response = client.get("/api/v1/modules")
 
     assert response.status_code == 200
-    assert [module["name"] for module in response.json()] == ["auth", "gear", "nutrition"]
+    assert [module["name"] for module in response.json()] == [
+        "auth",
+        "gear",
+        "nutrition",
+        "protocols",
+    ]
 
 
 def test_app_without_modules_has_no_auth_routes(monkeypatch):

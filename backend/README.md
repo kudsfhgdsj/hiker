@@ -82,6 +82,9 @@ ergänzen, dann
   --depends-on auth_0001
 ```
 
+Bei `--depends-on` nur die direkten Abhängigkeiten nennen (z. B. `gear_0001`, nicht zusätzlich
+`auth_0001`, von dem `gear_0001` schon abhängt); doppelte Angaben bringen Alembic durcheinander.
+
 Core-Tabellen (`file_object`) liegen im Zweig `core` unter `migrations/versions/`.
 Das Datenbankschema umfasst alle installierten Module, unabhängig von `ENABLED_MODULES`.
 

@@ -30,6 +30,14 @@ def get_user_by_email(db: Session, email: str) -> User | None:
     return db.scalar(select(User).where(User.email == email.strip().lower()))
 
 
+def get_display_names(db: Session, user_ids) -> dict:
+    """Display names by user id, for other modules that show who owns or wrote something."""
+    ids = set(user_ids)
+    if not ids:
+        return {}
+    return dict(db.execute(select(User.id, User.display_name).where(User.id.in_(ids))).all())
+
+
 def register_user(db: Session, *, email: str, display_name: str, password: str) -> User:
     if get_settings().registration_mode != "open":
         raise ForbiddenError("Registration is closed", code="registration_closed")

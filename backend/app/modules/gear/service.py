@@ -96,6 +96,17 @@ def _check_type_is_usable(db: Session, user: User, type_id: uuid.UUID | None) ->
         raise UnprocessableError("Unknown gear type", code="unknown_type")
 
 
+# --- Public interface for other modules ---
+
+
+def get_item_for_user(db: Session, user: User, item_id: uuid.UUID) -> GearItem | None:
+    """A gear item the user may use (their own, not deleted), otherwise None."""
+    item = db.get(GearItem, item_id)
+    if item is None or item.owner_id != user.id or item.deleted_at is not None:
+        return None
+    return item
+
+
 # --- Tags ---
 
 

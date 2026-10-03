@@ -38,6 +38,9 @@ Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen k
 | Migrationen | Je Modul ein eigener Alembic-Zweig in `modules/<name>/migrations` | `alembic upgrade heads`; Schema umfasst alle installierten Module |
 | Ausrüstungskategorien | Standardliste für alle (nur `admin` ändert sie) plus eigene Kategorien je Nutzer | Katalogeinträge verwenden nur Standardkategorien |
 | Bilder | Upload JPEG/PNG/WebP, serverseitig als JPEG ohne Metadaten neu kodiert, längste Kante begrenzt | Abhängigkeit Pillow; Auslieferung nur über Endpunkte mit Rechteprüfung |
+| `edit`-Grenze in Touren | `edit` ändert Titel, Fazit, Listen, Wegpunkte (und Fotos); Zeiten, Dauer, Startgewicht und Kalorienverbrauch ändert nur der Owner | Geänderte Owner-Felder von `edit` → 403 `owner_only_field` |
+| Einträge in geteilten Touren | Jeder trägt Ausrüstung aus der eigenen Datenbank ein (Essen: eigenes oder Katalog); die Tour speichert Name, Gewicht und Kalorien als Momentaufnahme | Alle mit Zugriff lesen die Einträge, ohne die Datenbank der anderen zu sehen |
+| Essen in Touren | `carried` (zählt ins Startgewicht) und `eaten` (zählt in die Kalorien) statt eines Felds `planned` | Auch Heimgetragenes und unterwegs Gekauftes erfassbar |
 | Fehlerformat | `{"error": {"code", "message"}}` für fachliche Fehler | Client übersetzt anhand von `code` |
 
 ## 3. Technologie-Stack
@@ -191,18 +194,21 @@ Open-Food-Facts-Einträge werden nach `OPENFOODFACTS_CACHE_DAYS` (Standard 30) b
 - start_point, end_point (lat, lon, optional Name), `points_source` (`gpx` | `manual`)
 - pack_weight_start_g (aus Ausrüstung berechnet, überschreibbar)
 - calories_burned, `calories_burned_source` (`manual` | `estimated`), calories_eaten (aus Einträgen)
+- Überschreibbare Werte: Die Felder `duration_minutes` und `pack_weight_start_g` enthalten nur den manuellen Wert (leer = nicht überschrieben). Die berechneten Werte liefert die API getrennt im Block `computed` (`duration_minutes`, `pack_weight_start_g`, `calories_eaten`); so kann der Client die Tour unverändert zurückschicken, ohne berechnete Werte zu manuellen zu machen.
 - gpx_file_id, `track_source` (`device` | `drawn` | `none`), track_stats (JSON)
 - cover_photo_id
 - version (Revisionszähler, Konflikterkennung)
 
-**tour_gear**: tour_id, gear_item_id, quantity, weight_g_snapshot, carried
-**tour_food_entry**: tour_id, food_item_id, amount_g, kcal_snapshot, eaten_at (optional), planned
+**tour_gear**: id, tour_id, gear_item_id (bleibt leer, wenn der Gegenstand endgültig entfernt wird), added_by, name_snapshot, brand_snapshot, weight_g_snapshot, quantity, carried (zählt ins Startgewicht); je Tour jeder Gegenstand höchstens einmal
+**tour_food_entry**: id, tour_id, food_item_id, added_by, name_snapshot, kcal_per_100g_snapshot, amount_g, kcal_snapshot (aus Menge und Momentaufnahme), carried, eaten, eaten_at (optional), sort_order
+
+Momentaufnahmen entstehen beim Hinzufügen und ändern sich nicht, wenn Gegenstand oder Lebensmittel später geändert oder gelöscht werden. Startgewicht (berechnet) = mitgeführte Ausrüstung × Stückzahl + mitgeführtes Essen; gegessene Kalorien = Summe der Einträge mit `eaten`.
 **contact**: id, owner_id, display_name, linked_user_id (leer = Platzhalter)
 **tour_partner**: tour_id, contact_id
 
 Platzhalter → echter User: `contact.linked_user_id` setzen; gilt sofort in allen Touren des Owners.
 
-**tour_peak**: tour_id, name, elevation_m, lat, lon, reached_at
+**tour_peak**: id, tour_id, name, elevation_m, lat, lon, reached_at, sort_order
 
 **tour_waypoint** (wie bei wanderer): id, tour_id, name, description, icon, lat, lon, track_distance_m, elevation_m
 **tour_photo**: id, tour_id, file_id, caption, taken_at, lat, lon, `position_source` (`exif_gps` | `exif_time` | `manual` | `none`), track_distance_m (Position entlang des Tracks), elevation_m, waypoint_id (optional), sort_order
@@ -287,8 +293,8 @@ Versioniertes Schema (`schema_version`): Tour, Ausrüstung (Snapshots), Essen, P
 ### Protokolle
 | Methode | Pfad | Zweck |
 |---|---|---|
-| GET, POST | /tours | Eigene + geteilte listen (Filter, Suche, Paging) / erstellen |
-| GET, PUT, DELETE | /tours/{id} | Lesen, Editieren, Löschen (nur Owner) |
+| GET, POST | /tours | Eigene + geteilte listen (`scope` = `all`/`mine`/`shared`, `q`, `start_from`, `start_to`, Paging) / erstellen |
+| GET, PUT, DELETE | /tours/{id} | Lesen, Editieren, Löschen (nur Owner, Soft Delete) |
 | GET | /tours/{id}/revisions, /revisions/{rev} | Historie |
 | POST | /tours/{id}/revisions/{rev}/restore | Wiederherstellen |
 | POST | /tours/{id}/shares | Teilen (`read`/`edit`) |
@@ -344,7 +350,9 @@ Listen mit Paging antworten mit `{items, total, limit, offset}`. Beim Anlegen da
 | GET | /nutrition/catalog/pending | Offene Vorschläge (admin) |
 | PATCH | /nutrition/catalog/{id} | Freigeben, ablehnen, Daten korrigieren (admin) |
 
-Berechtigungen werden zentral in einer Dependency geprüft, nicht in jedem Endpunkt.
+`PUT /tours/{id}` ersetzt das Tourdokument samt den Listen `gear`, `food` und `peaks`; Einträge werden über ihre `id` wiedererkannt, fehlende Einträge entfernt. Wegpunkte haben eigene Endpunkte (`PATCH`/`DELETE` unter `/tours/{id}/waypoints/{waypoint_id}`). Jede Änderung erhöht `tour.version`.
+
+Berechtigungen werden zentral in einer Dependency geprüft, nicht in jedem Endpunkt (`protocols/sharing.py`: `ReadableTour`, `EditableTour`, `OwnedTour`). Ohne Zugriff antwortet die API mit 404, bei zu geringem Recht mit 403. Die Admin-Rolle gibt keinen Zugriff auf fremde Touren.
 
 ## 9. UI-Grundlage
 

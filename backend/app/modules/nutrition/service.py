@@ -74,6 +74,16 @@ def _page(db: Session, conditions: list, order_by: tuple, limit: int, offset: in
 _BY_NAME = (func.lower(FoodItem.name), FoodItem.id)
 
 
+# --- Public interface for other modules ---
+
+
+def get_food_for_user(db: Session, user: User, food_id: uuid.UUID) -> FoodItem | None:
+    """A food the user may use (their own or one from the catalog), otherwise None."""
+    return db.scalar(
+        select(FoodItem).where(FoodItem.id == food_id, or_(_is_own(user), _in_catalog()))
+    )
+
+
 # --- Own foods ---
 
 
