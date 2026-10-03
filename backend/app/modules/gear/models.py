@@ -1,8 +1,7 @@
 import uuid
 from datetime import date, datetime
-from decimal import Decimal
 
-from sqlalchemy import Date, ForeignKey, Integer, Numeric, String, Text, Uuid
+from sqlalchemy import Date, Float, ForeignKey, Integer, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base, TimestampMixin, UTCDateTime, utcnow
@@ -71,7 +70,7 @@ class GearItem(TimestampMixin, Base):
     brand: Mapped[str | None] = mapped_column(String(100))
     weight_g: Mapped[int | None] = mapped_column(Integer)
     purchase_date: Mapped[date | None] = mapped_column(Date)
-    purchase_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    purchase_price: Mapped[float | None] = mapped_column(Float)
     currency: Mapped[str | None] = mapped_column(String(3))
     description: Mapped[str | None] = mapped_column(Text)
     notes: Mapped[str | None] = mapped_column(Text)

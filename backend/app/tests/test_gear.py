@@ -18,7 +18,7 @@ FULL_ITEM = {
     "brand": "Rab",
     "weight_g": 890,
     "purchase_date": "2025-05-17",
-    "purchase_price": "149.90",
+    "purchase_price": 149.9,
     "currency": "CHF",
     "description": "Tagesrucksack",
     "notes": "Hüftgurt links repariert",
@@ -128,8 +128,12 @@ def test_blank_optional_fields_become_null(client, anna):
     [
         {"name": "  "},
         {"weight_g": -1},
-        {"purchase_price": "-5"},
-        {"purchase_price": "1.999"},
+        {"purchase_price": -5, "currency": "CHF"},
+        {"purchase_price": 1.999, "currency": "CHF"},
+        {"purchase_price": 1_000_000.01, "currency": "CHF"},
+        {"purchase_price": "abc", "currency": "CHF"},
+        {"purchase_price": "NaN", "currency": "CHF"},
+        {"purchase_price": 20},
         {"currency": "chf"},
         {"status": "lost"},
         {"website_url": "javascript:alert(1)"},
@@ -140,6 +144,14 @@ def test_item_validates_input(client, anna, fields):
     response = client.post(ITEMS, json={"name": "Stirnlampe", **fields}, headers=anna)
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize(("price", "stored"), [(0, 0.0), (19.99, 19.99), ("249.5", 249.5)])
+def test_price_is_stored_as_number(client, anna, price, stored):
+    created = create_item(client, anna, purchase_price=price, currency="EUR")
+
+    assert created["purchase_price"] == stored
+    assert isinstance(created["purchase_price"], float)
 
 
 def test_update_replaces_all_fields(client, anna):
@@ -504,7 +516,7 @@ def test_proposal_shares_product_data_only(client, admin, anna):
         "status": "pending",
     }
     assert not PERSONAL_FIELDS & set(entry)
-    for secret in ("149.90", "SN-123", "Hüftgurt", "Tagesrucksack"):
+    for secret in ("149.9", "SN-123", "Hüftgurt", "Tagesrucksack"):
         assert secret not in response.text
     assert client.get(f"{ITEMS}/{item['id']}", headers=anna).json()["catalog_id"] == entry["id"]
 

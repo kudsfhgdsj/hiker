@@ -1,9 +1,16 @@
 import uuid
 from datetime import date, datetime
-from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 
 
 def _blank_to_none(value):
@@ -26,6 +33,22 @@ WebsiteUrl = Annotated[
     BeforeValidator(_blank_to_none),
 ]
 WeightG = Annotated[Annotated[int, Field(ge=0, le=1_000_000)] | None, Field()]
+
+
+MAX_PRICE = 1_000_000
+
+
+def _check_price(value: float) -> float:
+    if abs(value * 100 - round(value * 100)) > 1e-6:
+        raise ValueError("price must not have more than two decimal places")
+    return round(value, 2)
+
+
+Price = Annotated[
+    Annotated[float, Field(ge=0, le=MAX_PRICE, allow_inf_nan=False), AfterValidator(_check_price)]
+    | None,
+    Field(description="Purchase price as a number with at most two decimal places"),
+]
 
 
 # --- Types ---
@@ -60,8 +83,10 @@ class GearItemIn(BaseModel):
     type_id: uuid.UUID | None = None
     weight_g: WeightG = None
     purchase_date: date | None = None
-    purchase_price: Decimal | None = Field(default=None, ge=0, max_digits=10, decimal_places=2)
-    currency: str | None = Field(default=None, pattern=r"^[A-Z]{3}$", description="ISO 4217")
+    purchase_price: Price = None
+    currency: str | None = Field(
+        default=None, pattern=r"^[A-Z]{3}$", description="ISO 4217; required with a price"
+    )
     description: LongText = None
     notes: LongText = None
     website_url: WebsiteUrl = None
@@ -69,6 +94,12 @@ class GearItemIn(BaseModel):
     serial_number: _optional_text(100) = None
     size: _optional_text(50) = None
     color: _optional_text(50) = None
+
+    @model_validator(mode="after")
+    def _price_needs_currency(self):
+        if self.purchase_price is not None and self.currency is None:
+            raise ValueError("currency is required when purchase_price is set")
+        return self
 
 
 class GearItemCreate(GearItemIn):

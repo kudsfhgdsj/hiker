@@ -33,10 +33,6 @@ include = ["app*"]
 [tool.pytest.ini_options]
 testpaths = ["app/tests"]
 addopts = "-q"
-filterwarnings = [
-    # SQLite stores NUMERIC as float; production uses PostgreSQL.
-    "ignore:Dialect sqlite\\+pysqlite does \\*not\\* support Decimal:sqlalchemy.exc.SAWarning",
-]
 
 [tool.ruff]
 line-length = 100

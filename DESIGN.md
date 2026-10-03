@@ -149,7 +149,7 @@ Alle IDs sind UUIDs und clientseitig erzeugbar. Hauptdaten haben `created_at`, `
 **gear_item** (persönliche Gegenstände)
 - id, owner_id, catalog_id (optional, Verweis auf Katalog)
 - name, brand, type_id (Verweis auf `gear_type`), weight_g
-- purchase_date, purchase_price, currency
+- purchase_date, purchase_price (Gleitkommazahl, 0 bis 1 000 000, höchstens zwei Nachkommastellen), currency (ISO 4217, Pflicht sobald ein Preis gesetzt ist)
 - description, notes, website_url, image_file_id
 - status (`active` | `retired`)
 - optional: serial_number, size, color
