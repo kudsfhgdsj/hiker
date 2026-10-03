@@ -339,6 +339,15 @@ Umsetzung:
 **Offline-Sync**
 Lokale Änderungen mit `updated_at`/`deleted_at` und Basis-`version`; Konfliktregel wie bei der Historie. Fotos und GPX laufen über eine getrennte Upload-Warteschlange.
 
+Umsetzung auf dem Server:
+- Eigenes Modul `sync` mit den beiden Endpunkten. Die Sammlungen liefern die Fachmodule: Jedes Modul meldet seine Quellen beim Core an (`core/sync.py`); das `sync`-Modul kennt die Fachmodule nicht und umgekehrt.
+- `GET /sync/changes?since=` liefert je Sammlung `changed` (geänderte Datensätze), `deleted` (IDs gelöschter Datensätze) und `server_time` für den nächsten Abruf. Ohne `since` kommt alles.
+- Sammlungen: `gear_items`, `foods` (eigene Lebensmittel) und `tours` mit Änderungen seit `since`; `gear_types`, `gear_tags` und `gear_lists` sind klein und kommen immer vollständig (`full = true`).
+- Bei `tours` nennt `ids` zusätzlich alle noch sichtbaren Touren: Wird eine Freigabe entfernt, fehlt die Tour dort, und der Client löscht seine Kopie. Geteilte Touren kommen mit denselben Einschränkungen wie sonst (keine Gesundheitsdaten).
+- `POST /sync/push` nimmt bis zu 500 Operationen (`upsert` oder `delete` mit `id`) und wendet sie der Reihe nach über dieselben Dienste an wie die normalen Endpunkte – Rechte, Prüfungen und Historie gelten unverändert. Jede Operation bekommt ein eigenes Ergebnis: `ok` mit dem gespeicherten Datensatz, `conflict` mit dem aktuellen Stand des Servers oder `error` mit Code; ein Fehler hält die übrigen nicht auf.
+- Konflikte: Touren über `base_version` (wie bei `PUT`); Ausrüstung und Lebensmittel über `base_updated_at`. Schreibbar per Push sind `gear_items`, `foods` und `tours`.
+- Fotos und GPX-Dateien gehören nicht zum Push; die App lädt sie aus ihrer eigenen Warteschlange über die normalen Endpunkte hoch.
+
 **Teilen mit Usern**
 - Owner: alles.
 - `edit`: Textfelder (Titel, Fazit, Beschreibungen), Listen (Ausrüstung, Essen, Partner, Gipfel, Wegpunkte) und **Fotos** (hinzufügen, entfernen, Beschriftung, Titelbild, Position).

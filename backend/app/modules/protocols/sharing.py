@@ -69,12 +69,17 @@ def get_tour_access(tour_id: uuid.UUID, user: CurrentUser, db: DbSession) -> Tou
     return TourAccess(tour=tour, user=user, permission=permission)
 
 
+def require_permission(access: TourAccess, minimum: str) -> None:
+    """The one place that decides whether a permission is enough for an action."""
+    if _RANK[access.permission] < _RANK[minimum]:
+        raise ForbiddenError(
+            f"This action needs the '{minimum}' permission", code="insufficient_permission"
+        )
+
+
 def _require(minimum: str):
     def dependency(access: Annotated[TourAccess, Depends(get_tour_access)]) -> TourAccess:
-        if _RANK[access.permission] < _RANK[minimum]:
-            raise ForbiddenError(
-                f"This action needs the '{minimum}' permission", code="insufficient_permission"
-            )
+        require_permission(access, minimum)
         return access
 
     return dependency
