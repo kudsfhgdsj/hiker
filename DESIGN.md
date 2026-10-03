@@ -41,6 +41,10 @@ Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen k
 | `edit`-Grenze in Touren | `edit` ändert Titel, Fazit, Listen, Wegpunkte (und Fotos); Zeiten, Dauer, Startgewicht und Kalorienverbrauch ändert nur der Owner | Geänderte Owner-Felder von `edit` → 403 `owner_only_field` |
 | Einträge in geteilten Touren | Jeder trägt Ausrüstung aus der eigenen Datenbank ein (Essen: eigenes oder Katalog); die Tour speichert Name, Gewicht und Kalorien als Momentaufnahme | Alle mit Zugriff lesen die Einträge, ohne die Datenbank der anderen zu sehen |
 | Essen in Touren | `carried` (zählt ins Startgewicht) und `eaten` (zählt in die Kalorien) statt eines Felds `planned` | Auch Heimgetragenes und unterwegs Gekauftes erfassbar |
+| App: Server-Adresse | Wird beim Anmelden eingegeben und auf dem Gerät gespeichert; im Browser ist die eigene Herkunft vorbelegt | Keine feste Domain in der App; optionaler Vorgabewert per `--dart-define=API_BASE_URL` |
+| App: Tokens | Im Plattform-Keystore (`flutter_secure_storage`) | Abgelaufene Access-Tokens werden einmal automatisch erneuert; ein abgelehntes Refresh-Token meldet ab, fehlendes Netz nicht |
+| App: lokale Daten | Drift speichert die gesehenen Datensätze als JSON-Dokumente je Sammlung (`cached_documents`), nicht als Abbild aller Server-Tabellen | Weniger doppelte Schemapflege; die Typisierung liegt in den Dart-Modellen. Beim Abmelden wird die lokale Kopie gelöscht |
+| App: Kennung | Android-Paketname `internal.lacasa.hiker` (vorläufig) | Vor einer Veröffentlichung auf die endgültige Domain umstellen |
 | Fehlerformat | `{"error": {"code", "message"}}` für fachliche Fehler | Client übersetzt anhand von `code` |
 
 ## 3. Technologie-Stack
@@ -137,7 +141,7 @@ app/lib/
     ├── planning/             # Phase 2
     └── reports/              # Phase 3
 ```
-Jedes Feature registriert sich über ein `FeatureModule` (Routen, Navigationseintrag, Provider). In `core/map` liegen die wiederverwendbaren Bausteine: Karte, Track zeichnen, Punkt setzen, Foto-Marker, Höhenprofil.
+Jedes Feature registriert sich über ein `FeatureModule` (Routen, Navigationseintrag, Provider); verdrahtet wird in `lib/app.dart`. Der Core importiert keine Features. Die Navigation zeigt nur Features, deren Modul der Server meldet. In `core/map` liegen die wiederverwendbaren Bausteine: Karte, Track zeichnen, Punkt setzen, Foto-Marker, Höhenprofil.
 
 ## 6. Datenmodell
 
