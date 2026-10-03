@@ -2,12 +2,14 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/db/app_database.dart';
 import '../../../core/loaded.dart';
 import '../../../core/map/geo.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/sync/sync_service.dart' hide Json;
 import '../../../core/widgets/file_pick.dart';
 import 'tour_models.dart';
 
@@ -16,10 +18,11 @@ typedef Json = Map<String, dynamic>;
 /// Tours of the user and tours shared with them. Reads fall back to the copy
 /// on the device when the server cannot be reached; changes need the server.
 class TourRepository {
-  const TourRepository(this._dio, this._db);
+  const TourRepository(this._dio, this._db, this._sync);
 
   final Dio _dio;
   final AppDatabase _db;
+  final SyncService _sync;
 
   static const _tours = 'tours';
   static const _list = 'tour_list';
@@ -71,8 +74,16 @@ class TourRepository {
     } on ApiException catch (error) {
       if (error.code != ApiException.network) rethrow;
       final q = query.toLowerCase();
+      // The list as last loaded, plus tours opened, synced or created offline.
+      final documents = <String, Json>{
+        for (final d in await _db.listDocuments('$_list:$scope'))
+          d['id'] as String: d,
+        for (final d in await _db.listDocuments(_tours))
+          if ((d['permission'] == 'owner') == (scope == 'mine'))
+            d['id'] as String: d,
+      };
       final cached =
-          (await _db.listDocuments('$_list:$scope'))
+          documents.values
               .map(Tour.new)
               .where((t) => q.isEmpty || t.title.toLowerCase().contains(q))
               .toList()
@@ -95,17 +106,64 @@ class TourRepository {
     }
   }
 
-  Future<Tour> create(Json document) =>
-      _stored(() => _dio.post<Json>('/tours', data: document));
+  /// Without network the tour is created on the device and sent with the
+  /// next sync; it then has version 0 until the server answers.
+  Future<Tour> create(Json document) async {
+    try {
+      return await _stored(() => _dio.post<Json>('/tours', data: document));
+    } on ApiException catch (error) {
+      if (error.code != ApiException.network) rethrow;
+      final id = const Uuid().v4();
+      final tour = {
+        ...document,
+        'id': id,
+        'permission': 'owner',
+        'version': 0,
+        'computed': <String, dynamic>{},
+        'track_source': 'none',
+        'weather': <Json>[],
+      };
+      await _db.putDocument(_tours, id, tour);
+      await _sync.enqueue(collection: _tours, id: id, data: document);
+      return Tour(tour);
+    }
+  }
 
   /// Throws an [ApiException] with code `version_conflict` and the current
   /// tour in `body['current']` if the tour was changed in the meantime.
-  Future<Tour> update(String id, Json document, int version) => _stored(
-    () => _dio.put<Json>('/tours/$id', data: {...document, 'version': version}),
-  );
+  /// Without network the change is kept on the device and sent with the next
+  /// sync, where a conflict is merged field by field.
+  Future<Tour> update(String id, Json document, int version) async {
+    try {
+      return await _stored(
+        () => _dio.put<Json>(
+          '/tours/$id',
+          data: {...document, 'version': version},
+        ),
+      );
+    } on ApiException catch (error) {
+      if (error.code != ApiException.network) rethrow;
+      final before = await _db.getDocument(_tours, id) ?? <String, dynamic>{};
+      final tour = {...before, ...document};
+      await _db.putDocument(_tours, id, tour);
+      await _sync.enqueue(
+        collection: _tours,
+        id: id,
+        data: document,
+        baseVersion: version,
+        base: documentOf(before),
+      );
+      return Tour(tour);
+    }
+  }
 
   Future<void> delete(String id) async {
-    await apiCall(() => _dio.delete<void>('/tours/$id'));
+    try {
+      await apiCall(() => _dio.delete<void>('/tours/$id'));
+    } on ApiException catch (error) {
+      if (error.code != ApiException.network) rethrow;
+      await _sync.enqueue(collection: _tours, id: id);
+    }
     await _db.deleteDocument(_tours, id);
   }
 
@@ -123,14 +181,33 @@ class TourRepository {
     }
   }
 
-  Future<Tour> uploadGpx(String id, PickedFile file) => _stored(
+  /// Sends a GPX file; used directly and by the upload queue.
+  Future<Tour> sendGpx(String id, String filename, Uint8List bytes) => _stored(
     () => _dio.put<Json>(
       '/tours/$id/gpx',
       data: FormData.fromMap({
-        'file': MultipartFile.fromBytes(file.bytes, filename: file.name),
+        'file': MultipartFile.fromBytes(bytes, filename: filename),
       }),
     ),
   );
+
+  /// Uploads a GPX file. Without network it waits in the upload queue;
+  /// returns false in that case.
+  Future<bool> uploadGpx(String id, PickedFile file) async {
+    try {
+      await sendGpx(id, file.name, file.bytes);
+      return true;
+    } on ApiException catch (error) {
+      if (error.code != ApiException.network) rethrow;
+      await _sync.enqueueUpload(
+        kind: 'gpx',
+        tourId: id,
+        filename: file.name,
+        bytes: file.bytes,
+      );
+      return false;
+    }
+  }
 
   Future<Tour> saveDrawnTrack(String id, List<GeoPoint> points) => _stored(
     () => _dio.post<Json>(
@@ -194,7 +271,8 @@ class TourRepository {
     }
   }
 
-  Future<void> uploadPhotos(String id, List<PickedFile> files) => apiCall(
+  /// Sends photos; used directly and by the upload queue.
+  Future<void> sendPhotos(String id, List<PickedFile> files) => apiCall(
     () => _dio.post<void>(
       '/tours/$id/photos',
       data: FormData.fromMap({
@@ -205,6 +283,26 @@ class TourRepository {
       }),
     ),
   );
+
+  /// Uploads photos. Without network they wait in the upload queue; returns
+  /// false in that case.
+  Future<bool> uploadPhotos(String id, List<PickedFile> files) async {
+    try {
+      await sendPhotos(id, files);
+      return true;
+    } on ApiException catch (error) {
+      if (error.code != ApiException.network) rethrow;
+      for (final file in files) {
+        await _sync.enqueueUpload(
+          kind: 'photo',
+          tourId: id,
+          filename: file.name,
+          bytes: file.bytes,
+        );
+      }
+      return false;
+    }
+  }
 
   Future<void> updatePhoto(String id, String photoId, Json changes) => apiCall(
     () => _dio.patch<void>('/tours/$id/photos/$photoId', data: changes),
@@ -330,22 +428,49 @@ class TourRepository {
 }
 
 final tourRepositoryProvider = Provider<TourRepository>(
-  (ref) =>
-      TourRepository(ref.watch(dioProvider), ref.watch(appDatabaseProvider)),
+  (ref) => TourRepository(
+    ref.watch(dioProvider),
+    ref.watch(appDatabaseProvider),
+    ref.read(syncProvider.notifier),
+  ),
 );
 
 typedef TourListRequest = ({String scope, String query});
 
 final tourListProvider = FutureProvider.autoDispose
-    .family<Loaded<List<Tour>>, TourListRequest>(
-      (ref, request) => ref
+    .family<Loaded<List<Tour>>, TourListRequest>((ref, request) {
+      // Load again after every sync.
+      ref.watch(syncGenerationProvider);
+      return ref
           .watch(tourRepositoryProvider)
-          .list(scope: request.scope, query: request.query),
-    );
+          .list(scope: request.scope, query: request.query);
+    });
 
-final tourProvider = FutureProvider.autoDispose.family<Loaded<Tour>, String>(
-  (ref, id) => ref.watch(tourRepositoryProvider).get(id),
-);
+final tourProvider = FutureProvider.autoDispose.family<Loaded<Tour>, String>((
+  ref,
+  id,
+) {
+  ref.watch(syncGenerationProvider);
+  return ref.watch(tourRepositoryProvider).get(id);
+});
+
+/// Sends a queued GPX file or photo; wired into the sync in `app.dart`.
+UploadHandler tourUploadHandler(Ref ref) => (upload) {
+  final repository = ref.read(tourRepositoryProvider);
+  return upload.kind == 'gpx'
+      ? repository.sendGpx(upload.tourId, upload.filename, upload.bytes)
+      : repository.sendPhotos(upload.tourId, [
+          PickedFile(upload.filename, upload.bytes),
+        ]);
+};
+
+/// After a version conflict in the sync: merge field by field; null if both
+/// sides changed the same field and the user has to decide.
+Json? resolveTourConflict(Json? base, Json mine, Json current) {
+  if (base == null) return null;
+  final result = mergeDocuments(base, mine, documentOf(current));
+  return result.conflicts.isEmpty ? result.merged : null;
+}
 
 final tourTrackProvider = FutureProvider.autoDispose.family<TrackData, String>(
   (ref, id) => ref.watch(tourRepositoryProvider).track(id),

@@ -4,19 +4,43 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/db/app_database.dart';
 import '../../../core/session/session.dart';
+import '../../../core/sync/sync_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/error_text.dart';
+import '../../../core/widgets/sync_section.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/auth_repository.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
-  Future<void> _logout(WidgetRef ref) async {
+  Future<void> _logout(BuildContext context, WidgetRef ref) async {
+    // Changes that were not sent yet would be lost: ask first.
+    if (!ref.read(syncProvider).isClean) {
+      final l10n = AppLocalizations.of(context);
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          content: Text(l10n.syncLogoutWarning),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(l10n.logout),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true) return;
+    }
     final refresh = ref.read(sessionProvider).tokens?.refresh;
     if (refresh != null) await ref.read(authRepositoryProvider).logout(refresh);
     // Nothing of this user may stay on the device.
     await ref.read(appDatabaseProvider).clear();
+    await ref.read(syncProvider.notifier).load();
     await ref.read(sessionProvider.notifier).signOut();
   }
 
@@ -30,7 +54,7 @@ class ProfileScreen extends ConsumerWidget {
         title: Text(l10n.profileTitle),
         actions: [
           TextButton.icon(
-            onPressed: () => _logout(ref),
+            onPressed: () => _logout(context, ref),
             icon: const Icon(Icons.logout),
             label: Text(l10n.logout),
           ),
@@ -171,6 +195,8 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
       child: CenteredForm(
         children: [
           if (widget.header != null) ...[widget.header!, gap],
+          const SyncSection(),
+          gap,
           Text(
             l10n.profileIntro,
             style: Theme.of(context).textTheme.bodyMedium,

@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+/// Key of the time of the last sync with the server.
+const lastSyncStorageKey = 'last_sync';
+
 /// Small persistent store for secrets and settings (tokens, server address).
 abstract class KeyValueStore {
   Future<String?> read(String key);

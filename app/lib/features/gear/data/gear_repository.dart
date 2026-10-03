@@ -2,20 +2,23 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/db/app_database.dart';
 import '../../../core/loaded.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/sync/sync_service.dart';
 import 'gear_models.dart';
 
 /// Gear of the signed-in user. Reads fall back to the copy on the device when
 /// the server cannot be reached; changes need the server.
 class GearRepository {
-  const GearRepository(this._dio, this._db);
+  const GearRepository(this._dio, this._db, this._sync);
 
   final Dio _dio;
   final AppDatabase _db;
+  final SyncService _sync;
 
   static const _items = 'gear_items';
   static const _types = 'gear_types';
@@ -101,25 +104,53 @@ class GearRepository {
     }
   }
 
+  /// Saves on the server; without network the change is kept on the device
+  /// and sent with the next sync.
   Future<GearItem> saveItem(GearItem item, {String? catalogId}) async {
-    final response = await apiCall(
-      () => item.id == null
-          ? _dio.post<Map<String, dynamic>>(
-              '/gear/items',
-              data: {...item.toJson(), 'catalog_id': ?catalogId},
-            )
-          : _dio.put<Map<String, dynamic>>(
-              '/gear/items/${item.id}',
-              data: item.toJson(),
-            ),
-    );
-    final saved = GearItem.fromJson(response.data!);
-    await _db.putDocument(_items, saved.id!, response.data!);
-    return saved;
+    try {
+      final response = await apiCall(
+        () => item.id == null
+            ? _dio.post<Map<String, dynamic>>(
+                '/gear/items',
+                data: {...item.toJson(), 'catalog_id': ?catalogId},
+              )
+            : _dio.put<Map<String, dynamic>>(
+                '/gear/items/${item.id}',
+                data: item.toJson(),
+              ),
+      );
+      final saved = GearItem.fromJson(response.data!);
+      await _db.putDocument(_items, saved.id!, response.data!);
+      return saved;
+    } on ApiException catch (error) {
+      if (error.code != ApiException.network) rethrow;
+      final id = item.id ?? const Uuid().v4();
+      final before = await _db.getDocument(_items, id);
+      final document = {
+        ...?before,
+        ...item.toJson(),
+        'id': id,
+        'catalog_id': ?catalogId,
+      };
+      await _db.putDocument(_items, id, document);
+      await _sync.enqueue(
+        collection: _items,
+        id: id,
+        data: document,
+        baseUpdatedAt: before?['updated_at'] as String?,
+        base: before,
+      );
+      return GearItem.fromJson(document);
+    }
   }
 
   Future<void> deleteItem(String id) async {
-    await apiCall(() => _dio.delete<void>('/gear/items/$id'));
+    try {
+      await apiCall(() => _dio.delete<void>('/gear/items/$id'));
+    } on ApiException catch (error) {
+      if (error.code != ApiException.network) rethrow;
+      await _sync.enqueue(collection: _items, id: id);
+    }
     await _db.deleteDocument(_items, id);
   }
 
@@ -235,14 +266,19 @@ class GearRepository {
 }
 
 final gearRepositoryProvider = Provider<GearRepository>(
-  (ref) =>
-      GearRepository(ref.watch(dioProvider), ref.watch(appDatabaseProvider)),
+  (ref) => GearRepository(
+    ref.watch(dioProvider),
+    ref.watch(appDatabaseProvider),
+    ref.read(syncProvider.notifier),
+  ),
 );
 
 final gearItemsProvider = FutureProvider.autoDispose
-    .family<Loaded<List<GearItem>>, GearFilter>(
-      (ref, filter) => ref.watch(gearRepositoryProvider).listItems(filter),
-    );
+    .family<Loaded<List<GearItem>>, GearFilter>((ref, filter) {
+      // Load again after every sync.
+      ref.watch(syncGenerationProvider);
+      return ref.watch(gearRepositoryProvider).listItems(filter);
+    });
 
 final gearTypesProvider = FutureProvider.autoDispose<Loaded<List<GearType>>>(
   (ref) => ref.watch(gearRepositoryProvider).listTypes(),

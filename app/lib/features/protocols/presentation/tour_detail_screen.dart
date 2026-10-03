@@ -55,9 +55,18 @@ class _TourDetailScreenState extends ConsumerState<TourDetailScreen> {
     }
   }
 
+  /// Tells the user that a file waits on the device for a connection.
+  void _savedOffline(bool sent) {
+    if (sent || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppLocalizations.of(context).syncSavedOffline)),
+    );
+  }
+
   Future<void> _uploadGpx() async {
     final files = await ref.read(filePickerProvider)(extensions: const ['gpx']);
-    if (files.isNotEmpty) await _run((r) => r.uploadGpx(_id, files.first));
+    if (files.isEmpty) return;
+    await _run((r) async => _savedOffline(await r.uploadGpx(_id, files.first)));
   }
 
   Future<void> _addPhotos() async {
@@ -65,7 +74,8 @@ class _TourDetailScreenState extends ConsumerState<TourDetailScreen> {
       extensions: imageExtensions,
       multiple: true,
     );
-    if (files.isNotEmpty) await _run((r) => r.uploadPhotos(_id, files));
+    if (files.isEmpty) return;
+    await _run((r) async => _savedOffline(await r.uploadPhotos(_id, files)));
   }
 
   Future<void> _waypointsFromPhotos() async {

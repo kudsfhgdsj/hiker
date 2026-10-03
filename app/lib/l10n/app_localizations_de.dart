@@ -1045,4 +1045,66 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get osmAttribution => 'Namen: © OpenStreetMap-Mitwirkende (ODbL)';
+
+  @override
+  String get syncTitle => 'Synchronisierung';
+
+  @override
+  String get syncNow => 'Jetzt synchronisieren';
+
+  @override
+  String get syncClean => 'Alles ist mit dem Server abgeglichen.';
+
+  @override
+  String syncWaiting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Änderungen warten auf eine Verbindung',
+      one: '1 Änderung wartet auf eine Verbindung',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get syncNoConnection =>
+      'Der Server ist nicht erreichbar. Die Änderungen bleiben auf dem Gerät gespeichert.';
+
+  @override
+  String get syncDone => 'Synchronisiert.';
+
+  @override
+  String get syncConflict => 'Inzwischen am Server geändert';
+
+  @override
+  String get syncFailed => 'Vom Server abgelehnt';
+
+  @override
+  String get syncKeepMine => 'Meine Änderung behalten';
+
+  @override
+  String get syncTakeServer => 'Stand des Servers übernehmen';
+
+  @override
+  String get syncDiscard => 'Verwerfen';
+
+  @override
+  String get syncSavedOffline =>
+      'Ohne Verbindung gespeichert. Wird übertragen, sobald der Server erreichbar ist.';
+
+  @override
+  String get syncLogoutWarning =>
+      'Es gibt Änderungen, die noch nicht übertragen wurden. Beim Abmelden gehen sie verloren.';
+
+  @override
+  String get syncCollectionGear => 'Ausrüstung';
+
+  @override
+  String get syncCollectionFood => 'Lebensmittel';
+
+  @override
+  String get syncCollectionTour => 'Tour';
+
+  @override
+  String get syncDeleted => 'gelöscht';
 }

@@ -2025,6 +2025,108 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Namen: © OpenStreetMap-Mitwirkende (ODbL)'**
   String get osmAttribution;
+
+  /// No description provided for @syncTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Synchronisierung'**
+  String get syncTitle;
+
+  /// No description provided for @syncNow.
+  ///
+  /// In de, this message translates to:
+  /// **'Jetzt synchronisieren'**
+  String get syncNow;
+
+  /// No description provided for @syncClean.
+  ///
+  /// In de, this message translates to:
+  /// **'Alles ist mit dem Server abgeglichen.'**
+  String get syncClean;
+
+  /// No description provided for @syncWaiting.
+  ///
+  /// In de, this message translates to:
+  /// **'{count, plural, =1{1 Änderung wartet auf eine Verbindung} other{{count} Änderungen warten auf eine Verbindung}}'**
+  String syncWaiting(int count);
+
+  /// No description provided for @syncNoConnection.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Server ist nicht erreichbar. Die Änderungen bleiben auf dem Gerät gespeichert.'**
+  String get syncNoConnection;
+
+  /// No description provided for @syncDone.
+  ///
+  /// In de, this message translates to:
+  /// **'Synchronisiert.'**
+  String get syncDone;
+
+  /// No description provided for @syncConflict.
+  ///
+  /// In de, this message translates to:
+  /// **'Inzwischen am Server geändert'**
+  String get syncConflict;
+
+  /// No description provided for @syncFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Vom Server abgelehnt'**
+  String get syncFailed;
+
+  /// No description provided for @syncKeepMine.
+  ///
+  /// In de, this message translates to:
+  /// **'Meine Änderung behalten'**
+  String get syncKeepMine;
+
+  /// No description provided for @syncTakeServer.
+  ///
+  /// In de, this message translates to:
+  /// **'Stand des Servers übernehmen'**
+  String get syncTakeServer;
+
+  /// No description provided for @syncDiscard.
+  ///
+  /// In de, this message translates to:
+  /// **'Verwerfen'**
+  String get syncDiscard;
+
+  /// No description provided for @syncSavedOffline.
+  ///
+  /// In de, this message translates to:
+  /// **'Ohne Verbindung gespeichert. Wird übertragen, sobald der Server erreichbar ist.'**
+  String get syncSavedOffline;
+
+  /// No description provided for @syncLogoutWarning.
+  ///
+  /// In de, this message translates to:
+  /// **'Es gibt Änderungen, die noch nicht übertragen wurden. Beim Abmelden gehen sie verloren.'**
+  String get syncLogoutWarning;
+
+  /// No description provided for @syncCollectionGear.
+  ///
+  /// In de, this message translates to:
+  /// **'Ausrüstung'**
+  String get syncCollectionGear;
+
+  /// No description provided for @syncCollectionFood.
+  ///
+  /// In de, this message translates to:
+  /// **'Lebensmittel'**
+  String get syncCollectionFood;
+
+  /// No description provided for @syncCollectionTour.
+  ///
+  /// In de, this message translates to:
+  /// **'Tour'**
+  String get syncCollectionTour;
+
+  /// No description provided for @syncDeleted.
+  ///
+  /// In de, this message translates to:
+  /// **'gelöscht'**
+  String get syncDeleted;
 }
 
 class _AppLocalizationsDelegate

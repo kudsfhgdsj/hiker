@@ -96,6 +96,8 @@ class SessionController extends Notifier<SessionState> {
     await _store.delete(_accessKey);
     await _store.delete(_refreshKey);
     await _store.delete(_userKey);
+    // The next user starts with a full sync.
+    await _store.delete(lastSyncStorageKey);
     state = SessionState(
       status: SessionStatus.signedOut,
       baseUrl: state.baseUrl,

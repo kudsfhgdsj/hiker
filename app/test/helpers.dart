@@ -118,6 +118,8 @@ ProviderContainer createContainer({
     retry: (_, _) => null,
     overrides: [
       ...appOverrides(modules: modules),
+      // Tests trigger the sync themselves, so that it does not add requests.
+      autoSyncProvider.overrideWithValue(false),
       httpClientAdapterProvider.overrideWithValue(api),
       keyValueStoreProvider.overrideWithValue(store ?? MemoryKeyValueStore()),
       appDatabaseProvider.overrideWith((ref) {

@@ -19,13 +19,61 @@ class CachedDocuments extends Table {
   Set<Column<Object>> get primaryKey => {collection, id};
 }
 
-@DriftDatabase(tables: [CachedDocuments])
+/// A change made while the server could not be reached, waiting to be pushed.
+class PendingChanges extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get collection => text()();
+
+  /// `upsert` or `delete`.
+  TextColumn get op => text()();
+  TextColumn get recordId => text()();
+  IntColumn get baseVersion => integer().nullable()();
+  TextColumn get baseUpdatedAt => text().nullable()();
+
+  /// The record as JSON, for upsert.
+  TextColumn get data => text().nullable()();
+
+  /// The record before the first offline change, for merging after a conflict.
+  TextColumn get base => text().nullable()();
+
+  /// The server's record, set when the push ended in a conflict.
+  TextColumn get conflict => text().nullable()();
+
+  /// Error code of the server, set when the push was rejected.
+  TextColumn get error => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+}
+
+/// A file (GPX or photo) waiting to be uploaded.
+class PendingUploads extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// `gpx` or `photo`.
+  TextColumn get kind => text()();
+  TextColumn get tourId => text()();
+  TextColumn get filename => text()();
+  BlobColumn get bytes => blob()();
+  TextColumn get error => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+}
+
+@DriftDatabase(tables: [CachedDocuments, PendingChanges, PendingUploads])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor])
     : super(executor ?? driftDatabase(name: 'hiker'));
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: (migrator, from, to) async {
+      if (from < 2) {
+        await migrator.createTable(pendingChanges);
+        await migrator.createTable(pendingUploads);
+      }
+    },
+  );
 
   Future<void> putDocument(
     String collection,
@@ -78,8 +126,13 @@ class AppDatabase extends _$AppDatabase {
     cachedDocuments,
   )..where((r) => r.collection.equals(collection) & r.id.equals(id))).go();
 
-  /// Removes everything, e.g. when the user signs out.
-  Future<void> clear() => delete(cachedDocuments).go();
+  /// Removes everything, e.g. when the user signs out. Changes that were not
+  /// synced yet are lost.
+  Future<void> clear() => transaction(() async {
+    await delete(cachedDocuments).go();
+    await delete(pendingChanges).go();
+    await delete(pendingUploads).go();
+  });
 }
 
 final appDatabaseProvider = Provider<AppDatabase>((ref) {

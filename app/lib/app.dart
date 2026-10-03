@@ -6,11 +6,13 @@ import 'package:flutter_riverpod/misc.dart';
 import 'core/modules/feature_module.dart';
 import 'core/router/app_router.dart';
 import 'core/session/session.dart';
+import 'core/sync/sync_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/auth_form_screen.dart';
 import 'features/auth/presentation/profile_screen.dart';
 import 'features/gear/gear_module.dart';
 import 'features/nutrition/nutrition_module.dart';
+import 'features/protocols/data/tour_repository.dart';
 import 'features/protocols/protocols_module.dart';
 import 'l10n/app_localizations.dart';
 
@@ -31,7 +33,14 @@ List<Override> appOverrides({List<FeatureModule>? modules}) => [
       profile: (_) => const ProfileScreen(),
     ),
   ),
+  // Offline sync: tours merge field by field; files go through the tour API.
+  conflictResolversProvider.overrideWithValue({'tours': resolveTourConflict}),
+  uploadHandlerProvider.overrideWith(tourUploadHandler),
 ];
+
+/// Whether the app syncs by itself at start, after sign-in and when it comes
+/// back to the foreground. Tests switch it off.
+final autoSyncProvider = Provider<bool>((ref) => true);
 
 class HikerApp extends ConsumerStatefulWidget {
   const HikerApp({super.key});
@@ -40,16 +49,43 @@ class HikerApp extends ConsumerStatefulWidget {
   ConsumerState<HikerApp> createState() => _HikerAppState();
 }
 
-class _HikerAppState extends ConsumerState<HikerApp> {
+class _HikerAppState extends ConsumerState<HikerApp>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Load the stored session; the router leaves the splash screen afterwards.
-    Future.microtask(() => ref.read(sessionProvider.notifier).restore());
+    Future.microtask(() async {
+      await ref.read(sessionProvider.notifier).restore();
+      await ref.read(syncProvider.notifier).load();
+      _sync();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _sync();
+  }
+
+  void _sync() {
+    if (mounted && ref.read(autoSyncProvider)) {
+      ref.read(syncProvider.notifier).sync();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Sync right after signing in.
+    ref.listen(sessionProvider.select((s) => s.isSignedIn), (_, signedIn) {
+      if (signedIn) _sync();
+    });
     return MaterialApp.router(
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       theme: AppTheme.light(),

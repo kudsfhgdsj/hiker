@@ -1,19 +1,22 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/db/app_database.dart';
 import '../../../core/loaded.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/sync/sync_service.dart';
 import 'food_models.dart';
 
 /// Foods of the user and the shared catalog. Everything the app has seen is
 /// kept on the device, so that search and barcode lookup also work offline.
 class FoodRepository {
-  const FoodRepository(this._dio, this._db);
+  const FoodRepository(this._dio, this._db, this._sync);
 
   final Dio _dio;
   final AppDatabase _db;
+  final SyncService _sync;
 
   /// The user's own foods (replaced as a whole when the list is loaded).
   static const _own = 'foods';
@@ -115,24 +118,54 @@ class FoodRepository {
     }
   }
 
+  /// Saves on the server; without network the change is kept on the device
+  /// and sent with the next sync.
   Future<Food> save(Food food, {String? catalogId}) async {
-    final response = await apiCall(
-      () => food.id == null
-          ? _dio.post<Map<String, dynamic>>(
-              '/nutrition/foods',
-              data: {...food.toJson(), 'catalog_id': ?catalogId},
-            )
-          : _dio.put<Map<String, dynamic>>(
-              '/nutrition/foods/${food.id}',
-              data: food.toJson(),
-            ),
-    );
-    await _remember(response.data!);
-    return Food.fromJson(response.data!);
+    try {
+      final response = await apiCall(
+        () => food.id == null
+            ? _dio.post<Map<String, dynamic>>(
+                '/nutrition/foods',
+                data: {...food.toJson(), 'catalog_id': ?catalogId},
+              )
+            : _dio.put<Map<String, dynamic>>(
+                '/nutrition/foods/${food.id}',
+                data: food.toJson(),
+              ),
+      );
+      await _remember(response.data!);
+      return Food.fromJson(response.data!);
+    } on ApiException catch (error) {
+      if (error.code != ApiException.network) rethrow;
+      final id = food.id ?? const Uuid().v4();
+      final before = await _db.getDocument(_own, id);
+      final document = {
+        'source': 'custom',
+        ...?before,
+        ...food.toJson(),
+        'id': id,
+        'visibility': 'private',
+        'catalog_id': ?catalogId,
+      };
+      await _db.putDocument(_own, id, document);
+      await _sync.enqueue(
+        collection: _own,
+        id: id,
+        data: document,
+        baseUpdatedAt: before?['updated_at'] as String?,
+        base: before,
+      );
+      return Food.fromJson(document);
+    }
   }
 
   Future<void> delete(String id) async {
-    await apiCall(() => _dio.delete<void>('/nutrition/foods/$id'));
+    try {
+      await apiCall(() => _dio.delete<void>('/nutrition/foods/$id'));
+    } on ApiException catch (error) {
+      if (error.code != ApiException.network) rethrow;
+      await _sync.enqueue(collection: _own, id: id);
+    }
     await _db.deleteDocument(_own, id);
   }
 
@@ -156,11 +189,16 @@ class FoodRepository {
 }
 
 final foodRepositoryProvider = Provider<FoodRepository>(
-  (ref) =>
-      FoodRepository(ref.watch(dioProvider), ref.watch(appDatabaseProvider)),
+  (ref) => FoodRepository(
+    ref.watch(dioProvider),
+    ref.watch(appDatabaseProvider),
+    ref.read(syncProvider.notifier),
+  ),
 );
 
 final foodSearchProvider = FutureProvider.autoDispose
-    .family<Loaded<List<Food>>, String>(
-      (ref, query) => ref.watch(foodRepositoryProvider).search(query),
-    );
+    .family<Loaded<List<Food>>, String>((ref, query) {
+      // Load again after every sync.
+      ref.watch(syncGenerationProvider);
+      return ref.watch(foodRepositoryProvider).search(query);
+    });

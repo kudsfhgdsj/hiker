@@ -44,7 +44,7 @@ Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen k
 | App: Server-Adresse | Wird beim Anmelden eingegeben und auf dem Gerät gespeichert | Keine feste Domain in der App; optionaler Vorgabewert per `--dart-define=API_BASE_URL` |
 | App: Tokens | Im Plattform-Keystore (`flutter_secure_storage`) | Abgelaufene Access-Tokens werden einmal automatisch erneuert; ein abgelehntes Refresh-Token meldet ab, fehlendes Netz nicht |
 | App: lokale Daten | Drift speichert die gesehenen Datensätze als JSON-Dokumente je Sammlung (`cached_documents`), nicht als Abbild aller Server-Tabellen | Weniger doppelte Schemapflege; die Typisierung liegt in den Dart-Modellen. Beim Abmelden wird die lokale Kopie gelöscht |
-| App: Lesen ohne Netz | Listen werden beim Laden lokal gespeichert; ist der Server nicht erreichbar, zeigt die App den gespeicherten Stand mit einem Hinweis und wendet Filter lokal an | Änderungen brauchen bis Schritt 12 (Offline-Sync) eine Verbindung |
+| App: Lesen ohne Netz | Listen werden beim Laden lokal gespeichert; ist der Server nicht erreichbar, zeigt die App den gespeicherten Stand mit einem Hinweis und wendet Filter lokal an | Änderungen an Ausrüstung, Lebensmitteln und Touren sowie Datei-Uploads warten ohne Netz in einer Warteschlange (Offline-Sync) |
 | App: Dateiauswahl | `file_picker` (MIT) für Bilder und GPX | Nutzt die Dateiauswahl des Systems, keine Google-Dienste |
 | App: Barcode-Ablauf | Scan oder Eingabe → Server (eigene Produkte, Katalog, Open Food Facts); ohne Netz wird in den schon gesehenen Produkten auf dem Gerät gesucht. Unbekannt oder nicht erreichbar → Formular mit vorbelegtem Barcode | Alles, was die App gesehen hat (Suche, Scans), bleibt lokal gespeichert |
 | App: Kennung | Android-Paketname `internal.lacasa.hiker` (vorläufig) | Vor einer Veröffentlichung auf die endgültige Domain umstellen |
@@ -347,6 +347,15 @@ Umsetzung auf dem Server:
 - `POST /sync/push` nimmt bis zu 500 Operationen (`upsert` oder `delete` mit `id`) und wendet sie der Reihe nach über dieselben Dienste an wie die normalen Endpunkte – Rechte, Prüfungen und Historie gelten unverändert. Jede Operation bekommt ein eigenes Ergebnis: `ok` mit dem gespeicherten Datensatz, `conflict` mit dem aktuellen Stand des Servers oder `error` mit Code; ein Fehler hält die übrigen nicht auf.
 - Konflikte: Touren über `base_version` (wie bei `PUT`); Ausrüstung und Lebensmittel über `base_updated_at`. Schreibbar per Push sind `gear_items`, `foods` und `tours`.
 - Fotos und GPX-Dateien gehören nicht zum Push; die App lädt sie aus ihrer eigenen Warteschlange über die normalen Endpunkte hoch.
+
+Umsetzung in der Android-App (`core/sync`):
+- Ist der Server beim Speichern nicht erreichbar, wird die Änderung in die lokale Kopie geschrieben und in eine Warteschlange gelegt. Das gilt für Ausrüstungsgegenstände, eigene Lebensmittel und Touren (anlegen, ändern, löschen). Mehrere Änderungen am selben Datensatz werden zu einer zusammengefasst; offline Angelegtes und wieder Gelöschtes erreicht den Server nie.
+- GPX-Dateien und Fotos warten in einer eigenen Upload-Warteschlange.
+- Abgleich: beim Start, nach dem Anmelden, wenn die App in den Vordergrund kommt, und auf Knopfdruck im Profil. Reihenfolge: Änderungen senden, Dateien hochladen, Änderungen des Servers holen.
+- Konflikte bei Touren führt die App feldweise zusammen und sendet erneut; nur wenn beide dasselbe Feld geändert haben, wartet die Änderung auf eine Entscheidung. Bei Ausrüstung und Lebensmitteln wartet jeder Konflikt auf eine Entscheidung. Im Profil lässt sich je Konflikt wählen: eigene Änderung behalten oder Stand des Servers übernehmen. Vom Server abgelehnte Änderungen lassen sich verwerfen.
+- Datensätze, deren Änderung noch wartet, überschreibt der Abgleich nicht.
+- Beim Abmelden wird die lokale Kopie samt Warteschlange gelöscht; warten noch Änderungen, fragt die App vorher nach.
+- Nur online möglich bleiben: Tags, Kategorien und Packlisten ändern, Bilder von Gegenständen, Katalogvorschläge, Wegpunkte, Foto-Änderungen, Start und Ende, Freigaben und Links, Wiederherstellen aus dem Verlauf.
 
 **Teilen mit Usern**
 - Owner: alles.

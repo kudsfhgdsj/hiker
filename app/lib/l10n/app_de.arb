@@ -414,5 +414,29 @@
   "stationSaddle": "Pass",
   "stationWaypoint": "Wegpunkt",
   "tourDetectPlaces": "Gipfel und Pässe neu erkennen",
-  "osmAttribution": "Namen: © OpenStreetMap-Mitwirkende (ODbL)"
+  "osmAttribution": "Namen: © OpenStreetMap-Mitwirkende (ODbL)",
+  "syncTitle": "Synchronisierung",
+  "syncNow": "Jetzt synchronisieren",
+  "syncClean": "Alles ist mit dem Server abgeglichen.",
+  "syncWaiting": "{count, plural, =1{1 Änderung wartet auf eine Verbindung} other{{count} Änderungen warten auf eine Verbindung}}",
+  "@syncWaiting": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "syncNoConnection": "Der Server ist nicht erreichbar. Die Änderungen bleiben auf dem Gerät gespeichert.",
+  "syncDone": "Synchronisiert.",
+  "syncConflict": "Inzwischen am Server geändert",
+  "syncFailed": "Vom Server abgelehnt",
+  "syncKeepMine": "Meine Änderung behalten",
+  "syncTakeServer": "Stand des Servers übernehmen",
+  "syncDiscard": "Verwerfen",
+  "syncSavedOffline": "Ohne Verbindung gespeichert. Wird übertragen, sobald der Server erreichbar ist.",
+  "syncLogoutWarning": "Es gibt Änderungen, die noch nicht übertragen wurden. Beim Abmelden gehen sie verloren.",
+  "syncCollectionGear": "Ausrüstung",
+  "syncCollectionFood": "Lebensmittel",
+  "syncCollectionTour": "Tour",
+  "syncDeleted": "gelöscht"
 }
