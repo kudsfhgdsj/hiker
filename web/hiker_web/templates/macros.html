@@ -1,0 +1,21 @@
+{# Form field with label; `value` may be None. #}
+{% macro field(name, label, value=None, type="text", required=False, hint=None, attrs="") %}
+<label class="field">
+  <span>{{ label }}</span>
+  <input type="{{ type }}" name="{{ name }}" value="{{ '' if value is none else value }}"{% if required %} required{% endif %} {{ attrs|safe }}>
+  {% if hint %}<small>{{ hint }}</small>{% endif %}
+</label>
+{% endmacro %}
+
+{% macro csrf() %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endmacro %}
+
+{# A point in time; the browser shows it in local time. #}
+{% macro when(value) %}{% if value %}<time datetime="{{ value }}" class="local-time">{{ value|datetime }}</time>{% endif %}{% endmacro %}
+
+{# Button that deletes after a confirmation. #}
+{% macro delete_form(action, label=None) %}
+<form method="post" action="{{ action }}" class="inline" data-confirm="{{ t('common.confirm_delete') }}">
+  {{ csrf() }}
+  <button class="danger">{{ label or t('action.delete') }}</button>
+</form>
+{% endmacro %}

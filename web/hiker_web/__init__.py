@@ -1,0 +1,134 @@
+"""hiker web frontend: server-rendered pages on top of the hiker REST API."""
+
+import httpx2
+from flask import Flask, flash, redirect, render_template, request, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+from hiker_web import formatting
+from hiker_web.api import ApiError, api
+from hiker_web.config import load_config
+from hiker_web.security import check_csrf, csrf_token, install_log_redaction
+from hiker_web.sessions import SessionStore
+from hiker_web.texts_de import TEXTS, t
+
+__version__ = "0.1.0"
+
+# Blueprint, and the API module that must be enabled for its pages.
+NAVIGATION = (
+    ("protocols", "protocols.tour_list", "nav.tours"),
+    ("gear", "gear.item_list", "nav.gear"),
+    ("nutrition", "nutrition.food_list", "nav.food"),
+)
+
+
+def error_text(error: ApiError) -> str:
+    """German text for an error of the API; the API only sends codes."""
+    key = f"error.{error.code}"
+    if key in TEXTS:
+        return t(key)
+    by_status = {
+        403: "error.forbidden",
+        404: "error.not_found",
+        409: "error.conflict",
+        413: "error.too_large",
+        422: "error.validation",
+    }
+    return t(by_status.get(error.status, "error.unknown"))
+
+
+def create_app(config: dict | None = None) -> Flask:
+    app = Flask(__name__)
+    app.config.update(load_config())
+    app.config.update(config or {})
+    if len(app.config["SECRET_KEY"]) < 32:
+        raise RuntimeError("WEB_SECRET_KEY must be set and at least 32 characters long")
+
+    # Behind the reverse proxy: take scheme and client address from its headers.
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    app.extensions["session_store"] = SessionStore(app.config["SESSION_DIR"])
+    app.extensions["api_client"] = httpx2.Client(
+        base_url=app.config["API_BASE_URL"],
+        timeout=30,
+        transport=app.config.get("API_TRANSPORT"),
+        headers={"User-Agent": f"hiker-web/{__version__}"},
+    )
+    install_log_redaction()
+    app.jinja_env.filters.update(formatting.FILTERS)
+    # As globals, so that imported macros can use them too.
+    app.jinja_env.globals.update(t=t, csrf_token=csrf_token)
+    app.before_request(check_csrf)
+
+    @app.context_processor
+    def _globals():
+        data = api().data
+        modules = (data or {}).get("modules", [])
+        return {
+            "t": t,
+            "csrf_token": csrf_token,
+            "current_user": (data or {}).get("user"),
+            "navigation": [
+                (endpoint, t(label))
+                for module, endpoint, label in NAVIGATION
+                if module in modules and endpoint in app.view_functions
+            ],
+        }
+
+    @app.errorhandler(ApiError)
+    def _api_error(error: ApiError):
+        if error.status == 401:
+            flash(t("error.session_expired"), "error")
+            return redirect(url_for("auth.login"))
+        if error.status == 404:
+            return render_template("error.html", message=t("error.not_found")), 404
+        # Back to where the user came from, with the reason.
+        flash(error_text(error), "error")
+        target = request.referrer if request.method != "GET" and request.referrer else None
+        if target:
+            return redirect(target)
+        status = error.status if error.status < 500 else 502
+        return render_template("error.html", message=error_text(error)), status
+
+    @app.errorhandler(400)
+    def _bad_request(error):
+        message = (
+            t("error.csrf")
+            if getattr(error, "description", "") == "csrf"
+            else t("error.validation")
+        )
+        return render_template("error.html", message=message), 400
+
+    @app.errorhandler(404)
+    def _not_found(_error):
+        return render_template("error.html", message=t("error.page_404")), 404
+
+    @app.errorhandler(413)
+    def _too_large(_error):
+        return render_template("error.html", message=t("error.too_large")), 413
+
+    @app.after_request
+    def _security_headers(response):
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        return response
+
+    @app.get("/healthz")
+    def healthz():
+        return {"status": "ok"}
+
+    from hiker_web.views import auth, gear
+
+    app.register_blueprint(auth.blueprint)
+    app.register_blueprint(gear.blueprint)
+
+    @app.get("/")
+    def home():
+        data = api().data
+        if data is None:
+            return redirect(url_for("auth.login"))
+        for module, endpoint, _label in NAVIGATION:
+            if module in data.get("modules", []) and endpoint in app.view_functions:
+                return redirect(url_for(endpoint))
+        return redirect(url_for("auth.profile"))
+
+    return app

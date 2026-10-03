@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ t('gear.summary') }} – {{ t('app.title') }}{% endblock %}
+{% macro totals(title, data) %}
+<div class="card">
+  <h2 style="margin-top:0">{{ title }}</h2>
+  <p class="meta">{{ t('gear.item_count', count=data.item_count) }}</p>
+  <dl class="facts">
+    <dt>{{ t('gear.total_weight') }}</dt><dd>{{ data.weight_g|weight }}</dd>
+    <dt>{{ t('gear.total_value') }}</dt>
+    <dd>{% for value in data.value %}{{ value.amount|money(value.currency) }}{% if not loop.last %} + {% endif %}{% else %}–{% endfor %}</dd>
+  </dl>
+  {% if data.items_without_weight or data.items_without_price %}
+  <p class="meta">{% if data.items_without_weight %}{{ t('gear.without_weight', count=data.items_without_weight) }}{% endif %}
+    {% if data.items_without_price %}{{ t('gear.without_price', count=data.items_without_price) }}{% endif %}</p>
+  {% endif %}
+</div>
+{% endmacro %}
+{% block content %}
+<h1>{{ t('gear.summary') }}</h1>
+<nav class="tabs" aria-label="{{ t('gear.group_by') }}">
+  <a href="{{ url_for('gear.summary', **filters) }}"{% if not group_by %} aria-current="page"{% endif %}>{{ t('gear.group.none') }}</a>
+  {% for value in groupings %}
+  <a href="{{ url_for('gear.summary', group_by=value, **filters) }}"{% if group_by == value %} aria-current="page"{% endif %}>{{ t('gear.group.' ~ value) }}</a>
+  {% endfor %}
+</nav>
+<div class="cards">
+  {{ totals(t('gear.group.none'), summary.total) }}
+  {% if group_by == 'tag' %}<p class="meta">{{ t('gear.tag_group_hint') }}</p>{% endif %}
+  {% for group in summary.groups %}
+  {% set label = group.label if group.label is not none else t('gear.unassigned') %}
+  {{ totals(t('gear.status.' ~ label) if group_by == 'status' and group.label else label, group) }}
+  {% endfor %}
+</div>
+<p><a href="{{ url_for('gear.item_list', **filters) }}">{{ t('action.back') }}</a></p>
+{% endblock %}
