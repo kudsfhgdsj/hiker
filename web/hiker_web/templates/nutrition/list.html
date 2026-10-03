@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ t('nav.food') }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>{{ t('nav.food') }}</h1><span class="spacer"></span>
+  <a class="button" href="{{ url_for('nutrition.catalog') }}">{{ t('gear.catalog') }}</a>
+  <a class="button primary" href="{{ url_for('nutrition.food_new') }}">{{ t('food.new') }}</a>
+</div>
+<div class="row card">
+  <form method="get" class="row" role="search">
+    <label class="field"><span>{{ t('action.search') }}</span>
+      <input type="search" name="q" value="{{ query }}" placeholder="{{ t('food.search_hint') }}"></label>
+    <label><input type="checkbox" name="catalog" value="1"{% if with_catalog %} checked{% endif %}> {{ t('food.with_catalog') }}</label>
+    <button>{{ t('action.search') }}</button>
+  </form>
+  <form method="get" action="{{ url_for('nutrition.barcode') }}" class="row">
+    <label class="field"><span>{{ t('food.barcode') }}</span>
+      <input name="ean" inputmode="numeric" required placeholder="7613035974685"></label>
+    <button>{{ t('food.lookup') }}</button>
+  </form>
+</div>
+{% if foods %}
+<ul class="list">
+  {% for food in foods %}
+  <li>
+    <a class="grow" href="{{ url_for('nutrition.food_edit', food_id=food.id) }}">
+      <strong>{{ food.name }}</strong><br>
+      <span class="meta">{{ [food.brand, food.barcode]|select|join(' · ') }}</span>
+    </a>
+    {% if food.visibility != 'private' %}<span class="chip">{{ t('gear.catalog') }}</span>{% endif %}
+    {% if food.source == 'openfoodfacts' %}<span class="chip" title="{{ t('food.source_off') }} Open Food Facts (ODbL)">OFF</span>{% endif %}
+    <span>{{ t('food.kcal_value', value=food.kcal_per_100g|number) if food.kcal_per_100g is not none else '–' }}</span>
+  </li>
+  {% endfor %}
+</ul>
+{% if foods|selectattr('source', 'equalto', 'openfoodfacts')|list %}
+<p class="meta">{{ t('food.off_note') }}
+  <a href="https://world.openfoodfacts.org" rel="noopener noreferrer">Open Food Facts</a>
+  (<a href="https://opendatacommons.org/licenses/odbl/1-0/" rel="noopener noreferrer">ODbL</a>)</p>
+{% endif %}
+{% else %}
+<p>{{ t('food.empty') }}</p>
+{% endif %}
+{% endblock %}

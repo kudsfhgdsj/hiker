@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "macros.html" import field, csrf, delete_form %}
+{% block title %}{{ t('food.new' if is_new else 'food.edit') }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<section class="narrow">
+  <h1>{{ t('food.new' if is_new else 'food.edit') }}</h1>
+  <form method="post" class="stack">
+    {{ csrf() }}
+    {{ field('name', t('common.name'), food.name, required=True, attrs='maxlength="200"') }}
+    {{ field('brand', t('gear.brand'), food.brand) }}
+    {{ field('barcode', t('food.barcode'), food.barcode, hint=t('food.barcode_hint'), attrs='inputmode="numeric"') }}
+    {{ field('kcal_per_100g', t('food.kcal'), food.kcal_per_100g, required=True, attrs='inputmode="decimal"') }}
+    <fieldset class="stack"><legend>{{ t('food.per_100g') }}</legend>
+      <div class="row">
+        {{ field('protein_g', t('food.protein'), food.protein_g, attrs='inputmode="decimal"') }}
+        {{ field('fat_g', t('food.fat'), food.fat_g, attrs='inputmode="decimal"') }}
+      </div>
+      <div class="row">
+        {{ field('carbs_g', t('food.carbs'), food.carbs_g, attrs='inputmode="decimal"') }}
+        {{ field('sugar_g', t('food.sugar'), food.sugar_g, attrs='inputmode="decimal"') }}
+      </div>
+      {{ field('salt_g', t('food.salt'), food.salt_g, attrs='inputmode="decimal"') }}
+    </fieldset>
+    {{ field('serving_size_g', t('food.serving'), food.serving_size_g, attrs='inputmode="decimal"') }}
+    <button class="primary">{{ t('action.save') }}</button>
+  </form>
+  {% include "nutrition/_source.html" %}
+  {% if not is_new %}
+  <div class="toolbar" style="margin-top:1rem">
+    <form method="post" action="{{ url_for('nutrition.food_propose', food_id=food.id) }}" class="inline">{{ csrf() }}
+      <button title="{{ t('gear.propose_hint') }}">{{ t('gear.propose') }}</button></form>
+    {{ delete_form(url_for('nutrition.food_delete', food_id=food.id)) }}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

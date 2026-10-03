@@ -116,10 +116,11 @@ def create_app(config: dict | None = None) -> Flask:
     def healthz():
         return {"status": "ok"}
 
-    from hiker_web.views import auth, gear
+    from hiker_web.views import auth, gear, nutrition
 
     app.register_blueprint(auth.blueprint)
     app.register_blueprint(gear.blueprint)
+    app.register_blueprint(nutrition.blueprint)
 
     @app.get("/")
     def home():

@@ -1,0 +1,6 @@
+{# Open Food Facts data is under the ODbL: the source has to be named. #}
+{% if food.source == 'openfoodfacts' %}
+<p class="meta">{{ t('food.source_off') }}
+  <a href="https://world.openfoodfacts.org/{% if food.barcode %}product/{{ food.barcode }}{% endif %}" rel="noopener noreferrer">Open Food Facts</a>
+  (<a href="https://opendatacommons.org/licenses/odbl/1-0/" rel="noopener noreferrer">ODbL</a>)</p>
+{% endif %}
