@@ -1,6 +1,7 @@
-# Entwurf (Phase 1, Schritt 1). Läuft neben anderen Diensten auf einem geteilten Server:
-# keine Ports 80/443, die API ist nur über 127.0.0.1 erreichbar; der vorhandene
-# Reverse Proxy leitet dorthin weiter. Konfiguration über .env (siehe .env.example).
+# Entwurf. Läuft neben anderen Diensten auf einem geteilten Server: keine Ports 80/443,
+# API und Web-Frontend sind nur über 127.0.0.1 erreichbar; der vorhandene Reverse Proxy
+# leitet /api/ an die API und alles andere an das Web-Frontend.
+# Konfiguration über .env (siehe .env.example).
 name: hiker
 
 services:
@@ -48,6 +49,34 @@ services:
     cpus: 1.0
     mem_limit: 512m
 
+  web:
+    build: ./web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      WEB_SECRET_KEY: ${WEB_SECRET_KEY:?WEB_SECRET_KEY fehlt in .env}
+      API_BASE_URL: http://api:8000
+      WEB_SESSION_DIR: /data/sessions
+      WEB_SESSION_DAYS: ${REFRESH_TOKEN_TTL_DAYS:-30}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-15}
+      # Leer = Standard (OpenStreetMap).
+      MAP_TILE_URL: ${MAP_TILE_URL:-}
+    volumes:
+      - web-sessions:/data/sessions
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8011}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    cpus: 0.5
+    mem_limit: 256m
+
 volumes:
   db-data:
   files:
+  web-sessions:

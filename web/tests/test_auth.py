@@ -250,3 +250,48 @@ def test_german_formatting():
     assert formatting.duration(45) == "45 min"
     assert formatting.date("2026-08-01T06:00:00Z") == "01.08.2026"
     assert USER["display_name"] == "Anna"
+
+
+def test_renewal_uses_tokens_another_request_stored_meanwhile(user, fake_api, app):
+    """A refresh token works once, and a page loads its images in parallel."""
+    from flask import g
+
+    from hiker_web.api import api
+
+    fake_api.valid_tokens = {"access-2"}
+    fake_api.route("GET", "/me/profile", {"ok": True})
+    store = app.extensions["session_store"]
+    session_id = next(iter(store._directory.glob("*.json"))).stem
+    with user.client.session_transaction() as cookie_session:
+        assert cookie_session["sid"] == session_id
+
+    with app.test_request_context():
+        from flask import session
+
+        session["sid"] = session_id
+        client = api()
+        assert client.data["access"] == "access-1"
+        # Meanwhile a parallel request renews and stores the tokens.
+        store.save(session_id, {**client.data, "access": "access-2", "refresh": "r-2"})
+        assert client.get("/me/profile") == {"ok": True}
+        assert g.session_data["access"] == "access-2"
+
+    assert "POST /auth/refresh" not in fake_api.requested()
+
+
+def test_unused_sessions_are_removed(app, tmp_path):
+    import os
+    import time
+
+    from hiker_web.sessions import SessionStore
+
+    store = SessionStore(tmp_path / "s", max_age_seconds=3600)
+    old = store.create({"access": "a"})
+    fresh = store.create({"access": "b"})
+    past = time.time() - 7200
+    os.utime(tmp_path / "s" / f"{old}.json", (past, past))
+
+    newest = store.create({"access": "c"})
+
+    assert store.load(old) is None
+    assert store.load(fresh) and store.load(newest)

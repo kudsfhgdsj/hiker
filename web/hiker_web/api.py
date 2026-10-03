@@ -85,6 +85,24 @@ class Api:
         data = self.data if auth else None
         response = self._send(method, path, data["access"] if data else None, **kwargs)
         if response.status_code == 401 and data:
+            data = self._renew(data)
+            response = self._send(method, path, data["access"], **kwargs)
+        if response.status_code >= 400:
+            raise _error(response)
+        return response
+
+    def _renew(self, data: dict) -> dict:
+        """New tokens for the session. A refresh token works only once, and a page
+        loads its images in parallel: only one of those requests may renew."""
+        with self._store.lock(self.session_id):
+            latest = self._store.load(self.session_id)
+            if latest is None:
+                self.sign_out()
+                raise ApiError(401, "session_expired")
+            if latest["access"] != data["access"]:
+                # Another request has renewed the tokens in the meantime.
+                g.session_data = latest
+                return latest
             refreshed = self._send(
                 "POST", "/auth/refresh", None, json={"refresh_token": data["refresh"]}
             )
@@ -96,10 +114,7 @@ class Api:
             data = {**data, "access": tokens["access_token"], "refresh": tokens["refresh_token"]}
             self._store.save(self.session_id, data)
             g.session_data = data
-            response = self._send(method, path, data["access"], **kwargs)
-        if response.status_code >= 400:
-            raise _error(response)
-        return response
+            return data
 
     def get(self, path: str, **params):
         params = {key: value for key, value in params.items() if value not in (None, "", [])}

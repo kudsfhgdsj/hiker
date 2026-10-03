@@ -507,6 +507,17 @@ Das Web-Frontend ist ein eigenes Projekt in `web/` und ersetzt die früher gepla
 - **Betrieb**: eigener Dienst `web` im Compose-Stack, nur auf `127.0.0.1:<Port>`. Der Reverse Proxy leitet `/api/` an die API und alles andere an das Web-Frontend. Die Regel „Tokens öffentlicher Links nie in Logs“ gilt auch hier und im Proxy.
 - **Tests**: pytest mit dem Flask-Testclient; die API wird in den Tests durch eine Attrappe ersetzt.
 
+**Umsetzung (Schritt 13)**
+
+- Projekt `web/`, Paket `hiker_web`, Blueprints `auth`, `gear` (`/gear`), `nutrition` (`/food`), `protocols` (`/tours`) und `public` (`/p`). Start im Container mit gunicorn (`hiker_web.wsgi:app`), Port nur auf `127.0.0.1:${WEB_PORT}`.
+- **Sitzungen**: je Sitzung eine JSON-Datei in `WEB_SESSION_DIR` (Rechte 600) mit Tokens, Nutzer und aktiven Modulen; das Cookie enthält nur die zufällige Sitzungs-ID und das CSRF-Token. Ungenutzte Sitzungen werden nach `WEB_SESSION_DAYS` gelöscht. Weil ein Refresh-Token nur einmal gilt und eine Seite ihre Bilder parallel lädt, erneuert je Sitzung nur eine Anfrage die Tokens (Dateisperre); die anderen übernehmen das Ergebnis.
+- **Konflikte**: Das Bearbeiten-Formular schickt neben der `version` die Werte mit, mit denen es geladen wurde. Bei 409 führt das Frontend feldweise zusammen: unveränderte Felder übernehmen den neuen Stand, eigene Änderungen bleiben eingetragen; als Abweichung angezeigt werden nur Felder, die beide Seiten geändert haben. Bei den Listen gilt der neue Stand, eigene Änderungen an vorhandenen Zeilen sind eingetragen. Gespeichert wird erst nach erneutem Absenden, dann auf Basis der neuen Version.
+- **Rechte**: Die Oberfläche blendet aus, was die API ohnehin ablehnt (Track, Freigaben, Löschen nur für den Besitzer; Zeiten und Zahlenwerte bei `edit` als unveränderte versteckte Felder). Entscheidend bleibt die Prüfung der API.
+- **Karte**: MapLibre GL JS 5.24.0 in der CSP-Variante unter `static/vendor/maplibre-gl/`; Kachelquelle über `MAP_TILE_URL`. Höhenprofil als SVG ohne weitere Bibliothek, mit der Karte gekoppelt (Position unter dem Zeiger, Foto-Marker).
+- **Sicherheits-Header**: `Content-Security-Policy` (Skripte und Stile nur vom eigenen Server, Kacheln nur von der Kachelquelle), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`.
+- **Öffentliche Seite**: `/p/<token>`, `/p/<token>/track.json`, `/p/<token>/photos/<index>`; Token mit falscher Form erreichen die API nicht. gunicorn schreibt kein Zugriffs-Log.
+- **Noch nicht im Web** (in der App vorhanden oder später): Track zeichnen, Fotoposition verschieben, Wegpunkte von Hand, eigener Wetterpunkt, Packlisten, Start-/Endpunkt von Hand. Zeiten lassen sich nur mit JavaScript bearbeiten (Umrechnung der Ortszeit im Browser); alles andere funktioniert auch ohne.
+
 ## 10. Sicherheit und Datenschutz
 
 - Passwörter mit argon2 oder bcrypt, JWT kurzlebig + Refresh-Token.
@@ -525,9 +536,9 @@ Das Web-Frontend ist ein eigenes Projekt in `web/` und ersetzt die früher gepla
 Ziel: Ubuntu 26.04, Domain `hiker.lacasa.internal`, läuft auf dem bereits genutzten Server neben anderen Diensten.
 
 - Docker über das offizielle Docker-Repository installieren; Stack per Docker Compose: `api`, `db` (PostgreSQL), `web` (Flask-Web-Frontend, ab Schritt 13), optional `minio`.
-- **Keine festen Ports 80/443 im Stack.** Die API lauscht nur auf `127.0.0.1:<Port>`. Der bereits vorhandene Webserver bzw. Reverse Proxy (nginx, Apache oder Caddy) leitet `hiker.lacasa.internal` dorthin; TLS über Let's Encrypt (certbot oder Caddy). Beispielkonfigurationen für nginx und Caddy liegen in `deploy/`. Läuft auf dem Server noch kein Proxy, wird einer ergänzt.
+- **Keine festen Ports 80/443 im Stack.** API und Web-Frontend lauschen nur auf `127.0.0.1:<Port>` (`API_PORT`, `WEB_PORT`). Der bereits vorhandene Webserver bzw. Reverse Proxy (nginx, Apache oder Caddy) leitet `hiker.lacasa.internal` dorthin; TLS über Let's Encrypt (certbot oder Caddy). Beispielkonfigurationen für nginx und Caddy liegen in `deploy/`. Läuft auf dem Server noch kein Proxy, wird einer ergänzt.
 - DNS: A-/AAAA-Eintrag für `hiker.lacasa.internal` auf den Server.
-- Konfiguration in `.env` (nicht im Repository, Vorlage `.env.example`): Datenbankpasswort, `SECRET_KEY`, `PUBLIC_BASE_URL=https://hiker.lacasa.internal`, Speicherpfad, `ENABLED_MODULES`, `REGISTRATION_MODE`.
+- Konfiguration in `.env` (nicht im Repository, Vorlage `.env.example`): Datenbankpasswort, `SECRET_KEY`, `PUBLIC_BASE_URL=https://hiker.lacasa.internal`, Speicherpfad, `ENABLED_MODULES`, `REGISTRATION_MODE`, für das Web-Frontend `WEB_SECRET_KEY` und `WEB_PORT`.
 - Upload-Größen im Proxy erhöhen (Fotos, GPX).
 - Backups: Nächtlicher `pg_dump` plus Sicherung des Foto-/GPX-Verzeichnisses nach `/var/backups/hiker`, 14 Tage Rotation, per systemd-Timer. Eine Kopie außerhalb des Servers ist empfohlen (Ziel noch offen). Wiederherstellung einmal testen.
 - Datenbankmigrationen mit Alembic, Updates über neue Images.

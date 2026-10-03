@@ -47,7 +47,9 @@ def create_app(config: dict | None = None) -> Flask:
 
     # Behind the reverse proxy: take scheme and client address from its headers.
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
-    app.extensions["session_store"] = SessionStore(app.config["SESSION_DIR"])
+    app.extensions["session_store"] = SessionStore(
+        app.config["SESSION_DIR"], max_age_seconds=app.config["SESSION_DAYS"] * 86400
+    )
     app.extensions["api_client"] = httpx2.Client(
         base_url=app.config["API_BASE_URL"],
         timeout=30,
