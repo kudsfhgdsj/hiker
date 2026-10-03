@@ -171,13 +171,18 @@ Auswertungen (abgeleitet): Touren und Gesamtstrecke je Gegenstand (mit Modul `pr
 
 ### 6.3 Ernährung (Modul nutrition)
 **food_item**
-- id, owner_id (leer = gemeinsamer Katalog), barcode (EAN/UPC, indexiert), name, brand
-- kcal_per_100g, protein_g, carbs_g, fat_g, sugar_g, salt_g (je 100 g)
-- serving_size_g, image_url oder image_file_id
+- id, owner_id (leer = gemeinsamer Katalog), barcode (EAN-8, UPC-A, EAN-13 oder GTIN-14, indexiert), name, brand
+- kcal_per_100g (0–900, bei eigenen Produkten Pflicht), protein_g, carbs_g, fat_g, sugar_g, salt_g (je 100 g, 0–100)
+- serving_size_g, image_url (Bild-Upload für eigene Produkte ist noch nicht vorgesehen)
 - source (`openfoodfacts` | `custom`), source_synced_at
-- visibility (`private` | `catalog_pending` | `catalog`)
+- visibility (`private` | `catalog_pending` | `catalog_rejected` | `catalog`)
+- catalog_id (bei privaten Produkten: Katalogeintrag, von dem kopiert bzw. als der es vorgeschlagen wurde), proposed_by (wer den Katalogeintrag vorgeschlagen hat; wird nie ausgegeben)
 
-Gemeinsamer Katalog = Open-Food-Facts-Cache plus von Nutzern vorgeschlagene eigene Produkte (nach Freigabe durch `admin`). Eigene Korrekturen an einem Katalogprodukt werden als private Kopie des Nutzers gespeichert.
+Plausibilitätsprüfung bei der Eingabe: Zucker ≤ Kohlenhydrate; Eiweiß + Kohlenhydrate + Fett ≤ 100 g. Werte von Open Food Facts werden tolerant gelesen (unplausible Einzelwerte bleiben leer; kJ wird in kcal umgerechnet, wenn kcal fehlt).
+
+Gemeinsamer Katalog = Open-Food-Facts-Cache plus von Nutzern vorgeschlagene eigene Produkte (nach Freigabe durch `admin`). Ein Vorschlag ist eine Kopie des privaten Produkts; sie gehört bis zur Freigabe dem Vorschlagenden und wird erst dann für alle sichtbar. Der Admin kann die Daten beim Freigeben korrigieren; je Barcode gibt es höchstens einen Katalogeintrag. Eigene Korrekturen an einem Katalogprodukt werden als private Kopie des Nutzers gespeichert; in Suche und Barcode-Abfrage ersetzt sie für diesen Nutzer den Katalogeintrag.
+
+Open-Food-Facts-Einträge werden nach `OPENFOODFACTS_CACHE_DAYS` (Standard 30) beim nächsten Barcode-Abruf aktualisiert; ist der Dienst nicht erreichbar, wird der alte Stand geliefert.
 
 ### 6.4 Protokolle (Modul protocols)
 **tour**
@@ -246,7 +251,7 @@ Die verwendete Formel und Parameter werden im Code dokumentiert und als Tooltip 
 Auswahl aus der Datenbank oder per Packlisten-Vorlage. Startgewicht = Summe der mitgeführten Gegenstände (plus geplantes Essen), überschreibbar.
 
 **Barcode-Scan und Essen**
-Scanner liest EAN lokal → lokale Datenbank → Backend `GET /nutrition/barcode/{ean}` (eigener Katalog, dann Open Food Facts, mit Cache) → sonst Formular für ein eigenes Produkt (Barcode wird mitgespeichert) → Menge eingeben → Kalorien als Momentaufnahme in der Tour.
+Scanner liest EAN lokal → lokale Datenbank → Backend `GET /nutrition/barcode/{ean}` (eigene Produkte, dann gemeinsamer Katalog, dann Open Food Facts, mit Cache; 404 `product_not_found` = unbekannt, 502 `source_unavailable` = Open Food Facts nicht erreichbar) → sonst Formular für ein eigenes Produkt (Barcode wird mitgespeichert) → Menge eingeben → Kalorien als Momentaufnahme in der Tour.
 
 **Änderungshistorie**
 Jede Änderung erzeugt eine `tour_revision` (Autor, Zeit, Diff, Snapshot). Zeitleiste, Vergleich zweier Stände, Wiederherstellen (erzeugt neue Revision). Konfliktschutz über `version`: veralteter Stand → 409 mit aktuellem Stand; Client führt feldweise zusammen und fragt bei Überschneidung.
@@ -330,10 +335,14 @@ Listen mit Paging antworten mit `{items, total, limit, offset}`. Beim Anlegen da
 | Methode | Pfad | Zweck |
 |---|---|---|
 | GET | /nutrition/barcode/{ean} | Produkt per Barcode |
-| GET | /nutrition/search?q= | Produktsuche (privat + Katalog) |
-| GET, POST, PUT, DELETE | /nutrition/foods | Eigene Lebensmittel |
+| GET | /nutrition/search?q= | Produktsuche (privat + Katalog; Name, Marke oder exakter Barcode) |
+| GET, POST | /nutrition/foods | Eigene Lebensmittel / anlegen (optional mit `catalog_id` als private Kopie eines Katalogprodukts) |
+| GET | /nutrition/foods/{id} | Eigenes Lebensmittel, eigener Vorschlag oder Katalogeintrag |
+| PUT, DELETE | /nutrition/foods/{id} | Eigenes Lebensmittel ändern / löschen (Soft Delete) |
 | POST | /nutrition/foods/{id}/propose-to-catalog | Katalogvorschlag |
-| GET, PATCH | /nutrition/catalog/pending, …/{id} | Moderation (admin) |
+| GET | /nutrition/catalog/mine | Eigene Vorschläge mit Status |
+| GET | /nutrition/catalog/pending | Offene Vorschläge (admin) |
+| PATCH | /nutrition/catalog/{id} | Freigeben, ablehnen, Daten korrigieren (admin) |
 
 Berechtigungen werden zentral in einer Dependency geprüft, nicht in jedem Endpunkt.
 
@@ -418,5 +427,5 @@ Stehen in der separaten Datei `CLAUDE.md` im Repository-Hauptverzeichnis.
 1. Backup-Ziel außerhalb des Servers (z. B. zweiter Server, externer Speicher).
 2. Welcher Webserver bzw. Reverse Proxy läuft auf dem Server bereits (nginx, Apache, Caddy)? Davon hängt die Beispielkonfiguration in `deploy/` ab.
 3. Kartenquellen und Lizenzen (bis Phase 2).
-4. Rate-Limit für Login (Abschnitt 10) ist noch nicht umgesetzt; im Proxy oder in der API, spätestens mit Schritt 13.
+4. Rate-Limit für Login und Barcode-Lookup (Abschnitt 10) ist noch nicht umgesetzt; im Proxy oder in der API, spätestens mit Schritt 13.
 5. Genauer Wunsch zur Foto-Darstellung nach Sichtung der wanderer-Demo (Abschnitt 9), falls etwas anders sein soll.

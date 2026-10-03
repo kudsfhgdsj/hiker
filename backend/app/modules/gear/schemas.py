@@ -5,33 +5,19 @@ from typing import Annotated, Literal
 from pydantic import (
     AfterValidator,
     BaseModel,
-    BeforeValidator,
     ConfigDict,
     Field,
     StringConstraints,
     model_validator,
 )
 
+from app.core.fields import Name
+from app.core.fields import optional_text as _optional_text
 
-def _blank_to_none(value):
-    if isinstance(value, str):
-        return value.strip() or None
-    return value
-
-
-def _optional_text(max_length: int):
-    text = Annotated[str, StringConstraints(max_length=max_length)]
-    return Annotated[text | None, BeforeValidator(_blank_to_none)]
-
-
-Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 TypeName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 Brand = _optional_text(100)
 LongText = _optional_text(5000)
-WebsiteUrl = Annotated[
-    Annotated[str, StringConstraints(max_length=500, pattern=r"^https?://\S+$")] | None,
-    BeforeValidator(_blank_to_none),
-]
+WebsiteUrl = _optional_text(500, pattern=r"^https?://\S+$")
 WeightG = Annotated[Annotated[int, Field(ge=0, le=1_000_000)] | None, Field()]
 
 

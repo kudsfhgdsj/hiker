@@ -6,7 +6,7 @@ os.environ.update(
         "SECRET_KEY": "test-secret-key-not-for-production-0123456789",
         "DATABASE_URL": "sqlite://",
         "PUBLIC_BASE_URL": "http://testserver",
-        "ENABLED_MODULES": "auth,gear",
+        "ENABLED_MODULES": "auth,gear,nutrition",
         "REGISTRATION_MODE": "open",
         "ACCESS_TOKEN_TTL_MINUTES": "15",
         "REFRESH_TOKEN_TTL_DAYS": "30",
@@ -30,6 +30,8 @@ from app.core.registry import import_all_models  # noqa: E402
 from app.core.storage import get_storage  # noqa: E402
 from app.core.storage.local_fs import LocalFsStorage  # noqa: E402
 from app.main import create_app  # noqa: E402
+from app.modules.nutrition.deps import get_food_source  # noqa: E402
+from app.modules.nutrition.sources import FoodData, FoodSourceError  # noqa: E402
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -64,9 +66,10 @@ def db(session_factory):
 
 
 @pytest.fixture
-def client(session_factory, storage):
+def client(session_factory, storage, food_source):
     app = create_app()
     app.dependency_overrides[get_storage] = lambda: storage
+    app.dependency_overrides[get_food_source] = lambda: food_source
 
     def _get_db():
         with session_factory() as session:
@@ -75,6 +78,26 @@ def client(session_factory, storage):
     app.dependency_overrides[get_db] = _get_db
     with TestClient(app) as test_client:
         yield test_client
+
+
+class FakeFoodSource:
+    """Stands in for Open Food Facts; tests never touch the network."""
+
+    def __init__(self):
+        self.products: dict[str, FoodData] = {}
+        self.calls: list[str] = []
+        self.fail = False
+
+    def fetch_by_barcode(self, barcode: str) -> FoodData | None:
+        self.calls.append(barcode)
+        if self.fail:
+            raise FoodSourceError("unreachable")
+        return self.products.get(barcode)
+
+
+@pytest.fixture
+def food_source():
+    return FakeFoodSource()
 
 
 @pytest.fixture
