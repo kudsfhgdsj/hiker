@@ -1,9 +1,10 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.core.deps import DbSession
 from app.core.errors import NotFoundError, error_responses
+from app.core.ratelimit import rate_limit
 from app.modules.auth import service
 from app.modules.auth.deps import CurrentUser
 from app.modules.auth.schemas import (
@@ -20,6 +21,9 @@ from app.modules.auth.schemas import (
 
 router = APIRouter()
 
+# Slows down password guessing and mass registration.
+auth_rate_limit = Depends(rate_limit("auth", limit=20))
+
 
 def _auth_response(user, tokens: service.TokenPair) -> AuthResponse:
     return AuthResponse(
@@ -32,6 +36,7 @@ def _auth_response(user, tokens: service.TokenPair) -> AuthResponse:
 
 @router.post(
     "/auth/register",
+    dependencies=[auth_rate_limit],
     response_model=AuthResponse,
     status_code=status.HTTP_201_CREATED,
     tags=["auth"],
@@ -45,7 +50,11 @@ def register(body: RegisterRequest, db: DbSession):
 
 
 @router.post(
-    "/auth/login", response_model=AuthResponse, tags=["auth"], responses=error_responses(401)
+    "/auth/login",
+    dependencies=[auth_rate_limit],
+    response_model=AuthResponse,
+    tags=["auth"],
+    responses=error_responses(401),
 )
 def login(body: LoginRequest, db: DbSession):
     user = service.authenticate(db, email=body.email, password=body.password)
@@ -53,7 +62,11 @@ def login(body: LoginRequest, db: DbSession):
 
 
 @router.post(
-    "/auth/refresh", response_model=TokenResponse, tags=["auth"], responses=error_responses(401)
+    "/auth/refresh",
+    dependencies=[auth_rate_limit],
+    response_model=TokenResponse,
+    tags=["auth"],
+    responses=error_responses(401),
 )
 def refresh(body: RefreshRequest, db: DbSession):
     """Exchange the refresh token. The old one becomes invalid (rotation)."""

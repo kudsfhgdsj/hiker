@@ -22,7 +22,7 @@ from PIL import Image  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
-from app.core import security  # noqa: E402
+from app.core import ratelimit, security  # noqa: E402
 from app.core.config import get_settings  # noqa: E402
 from app.core.db import Base, create_db_engine  # noqa: E402
 from app.core.deps import get_db  # noqa: E402
@@ -46,6 +46,7 @@ def _fast_password_hashing():
 @pytest.fixture(autouse=True)
 def _fresh_settings():
     get_settings.cache_clear()
+    ratelimit.reset()
     yield
     get_settings.cache_clear()
 

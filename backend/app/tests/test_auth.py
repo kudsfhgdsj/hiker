@@ -262,3 +262,25 @@ def test_lookup_requires_login_and_returns_404_for_unknown_email(client):
     assert anonymous.status_code == 401
     assert unknown.status_code == 404
     assert partial.status_code == 422
+
+
+def test_login_attempts_are_rate_limited(client):
+    register(client)
+    wrong = {"email": "anna@example.org", "password": "wrong-password-123"}
+
+    statuses = [client.post("/api/v1/auth/login", json=wrong).status_code for _ in range(21)]
+
+    assert statuses == [401] * 19 + [429] * 2
+    limited = client.post("/api/v1/auth/login", json=wrong)
+    assert limited.json()["error"]["code"] == "rate_limited"
+    assert 0 < int(limited.headers["retry-after"]) <= 60
+
+
+def test_rate_limit_can_be_switched_off(client, monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT_ENABLED", "false")
+    get_settings.cache_clear()
+    wrong = {"email": "anna@example.org", "password": "wrong-password-123"}
+
+    statuses = {client.post("/api/v1/auth/login", json=wrong).status_code for _ in range(25)}
+
+    assert statuses == {401}

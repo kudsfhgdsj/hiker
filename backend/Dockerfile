@@ -22,5 +22,6 @@ USER hiker
 
 EXPOSE 8000
 
-# Apply pending migrations of all modules, then start the API.
-CMD ["sh", "-c", "alembic upgrade heads && exec uvicorn --factory app.main:create_app --host 0.0.0.0 --port 8000"]
+# Apply pending migrations of all modules, then start the API. The port is only published
+# on 127.0.0.1, so the forwarded headers of the local reverse proxy can be trusted.
+CMD ["sh", "-c", "alembic upgrade heads && exec uvicorn --factory app.main:create_app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips '*'"]

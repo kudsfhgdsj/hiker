@@ -391,7 +391,7 @@ Geplantes Verhalten (unsere Umsetzung):
 ## 10. Sicherheit und Datenschutz
 
 - Passwörter mit argon2 oder bcrypt, JWT kurzlebig + Refresh-Token.
-- Rate-Limit auf Login, Public Links und Barcode-Lookup; HTTPS Pflicht.
+- Rate-Limit auf Login, Public Links und Barcode-Lookup; HTTPS Pflicht. Umsetzung: je Client-Adresse und Minute 20 Anfragen an Registrierung/Login/Refresh, 60 an Barcode-Lookup und öffentliche Ansicht; darüber 429 mit `Retry-After`. Die Client-Adresse kommt aus den Proxy-Headern. Abschaltbar über `RATE_LIMIT_ENABLED=false`.
 - Public-Link-Tokens: kryptografisch zufällig, widerrufbar, optional befristet, nie in Logs.
 - Fotos: EXIF-GPS bei öffentlichen Links optional entfernen; Uploads auf Typ und Größe prüfen, Bilder serverseitig neu kodieren.
 - Dateizugriff nur mit Berechtigungsprüfung oder kurzlebigen signierten URLs.
@@ -445,5 +445,5 @@ Stehen in der separaten Datei `CLAUDE.md` im Repository-Hauptverzeichnis.
 1. Backup-Ziel außerhalb des Servers (z. B. zweiter Server, externer Speicher).
 2. Welcher Webserver bzw. Reverse Proxy läuft auf dem Server bereits (nginx, Apache, Caddy)? Davon hängt die Beispielkonfiguration in `deploy/` ab.
 3. Kartenquellen und Lizenzen (bis Phase 2).
-4. Rate-Limit für Login und Barcode-Lookup (Abschnitt 10) ist noch nicht umgesetzt; im Proxy oder in der API, spätestens mit Schritt 13.
+4. Das Rate-Limit liegt im Arbeitsspeicher eines API-Prozesses. Läuft die API später in mehreren Prozessen, muss es in den Proxy oder einen gemeinsamen Speicher wandern.
 5. Genauer Wunsch zur Foto-Darstellung nach Sichtung der wanderer-Demo (Abschnitt 9), falls etwas anders sein soll.

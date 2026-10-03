@@ -1,11 +1,12 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Path, Query, status
+from fastapi import APIRouter, Depends, Path, Query, status
 
 from app.core.deps import DbSession
 from app.core.errors import error_responses
 from app.core.pagination import Page, Paging
+from app.core.ratelimit import rate_limit
 from app.modules.auth.deps import AdminUser, CurrentUser
 from app.modules.nutrition import service
 from app.modules.nutrition.deps import OwnedFood, ReadableFood, Source
@@ -29,7 +30,12 @@ def _page(result, paging) -> Page:
     return Page(items=items, total=total, limit=paging.limit, offset=paging.offset)
 
 
-@router.get("/barcode/{ean}", response_model=FoodOut, responses=error_responses(404, 502))
+@router.get(
+    "/barcode/{ean}",
+    response_model=FoodOut,
+    responses=error_responses(404, 429, 502),
+    dependencies=[Depends(rate_limit("barcode", limit=60))],
+)
 def lookup_barcode(
     ean: Annotated[str, Path(pattern=BARCODE_PATTERN)],
     user: CurrentUser,

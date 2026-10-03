@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     storage_path: str = "./data/files"
     max_upload_mb: int = Field(default=15, gt=0)
     image_max_edge_px: int = Field(default=2000, ge=200)
+    rate_limit_enabled: bool = True
     # Empty value disables the lookup at Open Food Facts.
     openfoodfacts_base_url: str = "https://world.openfoodfacts.org"
     openfoodfacts_cache_days: int = Field(default=30, gt=0)
