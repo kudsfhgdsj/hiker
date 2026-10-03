@@ -8,12 +8,16 @@ from app.core.deps import DbSession
 from app.core.errors import error_responses
 from app.core.pagination import Page, Paging
 from app.modules.auth.deps import CurrentUser
-from app.modules.protocols import service
+from app.modules.protocols import history, service
 from app.modules.protocols.schemas import (
+    RevisionComparison,
+    RevisionListItem,
+    RevisionOut,
     TourCreate,
-    TourIn,
     TourListItem,
     TourOut,
+    TourUpdate,
+    VersionConflict,
     WaypointIn,
     WaypointOut,
     WaypointPatch,
@@ -72,9 +76,17 @@ def read_tour(access: ReadableTour, db: DbSession):
     return service.tour_out(db, access)
 
 
-@router.put("/tours/{tour_id}", response_model=TourOut, responses=error_responses(403, 404, 409))
-def update_tour(body: TourIn, access: EditableTour, db: DbSession):
+@router.put(
+    "/tours/{tour_id}",
+    response_model=TourOut,
+    responses={**error_responses(403, 404), 409: {"model": VersionConflict}},
+)
+def update_tour(body: TourUpdate, access: EditableTour, db: DbSession):
     """Replace the tour document including its lists.
+
+    `version` must be the version the change is based on. If the tour was changed
+    in the meantime the answer is 409 `version_conflict` with the current tour, so
+    that the client can merge field by field and try again.
 
     With `edit` permission the owner-only fields (times, duration, pack weight,
     calories burned) must be sent back unchanged.
@@ -131,3 +143,61 @@ def update_waypoint(
 )
 def delete_waypoint(waypoint_id: uuid.UUID, access: EditableTour, db: DbSession):
     service.delete_waypoint(db, access, service.get_waypoint(access, waypoint_id))
+
+
+# --- History ---
+
+
+@router.get(
+    "/tours/{tour_id}/revisions",
+    response_model=Page[RevisionListItem],
+    responses=error_responses(404),
+)
+def list_revisions(access: ReadableTour, db: DbSession, paging: Paging):
+    """The change history, newest first."""
+    revisions, total = history.list_revisions(
+        db, access.tour, limit=paging.limit, offset=paging.offset
+    )
+    items = service.revision_items(db, revisions, RevisionListItem)
+    return Page(items=items, total=total, limit=paging.limit, offset=paging.offset)
+
+
+@router.get(
+    "/tours/{tour_id}/revisions/{version}",
+    response_model=RevisionOut,
+    responses=error_responses(404),
+)
+def read_revision(version: int, access: ReadableTour, db: DbSession):
+    """One revision with the full state of the tour and the diff to its predecessor."""
+    revision = history.get_revision(db, access.tour, version)
+    return service.revision_items(db, [revision], RevisionOut)[0]
+
+
+@router.get(
+    "/tours/{tour_id}/revisions/{version}/compare/{other_version}",
+    response_model=RevisionComparison,
+    responses=error_responses(404),
+)
+def compare_revisions(version: int, other_version: int, access: ReadableTour, db: DbSession):
+    """Difference between two versions (from `version` to `other_version`)."""
+    old = history.get_revision(db, access.tour, version)
+    new = history.get_revision(db, access.tour, other_version)
+    return RevisionComparison(
+        from_version=version,
+        to_version=other_version,
+        diff=history.diff_snapshots(old.snapshot, new.snapshot),
+    )
+
+
+@router.post(
+    "/tours/{tour_id}/revisions/{version}/restore",
+    response_model=TourOut,
+    responses=error_responses(403, 404),
+)
+def restore_revision(version: int, access: EditableTour, db: DbSession):
+    """Bring the tour back to an earlier state. The history grows by one revision.
+
+    With `edit` permission this only works if the owner-only fields stay as they are.
+    """
+    history.restore(db, access, history.get_revision(db, access.tour, version))
+    return service.tour_out(db, access)

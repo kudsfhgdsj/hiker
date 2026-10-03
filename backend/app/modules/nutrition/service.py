@@ -84,6 +84,14 @@ def get_food_for_user(db: Session, user: User, food_id: uuid.UUID) -> FoodItem |
     )
 
 
+def existing_food_ids(db: Session, food_ids) -> set[uuid.UUID]:
+    """Those of the given ids that still refer to a food (deleted ones included)."""
+    ids = {food_id for food_id in food_ids if food_id is not None}
+    if not ids:
+        return set()
+    return set(db.scalars(select(FoodItem.id).where(FoodItem.id.in_(ids))))
+
+
 # --- Own foods ---
 
 

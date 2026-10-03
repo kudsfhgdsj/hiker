@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy.orm.exc import StaleDataError
 
 
 class AppError(Exception):
@@ -8,6 +9,8 @@ class AppError(Exception):
 
     status_code = 400
     code = "bad_request"
+    # Additional top-level fields of the response body, next to "error".
+    extra: dict | None = None
 
     def __init__(self, message: str, *, code: str | None = None):
         super().__init__(message)
@@ -72,4 +75,11 @@ def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     def _handle_app_error(_request: Request, exc: AppError) -> JSONResponse:
         body = ErrorResponse(error=ErrorBody(code=exc.code, message=exc.message))
-        return JSONResponse(body.model_dump(), status_code=exc.status_code, headers=exc.headers)
+        content = body.model_dump() | (exc.extra or {})
+        return JSONResponse(content, status_code=exc.status_code, headers=exc.headers)
+
+    @app.exception_handler(StaleDataError)
+    def _handle_stale_data(_request: Request, _exc: StaleDataError) -> JSONResponse:
+        # Optimistic locking: a concurrent request changed the record first.
+        error = ErrorBody(code="version_conflict", message="The record was changed in the meantime")
+        return JSONResponse(ErrorResponse(error=error).model_dump(), status_code=409)

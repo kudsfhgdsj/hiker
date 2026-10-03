@@ -121,6 +121,24 @@ class TourShare(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
+class TourRevision(Base):
+    """One entry of the change history. Rows are only ever inserted."""
+
+    __tablename__ = "tour_revision"
+    __table_args__ = (UniqueConstraint("tour_id", "version"),)
+
+    id: Mapped[uuid.UUID] = _id_column()
+    tour_id: Mapped[uuid.UUID] = _tour_id_column()
+    version: Mapped[int] = mapped_column(Integer)
+    # Emptied when the user is removed, which anonymises the history.
+    author_user_id: Mapped[uuid.UUID | None] = _user_reference()
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    kind: Mapped[str] = mapped_column(String(10))
+    change_summary: Mapped[str] = mapped_column(String(500))
+    snapshot: Mapped[dict] = mapped_column(JSON)
+    diff: Mapped[dict] = mapped_column(JSON)
+
+
 class Tour(TimestampMixin, Base):
     __tablename__ = "tour"
 
@@ -152,6 +170,9 @@ class Tour(TimestampMixin, Base):
     cover_photo_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     # Revision counter; raised by history.record_change on every change.
     version: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Optimistic locking: an UPDATE only succeeds if the version is still the one we read.
+    __mapper_args__ = {"version_id_col": version, "version_id_generator": False}
 
     gear: Mapped[list[TourGear]] = relationship(
         cascade="all, delete-orphan", order_by=(TourGear.name_snapshot, TourGear.id)

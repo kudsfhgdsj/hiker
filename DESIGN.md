@@ -220,7 +220,7 @@ Platzhalter → echter User: `contact.linked_user_id` setzen; gilt sofort in all
 ### 6.5 Teilen und Historie
 **tour_share**: tour_id, user_id, permission (`read` | `edit`)
 **tour_public_link**: id, tour_id, token (zufälliges UUIDv4), created_by, created_at, expires_at, revoked_at, Optionen (`hide_exact_start`, `strip_photo_gps`)
-**tour_revision**: id, tour_id, version, author_user_id, created_at, change_summary, snapshot (JSON), diff (JSON)
+**tour_revision**: id, tour_id, version (je Tour eindeutig), author_user_id (wird beim Entfernen des Nutzers geleert), created_at, kind (`created` | `updated` | `restored` | `deleted`), change_summary (geänderte Felder bzw. wiederhergestellte Version), snapshot (JSON), diff (JSON)
 
 ### 6.6 Dateien (core)
 **file_object**: id, owner_id, storage_key, mime, size, sha256, created_at
@@ -262,6 +262,14 @@ Scanner liest EAN lokal → lokale Datenbank → Backend `GET /nutrition/barcode
 **Änderungshistorie**
 Jede Änderung erzeugt eine `tour_revision` (Autor, Zeit, Diff, Snapshot). Zeitleiste, Vergleich zweier Stände, Wiederherstellen (erzeugt neue Revision). Konfliktschutz über `version`: veralteter Stand → 409 mit aktuellem Stand; Client führt feldweise zusammen und fragt bei Überschneidung.
 
+Umsetzung:
+- Alle Änderungen an einer Tour (Dokument, Wegpunkte, Löschen, Wiederherstellen) laufen durch `history.record_change`. Revisionen werden nur eingefügt, nie geändert oder gelöscht.
+- Der Snapshot enthält den vollständigen bearbeitbaren Stand: Textfelder, Zeiten, manuelle Werte sowie die Listen Ausrüstung, Essen, Gipfel und Wegpunkte (mit ihren Momentaufnahmen). Spätere Schritte (Track, Punkte, Fotos, Partner) erweitern ihn.
+- Der Diff nennt bei einfachen Feldern `{old, new}`, bei Listen `{added, removed, changed, reordered}`; Einträge werden über ihre `id` verglichen.
+- Ein `PUT`, das nichts ändert, erzeugt keine Revision und erhöht die Version nicht.
+- `PUT /tours/{id}` verlangt im Body die `version`, auf der die Änderung beruht. Weicht sie ab: 409 `version_conflict`, der Body enthält unter `current` die aktuelle Tour. Zusätzlich sichert die Datenbank gleichzeitige Schreibzugriffe ab (Update nur, wenn die Version noch stimmt). Wegpunkt-Endpunkte, Löschen und Wiederherstellen verlangen keine Basisversion.
+- Wiederherstellen setzt den Stand einer Revision vollständig zurück. Verweise auf inzwischen entfernte Gegenstände oder Lebensmittel werden geleert, die Momentaufnahme bleibt. Mit `edit` ist es nur möglich, wenn sich dabei keine Owner-Felder ändern (sonst 403).
+
 **Offline-Sync**
 Lokale Änderungen mit `updated_at`/`deleted_at` und Basis-`version`; Konfliktregel wie bei der Historie. Fotos und GPX laufen über eine getrennte Upload-Warteschlange.
 
@@ -295,7 +303,8 @@ Versioniertes Schema (`schema_version`): Tour, Ausrüstung (Snapshots), Essen, P
 |---|---|---|
 | GET, POST | /tours | Eigene + geteilte listen (`scope` = `all`/`mine`/`shared`, `q`, `start_from`, `start_to`, Paging) / erstellen |
 | GET, PUT, DELETE | /tours/{id} | Lesen, Editieren, Löschen (nur Owner, Soft Delete) |
-| GET | /tours/{id}/revisions, /revisions/{rev} | Historie |
+| GET | /tours/{id}/revisions, /revisions/{rev} | Historie (Liste mit Paging, neueste zuerst / eine Revision mit Snapshot und Diff; `rev` = Versionsnummer) |
+| GET | /tours/{id}/revisions/{rev}/compare/{other} | Diff zwischen zwei Versionen |
 | POST | /tours/{id}/revisions/{rev}/restore | Wiederherstellen |
 | POST | /tours/{id}/shares | Teilen (`read`/`edit`) |
 | PATCH, DELETE | /tours/{id}/shares/{user_id} | Recht ändern / entfernen |

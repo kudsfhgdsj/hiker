@@ -3,7 +3,9 @@ import uuid
 import pytest
 from sqlalchemy import select
 
-from app.modules.protocols.models import Tour, TourShare
+from app.modules.auth.models import User
+from app.modules.protocols import history
+from app.modules.protocols.models import Tour, TourRevision, TourShare
 from app.tests.conftest import auth_header, register
 
 TOURS = "/api/v1/tours"
@@ -77,7 +79,7 @@ def shared_tour(client, db, anna, bea, cleo):
 
 def document(tour, **changes):
     """The tour as a client would send it back in a PUT."""
-    fields = ("title", "summary", *OWNER_ONLY, "gear", "food", "peaks")
+    fields = ("title", "summary", *OWNER_ONLY, "gear", "food", "peaks", "version")
     return {field: tour[field] for field in fields} | changes
 
 
@@ -595,3 +597,336 @@ def test_tour_routes_are_absent_and_startup_fails_without_dependencies(monkeypat
 
     with pytest.raises(ModuleRegistryError, match="depends on 'nutrition'"):
         create_app()
+
+
+# --- History ---
+
+
+def revisions(client, person, tour, **params):
+    response = client.get(f"{TOURS}/{tour['id']}/revisions", params=params, headers=person.headers)
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def revision(client, person, tour, version):
+    response = client.get(f"{TOURS}/{tour['id']}/revisions/{version}", headers=person.headers)
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def restore(client, person, tour, version):
+    return client.post(f"{TOURS}/{tour['id']}/revisions/{version}/restore", headers=person.headers)
+
+
+def test_creating_a_tour_writes_the_first_revision(client, anna):
+    tour = create_tour(client, anna, summary="Schöne Tour", peaks=[{"name": "Säntis"}])
+
+    page = revisions(client, anna, tour)
+    first = revision(client, anna, tour, 1)
+
+    assert page["total"] == 1
+    assert page["items"][0]["kind"] == "created"
+    assert page["items"][0]["author"] == {"id": anna.id, "display_name": "Anna"}
+    assert first["diff"] == {}
+    assert first["snapshot"]["title"] == "Säntis"
+    assert first["snapshot"]["peaks"] == tour["peaks"]
+    assert "snapshot" not in page["items"][0]
+
+
+def test_every_change_adds_a_revision_with_author_and_diff(client, anna, bea, shared_tour):
+    tent = gear_item(client, bea)
+    second = put(client, anna, shared_tour, title="Säntis Nord", duration_minutes=500).json()
+    put(client, bea, second, summary="Mit Zelt", gear=[{"gear_item_id": tent["id"]}])
+
+    page = revisions(client, anna, shared_tour)
+
+    assert [(r["version"], r["kind"], r["change_summary"]) for r in page["items"]] == [
+        (3, "updated", "summary, gear"),
+        (2, "updated", "title, duration_minutes"),
+        (1, "created", ""),
+    ]
+    assert [r["author"]["display_name"] for r in page["items"]] == ["Bea", "Anna", "Anna"]
+    assert revision(client, anna, shared_tour, 2)["diff"] == {
+        "title": {"old": "Säntis", "new": "Säntis Nord"},
+        "duration_minutes": {"old": 480, "new": 500},
+    }
+    third = revision(client, anna, shared_tour, 3)
+    assert third["diff"]["summary"] == {"old": "Schöne Tour", "new": "Mit Zelt"}
+    assert [entry["name"] for entry in third["diff"]["gear"]["added"]] == ["Zelt"]
+    assert third["diff"]["gear"]["removed"] == [] and third["diff"]["gear"]["changed"] == []
+    assert third["snapshot"]["title"] == "Säntis Nord"
+
+
+def test_diff_describes_changed_removed_and_reordered_entries(client, anna):
+    tour = create_tour(client, anna, peaks=[{"name": "Säntis"}, {"name": "Altmann"}, {"name": "X"}])
+    saentis, altmann, removed = tour["peaks"]
+
+    put(client, anna, tour, peaks=[altmann, {**saentis, "elevation_m": 2502}])
+
+    peaks = revision(client, anna, tour, 2)["diff"]["peaks"]
+    assert peaks["removed"] == [removed]
+    assert peaks["added"] == []
+    assert peaks["changed"] == [
+        {
+            "id": saentis["id"],
+            "name": "Säntis",
+            "changes": {"elevation_m": {"old": None, "new": 2502}},
+        }
+    ]
+    assert peaks["reordered"] is True
+
+
+def test_unchanged_update_adds_no_revision(client, anna):
+    tour = create_tour(client, anna, **OWNER_ONLY)
+
+    response = put(client, anna, tour)
+
+    assert response.status_code == 200
+    assert response.json()["version"] == 1
+    assert revisions(client, anna, tour)["total"] == 1
+
+
+def test_waypoint_changes_are_part_of_the_history(client, anna):
+    tour = create_tour(client, anna)
+    url = f"{TOURS}/{tour['id']}/waypoints"
+    waypoint = client.post(
+        url, json={"name": "Hütte", "lat": 47.25, "lon": 9.34}, headers=anna.headers
+    ).json()
+    client.delete(f"{url}/{waypoint['id']}", headers=anna.headers)
+
+    page = revisions(client, anna, tour)
+
+    assert [(r["version"], r["change_summary"]) for r in page["items"]] == [
+        (3, "waypoints"),
+        (2, "waypoints"),
+        (1, ""),
+    ]
+    assert revision(client, anna, tour, 2)["snapshot"]["waypoints"] == [waypoint]
+    assert revision(client, anna, tour, 3)["diff"]["waypoints"]["removed"] == [waypoint]
+
+
+def test_history_is_never_rewritten(client, db, anna):
+    tour = create_tour(client, anna)
+    current = tour
+    for number in range(2, 6):
+        current = put(client, anna, current, title=f"Stand {number}").json()
+    before = [revision(client, anna, tour, version) for version in range(1, 6)]
+
+    restore(client, anna, tour, 2)
+    client.delete(f"{TOURS}/{tour['id']}", headers=anna.headers)
+
+    stored = db.scalars(
+        select(TourRevision)
+        .where(TourRevision.tour_id == uuid.UUID(tour["id"]))
+        .order_by(TourRevision.version)
+    ).all()
+    assert [row.version for row in stored] == [1, 2, 3, 4, 5, 6, 7]
+    assert [row.kind for row in stored[5:]] == ["restored", "deleted"]
+    assert [row.snapshot for row in stored[:5]] == [r["snapshot"] for r in before]
+    assert [row.snapshot["title"] for row in stored] == [
+        "Säntis",
+        "Stand 2",
+        "Stand 3",
+        "Stand 4",
+        "Stand 5",
+        "Stand 2",
+        "Stand 2",
+    ]
+
+
+def test_history_access_follows_the_tour_permissions(client, people, shared_tour):
+    url = f"{TOURS}/{shared_tour['id']}/revisions"
+
+    for name in ("anna", "bea", "cleo"):
+        assert client.get(url, headers=people[name].headers).status_code == 200
+        assert client.get(f"{url}/1", headers=people[name].headers).status_code == 200
+    dora = people["dora"].headers
+    assert client.get(url, headers=dora).status_code == 404
+    assert client.get(f"{url}/1", headers=dora).status_code == 404
+    assert client.post(f"{url}/1/restore", headers=dora).status_code == 404
+    assert client.post(f"{url}/1/restore", headers=people["cleo"].headers).status_code == 403
+    assert client.get(url).status_code == 401
+    assert client.get(f"{url}/99", headers=people["anna"].headers).status_code == 404
+
+
+def test_history_pages_and_compares_versions(client, anna):
+    tour = create_tour(client, anna, title="A")
+    second = put(client, anna, tour, title="B").json()
+    put(client, anna, second, title="C", summary="neu")
+
+    page = revisions(client, anna, tour, limit=1, offset=1)
+    comparison = client.get(
+        f"{TOURS}/{tour['id']}/revisions/1/compare/3", headers=anna.headers
+    ).json()
+
+    assert (page["total"], [r["version"] for r in page["items"]]) == (3, [2])
+    assert comparison == {
+        "from_version": 1,
+        "to_version": 3,
+        "diff": {"title": {"old": "A", "new": "C"}, "summary": {"old": None, "new": "neu"}},
+    }
+
+
+def test_author_is_anonymised_when_the_user_is_removed(client, db, anna, bea, shared_tour):
+    put(client, bea, shared_tour, title="Von Bea")
+
+    db.delete(db.get(User, uuid.UUID(bea.id)))
+    db.commit()
+
+    page = revisions(client, anna, shared_tour)
+    assert [(r["version"], r["author"]) for r in page["items"][:1]] == [(2, None)]
+    assert page["items"][1]["author"]["display_name"] == "Anna"
+
+
+# --- Restore ---
+
+
+def test_restore_brings_back_an_old_state_as_a_new_revision(client, anna):
+    tent = gear_item(client, anna, name="Zelt", weight_g=1500)
+    bar = food_item(client, anna)
+    tour = create_tour(
+        client,
+        anna,
+        summary="Original",
+        gear=[{"gear_item_id": tent["id"]}],
+        food=[{"food_item_id": bar["id"], "amount_g": 80, "eaten": True}],
+        peaks=[{"name": "Säntis", "elevation_m": 2502}],
+        **OWNER_ONLY,
+    )
+    changed = put(
+        client,
+        anna,
+        tour,
+        title="Kaputt",
+        summary=None,
+        gear=[],
+        food=[],
+        peaks=[],
+        calories_burned=None,
+    ).json()
+    assert changed["computed"]["pack_weight_start_g"] == 0
+
+    response = restore(client, anna, tour, 1)
+
+    assert response.status_code == 200
+    restored = response.json()
+    assert restored["version"] == 3
+    ignored = {"version", "updated_at"}
+    assert {k: v for k, v in restored.items() if k not in ignored} == {
+        k: v for k, v in tour.items() if k not in ignored
+    }
+    latest = revisions(client, anna, tour)["items"][0]
+    assert (latest["version"], latest["kind"], latest["change_summary"]) == (
+        3,
+        "restored",
+        "version 1",
+    )
+    assert revision(client, anna, tour, 3)["diff"]["title"] == {"old": "Kaputt", "new": "Säntis"}
+
+
+def test_restore_works_after_gear_was_removed_and_added_again(client, anna):
+    tent = gear_item(client, anna, name="Zelt", weight_g=1500)
+    tour = create_tour(client, anna, gear=[{"gear_item_id": tent["id"]}])
+    original_entry = tour["gear"][0]
+
+    # Remove the entry and add the same item again in one change: a new entry id.
+    readded = put(client, anna, tour, gear=[{"gear_item_id": tent["id"], "quantity": 2}]).json()
+    response = restore(client, anna, tour, 1)
+
+    assert readded["gear"][0]["id"] != original_entry["id"]
+    assert response.status_code == 200
+    assert response.json()["gear"] == [original_entry]
+
+
+def test_restore_keeps_snapshots_of_gear_that_no_longer_exists(client, db, anna, bea, shared_tour):
+    kocher = gear_item(client, bea, name="Beas Kocher", weight_g=300)
+    with_gear = put(client, bea, shared_tour, gear=[{"gear_item_id": kocher["id"]}]).json()
+    put(client, anna, with_gear, gear=[])
+    db.delete(db.get(User, uuid.UUID(bea.id)))
+    db.commit()
+
+    response = restore(client, anna, shared_tour, 2)
+
+    assert response.status_code == 200
+    entry = response.json()["gear"][0]
+    assert (entry["name"], entry["weight_g"], entry["gear_item_id"]) == ("Beas Kocher", 300, None)
+
+
+def test_edit_may_restore_only_without_touching_owner_only_fields(client, anna, bea, shared_tour):
+    second = put(client, bea, shared_tour, title="Von Bea").json()
+    put(client, anna, second, duration_minutes=100)
+
+    forbidden = restore(client, bea, shared_tour, 1)
+    current = client.get(f"{TOURS}/{shared_tour['id']}", headers=anna.headers).json()
+    put(client, anna, current, duration_minutes=480)
+    allowed = restore(client, bea, shared_tour, 1)
+
+    assert forbidden.status_code == 403
+    assert forbidden.json()["error"]["code"] == "owner_only_field"
+    assert current["title"] == "Von Bea" and current["version"] == 3
+    assert allowed.status_code == 200
+    assert allowed.json()["title"] == "Säntis"
+
+
+# --- Conflicts ---
+
+
+def test_outdated_version_is_rejected_with_the_current_tour(client, anna, bea, shared_tour):
+    newer = put(client, anna, shared_tour, title="Von Anna").json()
+
+    response = put(client, bea, shared_tour, summary="Von Bea")
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"]["code"] == "version_conflict"
+    assert body["current"]["version"] == 2
+    assert body["current"]["title"] == "Von Anna"
+    assert body["current"]["permission"] == "edit"
+    assert revisions(client, anna, shared_tour)["total"] == 2
+
+    # The client merges field by field on top of the current state and tries again.
+    merged = put(client, bea, body["current"], summary="Von Bea")
+    assert merged.status_code == 200
+    assert (merged.json()["title"], merged.json()["summary"]) == ("Von Anna", "Von Bea")
+    assert merged.json()["version"] == newer["version"] + 1
+
+
+def test_conflict_is_reported_before_the_owner_only_check(client, anna, bea, shared_tour):
+    put(client, anna, shared_tour, duration_minutes=100)
+
+    response = put(client, bea, shared_tour, title="Von Bea")
+
+    assert response.status_code == 409
+
+
+def test_update_requires_the_base_version(client, anna):
+    tour = create_tour(client, anna)
+    body = document(tour)
+    del body["version"]
+
+    response = client.put(f"{TOURS}/{tour['id']}", json=body, headers=anna.headers)
+
+    assert response.status_code == 422
+
+
+def test_concurrent_writes_cannot_both_succeed(client, session_factory, anna):
+    tour_id = uuid.UUID(create_tour(client, anna)["id"])
+    with session_factory() as first, session_factory() as second:
+        author = first.get(User, uuid.UUID(anna.id))
+        second_author = second.get(User, author.id)
+        tour_a = first.get(Tour, tour_id)
+        tour_b = second.get(Tour, tour_id)
+        tour_a.title = "A"
+        tour_b.title = "B"
+        history.record_change(first, tour_a, author, history.UPDATED)
+
+        with pytest.raises(history.VersionConflictError):
+            history.record_change(second, tour_b, second_author, history.UPDATED)
+
+    with session_factory() as check:
+        stored = check.get(Tour, tour_id)
+        assert (stored.title, stored.version) == ("A", 2)
+        versions = check.scalars(
+            select(TourRevision.version).where(TourRevision.tour_id == tour_id)
+        ).all()
+        assert sorted(versions) == [1, 2]

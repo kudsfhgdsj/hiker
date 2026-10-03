@@ -107,6 +107,14 @@ def get_item_for_user(db: Session, user: User, item_id: uuid.UUID) -> GearItem |
     return item
 
 
+def existing_item_ids(db: Session, item_ids) -> set[uuid.UUID]:
+    """Those of the given ids that still refer to a gear item (deleted ones included)."""
+    ids = {item_id for item_id in item_ids if item_id is not None}
+    if not ids:
+        return set()
+    return set(db.scalars(select(GearItem.id).where(GearItem.id.in_(ids))))
+
+
 # --- Tags ---
 
 

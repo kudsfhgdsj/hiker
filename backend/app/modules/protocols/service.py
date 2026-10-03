@@ -10,7 +10,7 @@ from app.modules.auth import service as auth_service
 from app.modules.auth.models import User
 from app.modules.gear import service as gear_service
 from app.modules.nutrition import service as nutrition_service
-from app.modules.protocols import history
+from app.modules.protocols import history, snapshots
 from app.modules.protocols.models import (
     CALORIES_MANUAL,
     Tour,
@@ -26,15 +26,13 @@ from app.modules.protocols.schemas import (
     TourComputed,
     TourCreate,
     TourFoodIn,
-    TourFoodOut,
     TourGearIn,
-    TourGearOut,
     TourIn,
     TourListItem,
     TourOut,
     TourOwner,
     TourPeakIn,
-    TourPeakOut,
+    TourUpdate,
     WaypointIn,
     WaypointPatch,
 )
@@ -97,6 +95,9 @@ def _sync_gear(db: Session, tour: Tour, user: User, incoming: list[TourGearIn]) 
     item_ids = [entry.gear_item_id for entry in result if entry.gear_item_id is not None]
     if len(set(item_ids)) != len(item_ids):
         raise UnprocessableError("A gear item appears more than once", code="duplicate_gear_item")
+    # Remove dropped entries first: an item may be removed and added again in one change.
+    tour.gear = [entry for entry in tour.gear if entry in result]
+    db.flush()
     tour.gear = result
 
 
@@ -170,21 +171,24 @@ def create_tour(db: Session, user: User, data: TourCreate) -> Tour:
         tour.id = data.id
     db.add(tour)
     _apply_document(db, tour, user, data, owner=True)
-    history.record_change(db, tour, user, "created")
+    history.record_change(db, tour, user, history.CREATED)
     return tour
 
 
-def update_tour(db: Session, access: TourAccess, data: TourIn) -> Tour:
+def update_tour(db: Session, access: TourAccess, data: TourUpdate) -> Tour:
+    if data.version != access.tour.version:
+        current = tour_out(db, access).model_dump(mode="json")
+        raise history.VersionConflictError(current)
     check_owner_only_fields(access, data.model_dump(include=set(OWNER_ONLY_FIELDS)))
     _apply_document(db, access.tour, access.user, data, owner=access.is_owner)
-    history.record_change(db, access.tour, access.user, "updated")
+    history.record_change(db, access.tour, access.user, history.UPDATED)
     return access.tour
 
 
 def delete_tour(db: Session, access: TourAccess) -> None:
     """Soft delete; the tour disappears for everyone it was shared with."""
     access.tour.deleted_at = utcnow()
-    history.record_change(db, access.tour, access.user, "deleted")
+    history.record_change(db, access.tour, access.user, history.DELETED)
 
 
 def list_tours(
@@ -288,33 +292,9 @@ def tour_out(db: Session, access: TourAccess) -> TourOut:
         end_point=_point(tour.end_lat, tour.end_lon, tour.end_name),
         points_source=tour.points_source,
         track_source=tour.track_source,
-        gear=[
-            TourGearOut(
-                id=entry.id,
-                gear_item_id=entry.gear_item_id,
-                name=entry.name_snapshot,
-                brand=entry.brand_snapshot,
-                weight_g=entry.weight_g_snapshot,
-                quantity=entry.quantity,
-                carried=entry.carried,
-            )
-            for entry in sorted(tour.gear, key=lambda e: (e.name_snapshot.lower(), str(e.id)))
-        ],
-        food=[
-            TourFoodOut(
-                id=entry.id,
-                food_item_id=entry.food_item_id,
-                name=entry.name_snapshot,
-                kcal_per_100g=entry.kcal_per_100g_snapshot,
-                amount_g=entry.amount_g,
-                kcal=entry.kcal_snapshot,
-                carried=entry.carried,
-                eaten=entry.eaten,
-                eaten_at=entry.eaten_at,
-            )
-            for entry in tour.food
-        ],
-        peaks=[TourPeakOut.model_validate(peak) for peak in tour.peaks],
+        gear=snapshots.gear_list(tour),
+        food=snapshots.food_list(tour),
+        peaks=snapshots.peak_list(tour),
     )
 
 
@@ -332,7 +312,7 @@ def create_waypoint(db: Session, access: TourAccess, data: WaypointIn) -> TourWa
     _check_new_id(db, TourWaypoint, data.id)
     waypoint = TourWaypoint(**data.model_dump(exclude_none=True))
     access.tour.waypoints.append(waypoint)
-    history.record_change(db, access.tour, access.user, "waypoint added")
+    history.record_change(db, access.tour, access.user, history.UPDATED)
     return waypoint
 
 
@@ -344,10 +324,27 @@ def update_waypoint(
         raise UnprocessableError("name, lat and lon cannot be empty")
     for field, value in changes.items():
         setattr(waypoint, field, value)
-    history.record_change(db, access.tour, access.user, "waypoint changed")
+    history.record_change(db, access.tour, access.user, history.UPDATED)
     return waypoint
 
 
 def delete_waypoint(db: Session, access: TourAccess, waypoint: TourWaypoint) -> None:
     access.tour.waypoints.remove(waypoint)
-    history.record_change(db, access.tour, access.user, "waypoint removed")
+    history.record_change(db, access.tour, access.user, history.UPDATED)
+
+
+# --- History ---
+
+
+def revision_items(db: Session, revisions: list, schema):
+    names = auth_service.get_display_names(db, {r.author_user_id for r in revisions})
+    items = []
+    for revision in revisions:
+        author = None
+        if revision.author_user_id is not None:
+            author = TourOwner(
+                id=revision.author_user_id, display_name=names.get(revision.author_user_id)
+            )
+        fields = {f: getattr(revision, f) for f in schema.model_fields if f != "author"}
+        items.append(schema(author=author, **fields))
+    return items
