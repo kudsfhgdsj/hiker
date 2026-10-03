@@ -264,6 +264,13 @@ Manuell eingegebene Werte haben immer Vorrang (`manual`). Fehlt ein Wert, schät
 - Ohne Profil oder Track: keine Schätzung, Hinweis zur Eingabe.
 Die verwendete Formel und Parameter werden im Code dokumentiert und als Tooltip erklärt. Änderungen an Track, Gewicht oder Profil lösen eine Neuberechnung aus, solange der Wert nicht manuell ist.
 
+Umsetzung (Formeln und Quellen stehen in `protocols/calories.py`):
+- Die Schätzung wird nicht gespeichert, sondern bei jedem Lesen aus Track-Statistik, Startgewicht und dem aktuellen Profil des Owners berechnet. Änderungen wirken dadurch sofort und erzeugen keine Revision. Folge: Ändert der Owner später sein Gewicht, ändern sich auch die Schätzungen älterer Touren; wer einen Wert festhalten will, trägt ihn manuell ein.
+- Pulsbasiert (`heart_rate`): Keytel et al. 2005 mit durchschnittlicher Herzfrequenz, Körpergewicht, Alter im Jahr der Tour und Dauer des Tracks. Braucht Puls im Track, Gewicht und Geburtsjahr.
+- Ohne Puls (`acsm_walking`): ACSM-Gehformel, über die Tour summiert: Sauerstoff [ml/kg] = 0,1 · Distanz + 1,8 · Höhenmeter aufwärts + 3,5 · Minuten; kcal = Sauerstoff · (Körper- + Rucksackgewicht) / 1000 · 5. Braucht Track, Gewicht und eine Dauer (aus dem Track, sonst aus der Tour). Grenzen: Abstieg zählt nicht, der Rucksack zählt wie Körpergewicht, schwieriges Gelände kostet mehr.
+- Keine Schätzung: ohne Gewicht im Profil (`no_profile`), ohne Track (`no_track`) oder ohne Dauer (`no_duration`).
+- API: `calories_burned` enthält nur den manuellen Wert, `computed.calories_burned` die Schätzung, `calories_burned_source` sagt, welcher gilt (`manual` | `estimated`). `calories_estimate` (Verfahren, Parameter oder Grund) sieht nur der Owner, weil es Gewicht und Alter enthält. `POST /tours/{id}/calories/estimate` verwirft den manuellen Wert zugunsten der Schätzung.
+
 **Fotos und Track**
 1. Upload der Fotos (mehrere gleichzeitig). EXIF wird gelesen: Aufnahmezeit und, falls vorhanden, GPS.
 2. Zuordnung zum Track: mit EXIF-GPS → nächster Punkt des Tracks; ohne GPS → über die Aufnahmezeit zum Zeitstempel im Track (mit einstellbarem Zeitversatz, z. B. wegen Kamera-/Uhrzeit-Abweichung); sonst bleibt das Foto ohne Position und kann per Hand auf der Karte oder im Höhenprofil gesetzt werden.
@@ -364,7 +371,7 @@ Stand `schema_version` 1: Tour (mit effektiven Werten für Dauer und Startgewich
 | POST | /tours/{id}/waypoints/from-photos | Wegpunkte aus Foto-GPS erzeugen |
 | GET, POST, PATCH, DELETE | /tours/{id}/waypoints | Wegpunkte |
 | POST | /tours/{id}/weather/fetch | Wetter neu abrufen (nur Owner) |
-| POST | /tours/{id}/calories/estimate | Verbrauch schätzen |
+| POST | /tours/{id}/calories/estimate | Manuellen Wert durch die Schätzung ersetzen (nur Owner) |
 | GET | /tours/{id}/export | JSON-Export |
 | GET, POST | /contacts | Partner-Kontakte listen / anlegen |
 | PATCH, DELETE | /contacts/{id} | Umbenennen, mit Nutzer verknüpfen (`linked_user_id`, `null` löst) / löschen |

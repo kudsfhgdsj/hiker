@@ -122,6 +122,11 @@ def get_profile(db: Session, user: User) -> UserProfile | None:
     return db.get(UserProfile, user.id)
 
 
+def get_profile_by_user_id(db: Session, user_id) -> UserProfile | None:
+    """Profile of a user for calculations in other modules. Health data: never expose it."""
+    return db.get(UserProfile, user_id)
+
+
 def save_profile(db: Session, user: User, data: Profile) -> UserProfile:
     profile = db.get(UserProfile, user.id)
     if profile is None:

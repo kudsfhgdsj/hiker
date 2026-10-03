@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import utcnow
 from app.modules.auth import service as auth_service
-from app.modules.protocols import photos, snapshots, track_service, weather
+from app.modules.protocols import calories, photos, snapshots, track_service, weather
 from app.modules.protocols.schemas import ExportedTour, ExportedTrack, GeoPoint, TourExport
 from app.modules.protocols.sharing import TourAccess
 
@@ -25,6 +25,7 @@ def _point(lat, lon, name) -> GeoPoint | None:
 def export_tour(db: Session, access: TourAccess) -> TourExport:
     tour = access.tour
     computed = snapshots.computed_values(tour)
+    burned, burned_source = calories.effective(tour, calories.for_tour(db, tour))
     duration = tour.duration_minutes
     pack_weight = tour.pack_weight_start_g
     return TourExport(
@@ -42,8 +43,8 @@ def export_tour(db: Session, access: TourAccess) -> TourExport:
             if pack_weight is not None
             else computed.pack_weight_start_g,
             calories_eaten=computed.calories_eaten,
-            calories_burned=tour.calories_burned,
-            calories_burned_source=tour.calories_burned_source,
+            calories_burned=burned,
+            calories_burned_source=burned_source,
             start_point=_point(tour.start_lat, tour.start_lon, tour.start_name),
             end_point=_point(tour.end_lat, tour.end_lon, tour.end_name),
             points_source=tour.points_source,

@@ -12,6 +12,7 @@ from app.modules.auth.models import User
 from app.modules.gear import service as gear_service
 from app.modules.nutrition import service as nutrition_service
 from app.modules.protocols import (
+    calories,
     contacts,
     history,
     photos,
@@ -31,6 +32,7 @@ from app.modules.protocols.models import (
     TourWaypoint,
 )
 from app.modules.protocols.schemas import (
+    CaloriesEstimate,
     GeoPoint,
     PointsIn,
     TourBase,
@@ -283,6 +285,17 @@ def list_tours(
     return items, total
 
 
+def use_estimate(db: Session, access: TourAccess) -> None:
+    """Drop the manual value so that the estimate applies."""
+    tour = access.tour
+    estimated = calories.for_tour(db, tour)
+    if estimated.kcal is None:
+        raise UnprocessableError(f"No estimate possible: {estimated.reason}", code=estimated.reason)
+    tour.calories_burned = None
+    tour.calories_burned_source = None
+    history.record_change(db, tour, access.user, history.UPDATED)
+
+
 def set_points(db: Session, access: TourAccess, data: PointsIn) -> None:
     """Set start and end point by hand; with a track only their names can change."""
     tour = access.tour
@@ -325,14 +338,23 @@ def _point(lat: float | None, lon: float | None, name: str | None) -> GeoPoint |
 def tour_out(db: Session, access: TourAccess) -> TourOut:
     tour = access.tour
     names = auth_service.get_display_names(db, {tour.owner_id})
+    estimated = calories.for_tour(db, tour)
+    computed = snapshots.computed_values(tour)
+    computed.calories_burned = estimated.kcal
     return TourOut(
         **_base(tour, access.permission, names),
         summary=tour.summary,
         duration_minutes=tour.duration_minutes,
         pack_weight_start_g=tour.pack_weight_start_g,
         calories_burned=tour.calories_burned,
-        calories_burned_source=tour.calories_burned_source,
-        computed=snapshots.computed_values(tour),
+        calories_burned_source=calories.effective(tour, estimated)[1],
+        # The parameters contain body weight and age of the owner.
+        calories_estimate=CaloriesEstimate(
+            method=estimated.method, reason=estimated.reason, parameters=estimated.parameters
+        )
+        if access.is_owner
+        else None,
+        computed=computed,
         start_point=_point(tour.start_lat, tour.start_lon, tour.start_name),
         end_point=_point(tour.end_lat, tour.end_lon, tour.end_name),
         points_source=tour.points_source,

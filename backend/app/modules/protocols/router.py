@@ -250,6 +250,21 @@ def fetch_weather(
     return service.tour_out(db, access)
 
 
+@router.post(
+    "/tours/{tour_id}/calories/estimate",
+    response_model=TourOut,
+    responses=error_responses(403, 404),
+)
+def estimate_calories(access: OwnedTour, db: DbSession):
+    """Replace the manual value of calories burned by the estimate. Owner only.
+
+    Without a manual value the estimate applies anyway (see `computed.calories_burned`).
+    Answers 422 with the reason if no estimate is possible.
+    """
+    service.use_estimate(db, access)
+    return service.tour_out(db, access)
+
+
 # --- Photos ---
 
 IMAGE_RESPONSE = {200: {"content": {"image/jpeg": {}}}}

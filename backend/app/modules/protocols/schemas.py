@@ -196,12 +196,25 @@ class GeoPoint(BaseModel):
     name: str | None
 
 
+class CaloriesEstimate(BaseModel):
+    method: Literal["heart_rate", "acsm_walking"] | None = Field(
+        description="heart_rate: Keytel et al. 2005; acsm_walking: ACSM walking equation"
+    )
+    reason: Literal["no_profile", "no_track", "no_duration"] | None = Field(
+        description="Why no estimate is possible"
+    )
+    parameters: dict = Field(description="The values that went into the formula")
+
+
 class TourComputed(BaseModel):
     """Values derived by the server; used wherever the manual value is empty."""
 
     duration_minutes: int | None = Field(description="From start_time and end_time")
     pack_weight_start_g: int = Field(description="Carried gear plus carried food")
     calories_eaten: float = Field(description="Sum of the eaten food entries")
+    calories_burned: float | None = Field(
+        default=None, description="Estimate; applies while no manual value is set"
+    )
 
 
 class TourBase(BaseModel):
@@ -227,8 +240,13 @@ class TourOut(TourBase):
     summary: str | None
     duration_minutes: int | None
     pack_weight_start_g: int | None
-    calories_burned: float | None
-    calories_burned_source: Literal["manual", "estimated"] | None
+    calories_burned: float | None = Field(description="Manual value; null = use the estimate")
+    calories_burned_source: Literal["manual", "estimated"] | None = Field(
+        description="Source of the value to show: the manual one or computed.calories_burned"
+    )
+    calories_estimate: CaloriesEstimate | None = Field(
+        description="How the estimate was made, for the owner only (contains profile data)"
+    )
     computed: TourComputed
     start_point: GeoPoint | None
     end_point: GeoPoint | None
@@ -554,7 +572,7 @@ class ExportedTour(BaseModel):
     duration_minutes: int | None = Field(description="Manual value, otherwise the computed one")
     pack_weight_start_g: int | None = Field(description="Manual value, otherwise the computed one")
     calories_eaten: float
-    calories_burned: float | None
+    calories_burned: float | None = Field(description="Manual value, otherwise the estimate")
     calories_burned_source: Literal["manual", "estimated"] | None
     start_point: GeoPoint | None
     end_point: GeoPoint | None

@@ -124,6 +124,7 @@ def test_create_and_read_tour(client, anna):
         "duration_minutes": 510,
         "pack_weight_start_g": 0,
         "calories_eaten": 0.0,
+        "calories_burned": None,
     }
     assert (created["gear"], created["food"], created["peaks"]) == ([], [], [])
     assert created["track_source"] == "none" and created["start_point"] is None

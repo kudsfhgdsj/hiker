@@ -11,7 +11,7 @@ from app.core.errors import NotFoundError, UnprocessableError
 from app.core.storage import Storage
 from app.modules.auth import service as auth_service
 from app.modules.auth.models import User
-from app.modules.protocols import photos, snapshots, track, track_service, weather
+from app.modules.protocols import calories, photos, snapshots, track, track_service, weather
 from app.modules.protocols.models import Tour, TourPublicLink
 from app.modules.protocols.schemas import (
     PublicFood,
@@ -153,6 +153,7 @@ def public_tour(db: Session, token: str) -> PublicTourOut:
     link, tour = _resolve(db, token)
 
     computed = snapshots.computed_values(tour)
+    burned, burned_source = calories.effective(tour, calories.for_tour(db, tour))
     health = link.show_health_data
     hide = link.hide_exact_start
     return PublicTourOut(
@@ -168,8 +169,8 @@ def public_tour(db: Session, token: str) -> PublicTourOut:
         if tour.pack_weight_start_g is not None
         else computed.pack_weight_start_g,
         calories_eaten=computed.calories_eaten,
-        calories_burned=tour.calories_burned if health else None,
-        calories_burned_source=tour.calories_burned_source if health else None,
+        calories_burned=burned if health else None,
+        calories_burned_source=burned_source if health else None,
         start_point=_point(tour.start_lat, tour.start_lon, tour.start_name, hide),
         end_point=_point(tour.end_lat, tour.end_lon, tour.end_name, hide),
         track_source=tour.track_source,
