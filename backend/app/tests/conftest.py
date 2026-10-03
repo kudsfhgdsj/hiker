@@ -6,7 +6,7 @@ os.environ.update(
         "SECRET_KEY": "test-secret-key-not-for-production-0123456789",
         "DATABASE_URL": "sqlite://",
         "PUBLIC_BASE_URL": "http://testserver",
-        "ENABLED_MODULES": "auth",
+        "ENABLED_MODULES": "auth,gear",
         "REGISTRATION_MODE": "open",
         "ACCESS_TOKEN_TTL_MINUTES": "15",
         "REFRESH_TOKEN_TTL_DAYS": "30",
@@ -16,11 +16,13 @@ os.environ.update(
 from io import BytesIO  # noqa: E402
 
 import pytest  # noqa: E402
+from argon2 import PasswordHasher  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from PIL import Image  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
+from app.core import security  # noqa: E402
 from app.core.config import get_settings  # noqa: E402
 from app.core.db import Base, create_db_engine  # noqa: E402
 from app.core.deps import get_db  # noqa: E402
@@ -28,6 +30,15 @@ from app.core.registry import import_all_models  # noqa: E402
 from app.core.storage import get_storage  # noqa: E402
 from app.core.storage.local_fs import LocalFsStorage  # noqa: E402
 from app.main import create_app  # noqa: E402
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _fast_password_hashing():
+    """Argon2 with minimal cost; the production parameters make the suite slow."""
+    original = security._hasher
+    security._hasher = PasswordHasher(time_cost=1, memory_cost=8, parallelism=1)
+    yield
+    security._hasher = original
 
 
 @pytest.fixture(autouse=True)

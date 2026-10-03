@@ -4,7 +4,7 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
 from app.core.db import Base, create_db_engine
 from app.core.registry import import_all_models
@@ -50,6 +50,20 @@ def test_migrations_build_the_schema_of_the_models(tmp_path):
         diff = compare_metadata(MigrationContext.configure(connection), Base.metadata)
     engine.dispose()
     assert diff == []
+
+
+def test_migrations_seed_the_standard_gear_types(tmp_path):
+    config, url = _alembic_config(tmp_path)
+
+    command.upgrade(config, "heads")
+
+    engine = create_db_engine(url)
+    with engine.connect() as connection:
+        rows = connection.execute(text("SELECT name, owner_id FROM gear_type")).all()
+    engine.dispose()
+    assert len(rows) == 12
+    assert {"Rucksack", "Sonstiges"} <= {name for name, _ in rows}
+    assert all(owner_id is None for _, owner_id in rows)
 
 
 def test_migrations_can_be_rolled_back(tmp_path):

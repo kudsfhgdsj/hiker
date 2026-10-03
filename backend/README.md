@@ -44,8 +44,16 @@ Aktiviert wird es über `ENABLED_MODULES`. Die Registry (`app/core/registry.py`)
 dass alle Abhängigkeiten aktiv sind und keine Zyklen bestehen, und registriert in
 Abhängigkeitsreihenfolge. Core importiert nie ein Modul direkt.
 
-Andere Module nutzen von `auth` nur `app.modules.auth.deps` (`CurrentUser`, `AdminUser`),
-`app.modules.auth.service` und Nutzer-IDs.
+Andere Module nutzen von `auth` nur `app.modules.auth.deps` (`CurrentUser`, `AdminUser`,
+`is_admin`), `app.modules.auth.service` und Nutzer-IDs.
+
+## Dateien und Bilder
+
+Dateien liegen hinter dem Interface `app.core.storage.Storage` (Standard: lokales
+Dateisystem unter `STORAGE_PATH`), die Metadaten in `file_object`. Hochgeladene Bilder
+(JPEG, PNG, WebP, höchstens `MAX_UPLOAD_MB`) werden geprüft, auf `IMAGE_MAX_EDGE_PX`
+verkleinert und als JPEG ohne Metadaten neu kodiert. Ausgeliefert werden sie nur über
+Endpunkte des jeweiligen Moduls, die die Berechtigung prüfen.
 
 ## Migrationen
 
@@ -67,4 +75,8 @@ ergänzen, dann
   --depends-on auth_0001
 ```
 
+Core-Tabellen (`file_object`) liegen im Zweig `core` unter `migrations/versions/`.
 Das Datenbankschema umfasst alle installierten Module, unabhängig von `ENABLED_MODULES`.
+
+Automatisch erzeugte Skripte vor dem Commit prüfen: `app.core.db.UTCDateTime` durch
+`sa.DateTime(timezone=True)` ersetzen, damit Migrationen keinen App-Code importieren.

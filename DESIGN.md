@@ -36,6 +36,8 @@ Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen k
 | Refresh-Tokens | Zufällige Tokens, gehasht in der Datenbank, Rotation bei jeder Nutzung, widerrufbar | Tabelle `refresh_token`; erneute Nutzung eines verbrauchten Tokens beendet alle Sitzungen des Nutzers |
 | Datenbankzugriff | SQLAlchemy 2 synchron (psycopg), Endpunkte im Threadpool | Einfacher Code und einfache Tests |
 | Migrationen | Je Modul ein eigener Alembic-Zweig in `modules/<name>/migrations` | `alembic upgrade heads`; Schema umfasst alle installierten Module |
+| Ausrüstungskategorien | Standardliste für alle (nur `admin` ändert sie) plus eigene Kategorien je Nutzer | Katalogeinträge verwenden nur Standardkategorien |
+| Bilder | Upload JPEG/PNG/WebP, serverseitig als JPEG ohne Metadaten neu kodiert, längste Kante begrenzt | Abhängigkeit Pillow; Auslieferung nur über Endpunkte mit Rechteprüfung |
 | Fehlerformat | `{"error": {"code", "message"}}` für fachliche Fehler | Client übersetzt anhand von `code` |
 
 ## 3. Technologie-Stack
@@ -146,20 +148,22 @@ Alle IDs sind UUIDs und clientseitig erzeugbar. Hauptdaten haben `created_at`, `
 ### 6.2 Ausrüstung (Modul gear)
 **gear_item** (persönliche Gegenstände)
 - id, owner_id, catalog_id (optional, Verweis auf Katalog)
-- name, brand, type, weight_g
+- name, brand, type_id (Verweis auf `gear_type`), weight_g
 - purchase_date, purchase_price, currency
 - description, notes, website_url, image_file_id
 - status (`active` | `retired`)
 - optional: serial_number, size, color
 
 **gear_catalog_item** (gemeinsamer Katalog, nutzerübergreifend)
-- id, created_by, name, brand, type, nominal_weight_g, website_url, image_file_id
+- id, created_by, name, brand, type_id (nur Standardkategorien), nominal_weight_g, website_url, image_file_id
 - status (`pending` | `approved` | `rejected`), Moderation durch `admin`
 
-Ablauf: Nutzer legt Gegenstand an → kann Katalogeintrag vorschlagen („Teilen im Katalog“, nur Produktdaten, keine persönlichen Felder wie Kaufpreis/-datum) → Admin gibt frei. Beim Anlegen eines eigenen Gegenstands lässt sich ein Katalogeintrag als Vorlage übernehmen (Kopie, spätere Katalogänderungen verändern persönliche Gegenstände nicht).
+Ablauf: Nutzer legt Gegenstand an → kann Katalogeintrag vorschlagen („Teilen im Katalog“, nur Produktdaten: Name, Marke, Kategorie, Gewicht, Website, Bild; keine persönlichen Felder wie Kaufpreis/-datum, Notizen, Beschreibung, Seriennummer) → Admin gibt frei oder lehnt ab und kann die Produktdaten dabei korrigieren. Ein Gegenstand kann erst nach einer Ablehnung erneut vorgeschlagen werden. Beim Anlegen eines eigenen Gegenstands lässt sich ein Katalogeintrag als Vorlage übernehmen (Kopie, spätere Katalogänderungen verändern persönliche Gegenstände nicht).
 
-**gear_type**: id, name, sort_order (Standardliste, erweiterbar)
-**gear_list** (Packlisten-Vorlage) + **gear_list_item**: gear_item_id, quantity
+**gear_type**: id, owner_id (leer = Standardliste), name, sort_order. Die Standardliste wird per Migration angelegt; wird eine Kategorie gelöscht, verlieren ihre Gegenstände nur die Zuordnung.
+**gear_list** (Packlisten-Vorlage): id, owner_id, name, description + **gear_list_item**: gear_item_id, quantity
+
+Löschen eines Gegenstands oder einer Packliste ist ein Soft Delete (`deleted_at`); das Bild des Gegenstands wird dabei entfernt.
 
 Auswertungen (abgeleitet): Touren und Gesamtstrecke je Gegenstand, Gewicht je Kategorie.
 
@@ -206,7 +210,7 @@ Platzhalter → echter User: `contact.linked_user_id` setzen; gilt sofort in all
 **tour_revision**: id, tour_id, version, author_user_id, created_at, change_summary, snapshot (JSON), diff (JSON)
 
 ### 6.6 Dateien (core)
-**file_object**: id, owner_id, storage_key, mime, size, sha256
+**file_object**: id, owner_id, storage_key, mime, size, sha256, created_at
 
 ## 7. Wichtige Abläufe
 
@@ -301,13 +305,20 @@ Versioniertes Schema (`schema_version`): Tour, Ausrüstung (Snapshots), Essen, P
 ### Ausrüstung
 | Methode | Pfad | Zweck |
 |---|---|---|
-| GET, POST | /gear/items | Liste (Filter) / Anlegen |
+| GET, POST | /gear/items | Liste (`q`, `type_id`, `status`, `limit`, `offset`) / Anlegen (optional mit `catalog_id` als Vorlage) |
 | GET, PUT, DELETE | /gear/items/{id} | CRUD |
-| POST | /gear/items/{id}/image | Bild |
-| GET | /gear/catalog?q= | Katalog durchsuchen |
+| POST, GET, DELETE | /gear/items/{id}/image | Bild hochladen (multipart, Feld `file`) / abrufen / entfernen |
+| GET | /gear/catalog?q= | Freigegebene Katalogeinträge durchsuchen |
+| GET | /gear/catalog/{id}/image | Bild eines Katalogeintrags |
 | POST | /gear/items/{id}/propose-to-catalog | Katalogvorschlag |
-| GET, PATCH | /gear/catalog/pending, …/{id} | Moderation (admin) |
-| GET, POST, PUT, DELETE | /gear/types, /gear/lists | Kategorien, Packlisten |
+| GET | /gear/catalog/pending | Offene Vorschläge (admin) |
+| PATCH | /gear/catalog/{id} | Freigeben, ablehnen, Produktdaten korrigieren (admin) |
+| GET, POST | /gear/types | Kategorien (Standard + eigene) / anlegen |
+| PUT, DELETE | /gear/types/{id} | Kategorie ändern / löschen |
+| GET, POST | /gear/lists | Packlisten (mit Gesamtgewicht) / anlegen |
+| GET, PUT, DELETE | /gear/lists/{id} | Packliste lesen / ersetzen / löschen |
+
+Listen mit Paging antworten mit `{items, total, limit, offset}`. Beim Anlegen darf der Client die `id` (UUID) mitgeben.
 
 ### Ernährung
 | Methode | Pfad | Zweck |

@@ -1,7 +1,7 @@
 """Module auth: users, profile, login and tokens.
 
-Public interface for other modules: `deps.CurrentUser`, `deps.AdminUser` and the
-functions in `service`.
+Public interface for other modules: `deps.CurrentUser`, `deps.AdminUser`,
+`deps.is_admin`, the functions in `service` and `models.User` (read only).
 """
 
 from fastapi import FastAPI

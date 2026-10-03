@@ -1,0 +1,114 @@
+import uuid
+from datetime import date, datetime
+from decimal import Decimal
+
+from sqlalchemy import Date, ForeignKey, Integer, Numeric, String, Text, Uuid
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.db import Base, TimestampMixin, UTCDateTime, utcnow
+
+STATUS_ACTIVE = "active"
+STATUS_RETIRED = "retired"
+
+CATALOG_PENDING = "pending"
+CATALOG_APPROVED = "approved"
+CATALOG_REJECTED = "rejected"
+
+
+class GearType(Base):
+    """Category of gear. Without an owner it belongs to the standard list for everyone."""
+
+    __tablename__ = "gear_type"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(80))
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class GearCatalogItem(Base):
+    """Shared catalog entry: product data only, never personal fields."""
+
+    __tablename__ = "gear_catalog_item"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("user_account.id", ondelete="SET NULL")
+    )
+    name: Mapped[str] = mapped_column(String(200))
+    brand: Mapped[str | None] = mapped_column(String(100))
+    type_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("gear_type.id", ondelete="SET NULL")
+    )
+    nominal_weight_g: Mapped[int | None] = mapped_column(Integer)
+    website_url: Mapped[str | None] = mapped_column(String(500))
+    image_file_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("file_object.id", ondelete="SET NULL")
+    )
+    status: Mapped[str] = mapped_column(String(16), default=CATALOG_PENDING, index=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class GearItem(TimestampMixin, Base):
+    __tablename__ = "gear_item"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), index=True
+    )
+    catalog_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("gear_catalog_item.id", ondelete="SET NULL")
+    )
+    type_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("gear_type.id", ondelete="SET NULL")
+    )
+    name: Mapped[str] = mapped_column(String(200))
+    brand: Mapped[str | None] = mapped_column(String(100))
+    weight_g: Mapped[int | None] = mapped_column(Integer)
+    purchase_date: Mapped[date | None] = mapped_column(Date)
+    purchase_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    currency: Mapped[str | None] = mapped_column(String(3))
+    description: Mapped[str | None] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(Text)
+    website_url: Mapped[str | None] = mapped_column(String(500))
+    image_file_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("file_object.id", ondelete="SET NULL")
+    )
+    status: Mapped[str] = mapped_column(String(16), default=STATUS_ACTIVE)
+    serial_number: Mapped[str | None] = mapped_column(String(100))
+    size: Mapped[str | None] = mapped_column(String(50))
+    color: Mapped[str | None] = mapped_column(String(50))
+
+
+class GearList(TimestampMixin, Base):
+    """Packing list template."""
+
+    __tablename__ = "gear_list"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str | None] = mapped_column(Text)
+
+    entries: Mapped[list["GearListItem"]] = relationship(
+        cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class GearListItem(Base):
+    __tablename__ = "gear_list_item"
+
+    list_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("gear_list.id", ondelete="CASCADE"), primary_key=True
+    )
+    gear_item_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("gear_item.id", ondelete="CASCADE"), primary_key=True
+    )
+    quantity: Mapped[int] = mapped_column(Integer, default=1)

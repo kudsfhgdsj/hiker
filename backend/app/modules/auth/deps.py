@@ -27,8 +27,12 @@ def get_current_user(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
+def is_admin(user: User) -> bool:
+    return user.role == ROLE_ADMIN
+
+
 def require_admin(user: CurrentUser) -> User:
-    if user.role != ROLE_ADMIN:
+    if not is_admin(user):
         raise ForbiddenError("Admin role required")
     return user
 
