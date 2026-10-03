@@ -116,7 +116,7 @@ ProviderContainer createContainer({
     // Riverpod retries failed providers with a delay; tests want the first answer.
     retry: (_, _) => null,
     overrides: [
-      ...appOverrides(modules: modules ?? builtInModules),
+      ...appOverrides(modules: modules),
       httpClientAdapterProvider.overrideWithValue(api),
       keyValueStoreProvider.overrideWithValue(store ?? MemoryKeyValueStore()),
       appDatabaseProvider.overrideWith((ref) {

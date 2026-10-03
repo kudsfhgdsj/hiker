@@ -159,4 +159,282 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get errorUnknown =>
       'Etwas ist schiefgegangen. Bitte später erneut versuchen.';
+
+  @override
+  String get delete => 'Löschen';
+
+  @override
+  String get edit => 'Bearbeiten';
+
+  @override
+  String get add => 'Hinzufügen';
+
+  @override
+  String get search => 'Suchen';
+
+  @override
+  String get all => 'Alle';
+
+  @override
+  String get none => 'Keine';
+
+  @override
+  String get confirmDeleteTitle => 'Wirklich löschen?';
+
+  @override
+  String get close => 'Schließen';
+
+  @override
+  String get name => 'Name';
+
+  @override
+  String get offlineData => 'Ohne Verbindung – gespeicherter Stand';
+
+  @override
+  String get errorConflict => 'Das gibt es schon.';
+
+  @override
+  String get errorForbidden => 'Dafür fehlt die Berechtigung.';
+
+  @override
+  String get errorNotFound => 'Nicht gefunden.';
+
+  @override
+  String get errorInvalidImage =>
+      'Die Datei ist kein unterstütztes Bild (JPEG, PNG, WebP).';
+
+  @override
+  String get errorTooLarge => 'Die Datei ist zu groß.';
+
+  @override
+  String get gearTitle => 'Ausrüstung';
+
+  @override
+  String get gearEmpty => 'Noch keine Ausrüstung erfasst.';
+
+  @override
+  String get gearNew => 'Neuer Gegenstand';
+
+  @override
+  String get gearEdit => 'Gegenstand bearbeiten';
+
+  @override
+  String get gearSearchHint => 'Name oder Marke';
+
+  @override
+  String get gearBrand => 'Marke';
+
+  @override
+  String get gearType => 'Kategorie';
+
+  @override
+  String get gearNoType => 'Ohne Kategorie';
+
+  @override
+  String get gearWeight => 'Gewicht (g)';
+
+  @override
+  String get gearPurchaseDate => 'Kaufdatum';
+
+  @override
+  String get gearPurchasePrice => 'Kaufpreis';
+
+  @override
+  String get gearCurrency => 'Währung';
+
+  @override
+  String get gearCurrencyRequired =>
+      'Zur Angabe eines Preises gehört die Währung (z. B. CHF)';
+
+  @override
+  String get gearCurrencyInvalid => 'Drei Großbuchstaben, z. B. CHF';
+
+  @override
+  String get gearPriceInvalid =>
+      'Betrag zwischen 0 und 1 000 000 mit höchstens zwei Nachkommastellen';
+
+  @override
+  String get gearDescription => 'Beschreibung';
+
+  @override
+  String get gearNotes => 'Notizen';
+
+  @override
+  String get gearWebsite => 'Website';
+
+  @override
+  String get gearWebsiteInvalid =>
+      'Adresse muss mit http:// oder https:// beginnen';
+
+  @override
+  String get gearStatus => 'Status';
+
+  @override
+  String get gearStatusActive => 'In Gebrauch';
+
+  @override
+  String get gearStatusRetired => 'Ausgemustert';
+
+  @override
+  String get gearSerialNumber => 'Seriennummer';
+
+  @override
+  String get gearSize => 'Größe';
+
+  @override
+  String get gearColor => 'Farbe';
+
+  @override
+  String get gearTags => 'Tags';
+
+  @override
+  String get gearImage => 'Bild';
+
+  @override
+  String get gearImageChoose => 'Bild wählen';
+
+  @override
+  String get gearImageRemove => 'Bild entfernen';
+
+  @override
+  String get gearProposeToCatalog => 'Im Katalog teilen';
+
+  @override
+  String get gearProposed =>
+      'Vorschlag eingereicht. Geteilt werden nur Produktdaten, keine persönlichen Angaben.';
+
+  @override
+  String get gearAlreadyInCatalog =>
+      'Dieser Gegenstand ist schon mit einem Katalogeintrag verknüpft.';
+
+  @override
+  String get gearFromCatalog => 'Aus Katalog übernehmen';
+
+  @override
+  String get gearCatalogSearchHint => 'Katalog durchsuchen';
+
+  @override
+  String get gearCatalogEmpty => 'Nichts gefunden.';
+
+  @override
+  String get gearSummaryTitle => 'Summen';
+
+  @override
+  String get gearGroupBy => 'Gruppieren nach';
+
+  @override
+  String get gearGroupNone => 'Gesamt';
+
+  @override
+  String get gearGroupType => 'Kategorie';
+
+  @override
+  String get gearGroupTag => 'Tag';
+
+  @override
+  String get gearGroupStatus => 'Status';
+
+  @override
+  String get gearGroupBrand => 'Marke';
+
+  @override
+  String get gearUnassigned => 'Nicht zugeordnet';
+
+  @override
+  String gearItemCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Gegenstände',
+      one: '1 Gegenstand',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get gearTotalWeight => 'Gesamtgewicht';
+
+  @override
+  String get gearTotalValue => 'Kaufwert';
+
+  @override
+  String gearWithoutWeight(int count) {
+    return '$count ohne Gewicht';
+  }
+
+  @override
+  String gearWithoutPrice(int count) {
+    return '$count ohne Preis';
+  }
+
+  @override
+  String get gearTagGroupHint =>
+      'Ein Gegenstand zählt in jedem seiner Tags; die Gruppen können zusammen mehr ergeben als die Gesamtsumme.';
+
+  @override
+  String get gearListsTitle => 'Packlisten';
+
+  @override
+  String get gearListsEmpty => 'Noch keine Packliste.';
+
+  @override
+  String get gearListNew => 'Neue Packliste';
+
+  @override
+  String get gearListEdit => 'Packliste bearbeiten';
+
+  @override
+  String get gearQuantity => 'Anzahl';
+
+  @override
+  String get gearManageTitle => 'Tags und Kategorien';
+
+  @override
+  String get gearTagNew => 'Neuer Tag';
+
+  @override
+  String get gearTypeNew => 'Neue Kategorie';
+
+  @override
+  String get gearTagsEmpty =>
+      'Noch keine Tags. Tags sind frei wählbare Stichworte wie „Winter“ oder „Verleihbar“.';
+
+  @override
+  String get gearStandardType => 'Standard';
+
+  @override
+  String get gearOwnType => 'Eigene';
+
+  @override
+  String get gearColorHex => 'Farbe (#RRGGBB)';
+
+  @override
+  String get gearColorInvalid => 'Format #RRGGBB, z. B. #3366CC';
+
+  @override
+  String get gearCatalogTitle => 'Katalog';
+
+  @override
+  String get gearMyProposals => 'Meine Vorschläge';
+
+  @override
+  String get gearPendingProposals => 'Offene Vorschläge';
+
+  @override
+  String get gearNoProposals => 'Keine Vorschläge.';
+
+  @override
+  String get catalogPending => 'Offen';
+
+  @override
+  String get catalogApproved => 'Freigegeben';
+
+  @override
+  String get catalogRejected => 'Abgelehnt';
+
+  @override
+  String get catalogApprove => 'Freigeben';
+
+  @override
+  String get catalogReject => 'Ablehnen';
 }

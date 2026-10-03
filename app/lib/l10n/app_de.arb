@@ -8,7 +8,6 @@
   "cancel": "Abbrechen",
   "requiredField": "Pflichtfeld",
   "invalidNumber": "Bitte eine gültige Zahl eingeben",
-
   "loginTitle": "Anmelden",
   "registerTitle": "Konto anlegen",
   "serverUrl": "Server-Adresse",
@@ -24,7 +23,6 @@
   "goToRegister": "Noch kein Konto? Konto anlegen",
   "goToLogin": "Schon ein Konto? Anmelden",
   "logout": "Abmelden",
-
   "profileTitle": "Profil",
   "profileIntro": "Diese Angaben sind freiwillig. Sie dienen nur der Schätzung des Kalorienverbrauchs und sind für niemanden sonst sichtbar.",
   "weightKg": "Gewicht (kg)",
@@ -38,12 +36,16 @@
   "maxHeartRate": "Maximale Herzfrequenz",
   "restingHeartRate": "Ruheherzfrequenz",
   "signedInAs": "Angemeldet als {name}",
-  "@signedInAs": {"placeholders": {"name": {"type": "String"}}},
+  "@signedInAs": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "roleAdmin": "Administrator",
-
   "noModulesTitle": "Noch nichts zu sehen",
   "noModulesBody": "Auf diesem Server ist kein Modul aktiv, das diese App kennt.",
-
   "errorNetwork": "Der Server ist nicht erreichbar. Bitte Verbindung und Adresse prüfen.",
   "errorInvalidCredentials": "E-Mail oder Passwort ist falsch.",
   "errorEmailTaken": "Diese E-Mail-Adresse ist schon registriert.",
@@ -51,5 +53,112 @@
   "errorRateLimited": "Zu viele Versuche. Bitte kurz warten.",
   "errorValidation": "Die Eingaben wurden vom Server nicht angenommen.",
   "errorSessionExpired": "Die Anmeldung ist abgelaufen. Bitte neu anmelden.",
-  "errorUnknown": "Etwas ist schiefgegangen. Bitte später erneut versuchen."
+  "errorUnknown": "Etwas ist schiefgegangen. Bitte später erneut versuchen.",
+  "delete": "Löschen",
+  "edit": "Bearbeiten",
+  "add": "Hinzufügen",
+  "search": "Suchen",
+  "all": "Alle",
+  "none": "Keine",
+  "confirmDeleteTitle": "Wirklich löschen?",
+  "close": "Schließen",
+  "name": "Name",
+  "offlineData": "Ohne Verbindung – gespeicherter Stand",
+  "errorConflict": "Das gibt es schon.",
+  "errorForbidden": "Dafür fehlt die Berechtigung.",
+  "errorNotFound": "Nicht gefunden.",
+  "errorInvalidImage": "Die Datei ist kein unterstütztes Bild (JPEG, PNG, WebP).",
+  "errorTooLarge": "Die Datei ist zu groß.",
+  "gearTitle": "Ausrüstung",
+  "gearEmpty": "Noch keine Ausrüstung erfasst.",
+  "gearNew": "Neuer Gegenstand",
+  "gearEdit": "Gegenstand bearbeiten",
+  "gearSearchHint": "Name oder Marke",
+  "gearBrand": "Marke",
+  "gearType": "Kategorie",
+  "gearNoType": "Ohne Kategorie",
+  "gearWeight": "Gewicht (g)",
+  "gearPurchaseDate": "Kaufdatum",
+  "gearPurchasePrice": "Kaufpreis",
+  "gearCurrency": "Währung",
+  "gearCurrencyRequired": "Zur Angabe eines Preises gehört die Währung (z. B. CHF)",
+  "gearCurrencyInvalid": "Drei Großbuchstaben, z. B. CHF",
+  "gearPriceInvalid": "Betrag zwischen 0 und 1 000 000 mit höchstens zwei Nachkommastellen",
+  "gearDescription": "Beschreibung",
+  "gearNotes": "Notizen",
+  "gearWebsite": "Website",
+  "gearWebsiteInvalid": "Adresse muss mit http:// oder https:// beginnen",
+  "gearStatus": "Status",
+  "gearStatusActive": "In Gebrauch",
+  "gearStatusRetired": "Ausgemustert",
+  "gearSerialNumber": "Seriennummer",
+  "gearSize": "Größe",
+  "gearColor": "Farbe",
+  "gearTags": "Tags",
+  "gearImage": "Bild",
+  "gearImageChoose": "Bild wählen",
+  "gearImageRemove": "Bild entfernen",
+  "gearProposeToCatalog": "Im Katalog teilen",
+  "gearProposed": "Vorschlag eingereicht. Geteilt werden nur Produktdaten, keine persönlichen Angaben.",
+  "gearAlreadyInCatalog": "Dieser Gegenstand ist schon mit einem Katalogeintrag verknüpft.",
+  "gearFromCatalog": "Aus Katalog übernehmen",
+  "gearCatalogSearchHint": "Katalog durchsuchen",
+  "gearCatalogEmpty": "Nichts gefunden.",
+  "gearSummaryTitle": "Summen",
+  "gearGroupBy": "Gruppieren nach",
+  "gearGroupNone": "Gesamt",
+  "gearGroupType": "Kategorie",
+  "gearGroupTag": "Tag",
+  "gearGroupStatus": "Status",
+  "gearGroupBrand": "Marke",
+  "gearUnassigned": "Nicht zugeordnet",
+  "gearItemCount": "{count, plural, =1{1 Gegenstand} other{{count} Gegenstände}}",
+  "@gearItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "gearTotalWeight": "Gesamtgewicht",
+  "gearTotalValue": "Kaufwert",
+  "gearWithoutWeight": "{count} ohne Gewicht",
+  "@gearWithoutWeight": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "gearWithoutPrice": "{count} ohne Preis",
+  "@gearWithoutPrice": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "gearTagGroupHint": "Ein Gegenstand zählt in jedem seiner Tags; die Gruppen können zusammen mehr ergeben als die Gesamtsumme.",
+  "gearListsTitle": "Packlisten",
+  "gearListsEmpty": "Noch keine Packliste.",
+  "gearListNew": "Neue Packliste",
+  "gearListEdit": "Packliste bearbeiten",
+  "gearQuantity": "Anzahl",
+  "gearManageTitle": "Tags und Kategorien",
+  "gearTagNew": "Neuer Tag",
+  "gearTypeNew": "Neue Kategorie",
+  "gearTagsEmpty": "Noch keine Tags. Tags sind frei wählbare Stichworte wie „Winter“ oder „Verleihbar“.",
+  "gearStandardType": "Standard",
+  "gearOwnType": "Eigene",
+  "gearColorHex": "Farbe (#RRGGBB)",
+  "gearColorInvalid": "Format #RRGGBB, z. B. #3366CC",
+  "gearCatalogTitle": "Katalog",
+  "gearMyProposals": "Meine Vorschläge",
+  "gearPendingProposals": "Offene Vorschläge",
+  "gearNoProposals": "Keine Vorschläge.",
+  "catalogPending": "Offen",
+  "catalogApproved": "Freigegeben",
+  "catalogRejected": "Abgelehnt",
+  "catalogApprove": "Freigeben",
+  "catalogReject": "Ablehnen"
 }

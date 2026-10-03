@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../network/api_exception.dart';
@@ -15,7 +16,16 @@ String describeError(AppLocalizations l10n, Object error) {
     'registration_closed' => l10n.errorRegistrationClosed,
     'rate_limited' => l10n.errorRateLimited,
     'invalid_token' || 'unauthorized' => l10n.errorSessionExpired,
-    _ => l10n.errorUnknown,
+    'invalid_image' => l10n.errorInvalidImage,
+    'already_in_catalog' => l10n.gearAlreadyInCatalog,
+    _ => switch (error.statusCode) {
+      403 => l10n.errorForbidden,
+      404 => l10n.errorNotFound,
+      409 => l10n.errorConflict,
+      413 => l10n.errorTooLarge,
+      422 => l10n.errorValidation,
+      _ => l10n.errorUnknown,
+    },
   };
 }
 
@@ -68,4 +78,96 @@ class CenteredForm extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Shows the German text of an error at the bottom of the screen.
+void showError(BuildContext context, Object error) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(describeError(AppLocalizations.of(context), error))),
+  );
+}
+
+/// Loading, error with retry, or the content: the three states of a request.
+class AsyncBody<T> extends StatelessWidget {
+  const AsyncBody({
+    super.key,
+    required this.value,
+    required this.onRetry,
+    required this.builder,
+  });
+
+  final AsyncValue<T> value;
+  final VoidCallback onRetry;
+  final Widget Function(T data) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return value.when(
+      skipLoadingOnRefresh: true,
+      skipLoadingOnReload: true,
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => CenteredForm(
+        children: [
+          ErrorText(error),
+          const SizedBox(height: AppSpacing.m),
+          OutlinedButton(onPressed: onRetry, child: Text(l10n.retry)),
+        ],
+      ),
+      data: builder,
+    );
+  }
+}
+
+/// Hint that the data on screen comes from the device, not from the server.
+class OfflineBanner extends StatelessWidget {
+  const OfflineBanner({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      color: scheme.secondaryContainer,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.m,
+        vertical: AppSpacing.s,
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.cloud_off, size: 18, color: scheme.onSecondaryContainer),
+          const SizedBox(width: AppSpacing.s),
+          Expanded(
+            child: Text(
+              AppLocalizations.of(context).offlineData,
+              style: TextStyle(color: scheme.onSecondaryContainer),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Asks before something is deleted; true if the user confirmed.
+Future<bool> confirmDelete(BuildContext context, String what) async {
+  final l10n = AppLocalizations.of(context);
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(l10n.confirmDeleteTitle),
+      content: Text(what),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(l10n.cancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(l10n.delete),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
 }

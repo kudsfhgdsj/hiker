@@ -44,6 +44,8 @@ Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen k
 | App: Server-Adresse | Wird beim Anmelden eingegeben und auf dem Gerät gespeichert; im Browser ist die eigene Herkunft vorbelegt | Keine feste Domain in der App; optionaler Vorgabewert per `--dart-define=API_BASE_URL` |
 | App: Tokens | Im Plattform-Keystore (`flutter_secure_storage`) | Abgelaufene Access-Tokens werden einmal automatisch erneuert; ein abgelehntes Refresh-Token meldet ab, fehlendes Netz nicht |
 | App: lokale Daten | Drift speichert die gesehenen Datensätze als JSON-Dokumente je Sammlung (`cached_documents`), nicht als Abbild aller Server-Tabellen | Weniger doppelte Schemapflege; die Typisierung liegt in den Dart-Modellen. Beim Abmelden wird die lokale Kopie gelöscht |
+| App: Lesen ohne Netz | Listen werden beim Laden lokal gespeichert; ist der Server nicht erreichbar, zeigt die App den gespeicherten Stand mit einem Hinweis und wendet Filter lokal an | Änderungen brauchen bis Schritt 12 (Offline-Sync) eine Verbindung |
+| App: Dateiauswahl | `file_picker` (MIT) für Bilder und GPX | Nutzt die Dateiauswahl des Systems, keine Google-Dienste |
 | App: Kennung | Android-Paketname `internal.lacasa.hiker` (vorläufig) | Vor einer Veröffentlichung auf die endgültige Domain umstellen |
 | Fehlerformat | `{"error": {"code", "message"}}` für fachliche Fehler | Client übersetzt anhand von `code` |
 

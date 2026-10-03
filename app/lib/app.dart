@@ -9,14 +9,15 @@ import 'core/session/session.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/auth_form_screen.dart';
 import 'features/auth/presentation/profile_screen.dart';
+import 'features/gear/gear_module.dart';
 import 'l10n/app_localizations.dart';
 
 /// The features built into the app. A feature is added or removed here only.
-const List<FeatureModule> builtInModules = [];
+final List<FeatureModule> builtInModules = [gearModule];
 
 /// Wires the features into core. Tests pass their own list of modules.
-List<Override> appOverrides({List<FeatureModule> modules = builtInModules}) => [
-  featureModulesProvider.overrideWithValue(modules),
+List<Override> appOverrides({List<FeatureModule>? modules}) => [
+  featureModulesProvider.overrideWithValue(modules ?? builtInModules),
   authScreensProvider.overrideWithValue(
     AuthScreens(
       login: (_) => const AuthFormScreen(register: false),

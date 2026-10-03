@@ -375,6 +375,522 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Etwas ist schiefgegangen. Bitte später erneut versuchen.'**
   String get errorUnknown;
+
+  /// No description provided for @delete.
+  ///
+  /// In de, this message translates to:
+  /// **'Löschen'**
+  String get delete;
+
+  /// No description provided for @edit.
+  ///
+  /// In de, this message translates to:
+  /// **'Bearbeiten'**
+  String get edit;
+
+  /// No description provided for @add.
+  ///
+  /// In de, this message translates to:
+  /// **'Hinzufügen'**
+  String get add;
+
+  /// No description provided for @search.
+  ///
+  /// In de, this message translates to:
+  /// **'Suchen'**
+  String get search;
+
+  /// No description provided for @all.
+  ///
+  /// In de, this message translates to:
+  /// **'Alle'**
+  String get all;
+
+  /// No description provided for @none.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine'**
+  String get none;
+
+  /// No description provided for @confirmDeleteTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Wirklich löschen?'**
+  String get confirmDeleteTitle;
+
+  /// No description provided for @close.
+  ///
+  /// In de, this message translates to:
+  /// **'Schließen'**
+  String get close;
+
+  /// No description provided for @name.
+  ///
+  /// In de, this message translates to:
+  /// **'Name'**
+  String get name;
+
+  /// No description provided for @offlineData.
+  ///
+  /// In de, this message translates to:
+  /// **'Ohne Verbindung – gespeicherter Stand'**
+  String get offlineData;
+
+  /// No description provided for @errorConflict.
+  ///
+  /// In de, this message translates to:
+  /// **'Das gibt es schon.'**
+  String get errorConflict;
+
+  /// No description provided for @errorForbidden.
+  ///
+  /// In de, this message translates to:
+  /// **'Dafür fehlt die Berechtigung.'**
+  String get errorForbidden;
+
+  /// No description provided for @errorNotFound.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht gefunden.'**
+  String get errorNotFound;
+
+  /// No description provided for @errorInvalidImage.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Datei ist kein unterstütztes Bild (JPEG, PNG, WebP).'**
+  String get errorInvalidImage;
+
+  /// No description provided for @errorTooLarge.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Datei ist zu groß.'**
+  String get errorTooLarge;
+
+  /// No description provided for @gearTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Ausrüstung'**
+  String get gearTitle;
+
+  /// No description provided for @gearEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch keine Ausrüstung erfasst.'**
+  String get gearEmpty;
+
+  /// No description provided for @gearNew.
+  ///
+  /// In de, this message translates to:
+  /// **'Neuer Gegenstand'**
+  String get gearNew;
+
+  /// No description provided for @gearEdit.
+  ///
+  /// In de, this message translates to:
+  /// **'Gegenstand bearbeiten'**
+  String get gearEdit;
+
+  /// No description provided for @gearSearchHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Name oder Marke'**
+  String get gearSearchHint;
+
+  /// No description provided for @gearBrand.
+  ///
+  /// In de, this message translates to:
+  /// **'Marke'**
+  String get gearBrand;
+
+  /// No description provided for @gearType.
+  ///
+  /// In de, this message translates to:
+  /// **'Kategorie'**
+  String get gearType;
+
+  /// No description provided for @gearNoType.
+  ///
+  /// In de, this message translates to:
+  /// **'Ohne Kategorie'**
+  String get gearNoType;
+
+  /// No description provided for @gearWeight.
+  ///
+  /// In de, this message translates to:
+  /// **'Gewicht (g)'**
+  String get gearWeight;
+
+  /// No description provided for @gearPurchaseDate.
+  ///
+  /// In de, this message translates to:
+  /// **'Kaufdatum'**
+  String get gearPurchaseDate;
+
+  /// No description provided for @gearPurchasePrice.
+  ///
+  /// In de, this message translates to:
+  /// **'Kaufpreis'**
+  String get gearPurchasePrice;
+
+  /// No description provided for @gearCurrency.
+  ///
+  /// In de, this message translates to:
+  /// **'Währung'**
+  String get gearCurrency;
+
+  /// No description provided for @gearCurrencyRequired.
+  ///
+  /// In de, this message translates to:
+  /// **'Zur Angabe eines Preises gehört die Währung (z. B. CHF)'**
+  String get gearCurrencyRequired;
+
+  /// No description provided for @gearCurrencyInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'Drei Großbuchstaben, z. B. CHF'**
+  String get gearCurrencyInvalid;
+
+  /// No description provided for @gearPriceInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'Betrag zwischen 0 und 1 000 000 mit höchstens zwei Nachkommastellen'**
+  String get gearPriceInvalid;
+
+  /// No description provided for @gearDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Beschreibung'**
+  String get gearDescription;
+
+  /// No description provided for @gearNotes.
+  ///
+  /// In de, this message translates to:
+  /// **'Notizen'**
+  String get gearNotes;
+
+  /// No description provided for @gearWebsite.
+  ///
+  /// In de, this message translates to:
+  /// **'Website'**
+  String get gearWebsite;
+
+  /// No description provided for @gearWebsiteInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'Adresse muss mit http:// oder https:// beginnen'**
+  String get gearWebsiteInvalid;
+
+  /// No description provided for @gearStatus.
+  ///
+  /// In de, this message translates to:
+  /// **'Status'**
+  String get gearStatus;
+
+  /// No description provided for @gearStatusActive.
+  ///
+  /// In de, this message translates to:
+  /// **'In Gebrauch'**
+  String get gearStatusActive;
+
+  /// No description provided for @gearStatusRetired.
+  ///
+  /// In de, this message translates to:
+  /// **'Ausgemustert'**
+  String get gearStatusRetired;
+
+  /// No description provided for @gearSerialNumber.
+  ///
+  /// In de, this message translates to:
+  /// **'Seriennummer'**
+  String get gearSerialNumber;
+
+  /// No description provided for @gearSize.
+  ///
+  /// In de, this message translates to:
+  /// **'Größe'**
+  String get gearSize;
+
+  /// No description provided for @gearColor.
+  ///
+  /// In de, this message translates to:
+  /// **'Farbe'**
+  String get gearColor;
+
+  /// No description provided for @gearTags.
+  ///
+  /// In de, this message translates to:
+  /// **'Tags'**
+  String get gearTags;
+
+  /// No description provided for @gearImage.
+  ///
+  /// In de, this message translates to:
+  /// **'Bild'**
+  String get gearImage;
+
+  /// No description provided for @gearImageChoose.
+  ///
+  /// In de, this message translates to:
+  /// **'Bild wählen'**
+  String get gearImageChoose;
+
+  /// No description provided for @gearImageRemove.
+  ///
+  /// In de, this message translates to:
+  /// **'Bild entfernen'**
+  String get gearImageRemove;
+
+  /// No description provided for @gearProposeToCatalog.
+  ///
+  /// In de, this message translates to:
+  /// **'Im Katalog teilen'**
+  String get gearProposeToCatalog;
+
+  /// No description provided for @gearProposed.
+  ///
+  /// In de, this message translates to:
+  /// **'Vorschlag eingereicht. Geteilt werden nur Produktdaten, keine persönlichen Angaben.'**
+  String get gearProposed;
+
+  /// No description provided for @gearAlreadyInCatalog.
+  ///
+  /// In de, this message translates to:
+  /// **'Dieser Gegenstand ist schon mit einem Katalogeintrag verknüpft.'**
+  String get gearAlreadyInCatalog;
+
+  /// No description provided for @gearFromCatalog.
+  ///
+  /// In de, this message translates to:
+  /// **'Aus Katalog übernehmen'**
+  String get gearFromCatalog;
+
+  /// No description provided for @gearCatalogSearchHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Katalog durchsuchen'**
+  String get gearCatalogSearchHint;
+
+  /// No description provided for @gearCatalogEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Nichts gefunden.'**
+  String get gearCatalogEmpty;
+
+  /// No description provided for @gearSummaryTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Summen'**
+  String get gearSummaryTitle;
+
+  /// No description provided for @gearGroupBy.
+  ///
+  /// In de, this message translates to:
+  /// **'Gruppieren nach'**
+  String get gearGroupBy;
+
+  /// No description provided for @gearGroupNone.
+  ///
+  /// In de, this message translates to:
+  /// **'Gesamt'**
+  String get gearGroupNone;
+
+  /// No description provided for @gearGroupType.
+  ///
+  /// In de, this message translates to:
+  /// **'Kategorie'**
+  String get gearGroupType;
+
+  /// No description provided for @gearGroupTag.
+  ///
+  /// In de, this message translates to:
+  /// **'Tag'**
+  String get gearGroupTag;
+
+  /// No description provided for @gearGroupStatus.
+  ///
+  /// In de, this message translates to:
+  /// **'Status'**
+  String get gearGroupStatus;
+
+  /// No description provided for @gearGroupBrand.
+  ///
+  /// In de, this message translates to:
+  /// **'Marke'**
+  String get gearGroupBrand;
+
+  /// No description provided for @gearUnassigned.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht zugeordnet'**
+  String get gearUnassigned;
+
+  /// No description provided for @gearItemCount.
+  ///
+  /// In de, this message translates to:
+  /// **'{count, plural, =1{1 Gegenstand} other{{count} Gegenstände}}'**
+  String gearItemCount(int count);
+
+  /// No description provided for @gearTotalWeight.
+  ///
+  /// In de, this message translates to:
+  /// **'Gesamtgewicht'**
+  String get gearTotalWeight;
+
+  /// No description provided for @gearTotalValue.
+  ///
+  /// In de, this message translates to:
+  /// **'Kaufwert'**
+  String get gearTotalValue;
+
+  /// No description provided for @gearWithoutWeight.
+  ///
+  /// In de, this message translates to:
+  /// **'{count} ohne Gewicht'**
+  String gearWithoutWeight(int count);
+
+  /// No description provided for @gearWithoutPrice.
+  ///
+  /// In de, this message translates to:
+  /// **'{count} ohne Preis'**
+  String gearWithoutPrice(int count);
+
+  /// No description provided for @gearTagGroupHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Ein Gegenstand zählt in jedem seiner Tags; die Gruppen können zusammen mehr ergeben als die Gesamtsumme.'**
+  String get gearTagGroupHint;
+
+  /// No description provided for @gearListsTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Packlisten'**
+  String get gearListsTitle;
+
+  /// No description provided for @gearListsEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch keine Packliste.'**
+  String get gearListsEmpty;
+
+  /// No description provided for @gearListNew.
+  ///
+  /// In de, this message translates to:
+  /// **'Neue Packliste'**
+  String get gearListNew;
+
+  /// No description provided for @gearListEdit.
+  ///
+  /// In de, this message translates to:
+  /// **'Packliste bearbeiten'**
+  String get gearListEdit;
+
+  /// No description provided for @gearQuantity.
+  ///
+  /// In de, this message translates to:
+  /// **'Anzahl'**
+  String get gearQuantity;
+
+  /// No description provided for @gearManageTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Tags und Kategorien'**
+  String get gearManageTitle;
+
+  /// No description provided for @gearTagNew.
+  ///
+  /// In de, this message translates to:
+  /// **'Neuer Tag'**
+  String get gearTagNew;
+
+  /// No description provided for @gearTypeNew.
+  ///
+  /// In de, this message translates to:
+  /// **'Neue Kategorie'**
+  String get gearTypeNew;
+
+  /// No description provided for @gearTagsEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch keine Tags. Tags sind frei wählbare Stichworte wie „Winter“ oder „Verleihbar“.'**
+  String get gearTagsEmpty;
+
+  /// No description provided for @gearStandardType.
+  ///
+  /// In de, this message translates to:
+  /// **'Standard'**
+  String get gearStandardType;
+
+  /// No description provided for @gearOwnType.
+  ///
+  /// In de, this message translates to:
+  /// **'Eigene'**
+  String get gearOwnType;
+
+  /// No description provided for @gearColorHex.
+  ///
+  /// In de, this message translates to:
+  /// **'Farbe (#RRGGBB)'**
+  String get gearColorHex;
+
+  /// No description provided for @gearColorInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'Format #RRGGBB, z. B. #3366CC'**
+  String get gearColorInvalid;
+
+  /// No description provided for @gearCatalogTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Katalog'**
+  String get gearCatalogTitle;
+
+  /// No description provided for @gearMyProposals.
+  ///
+  /// In de, this message translates to:
+  /// **'Meine Vorschläge'**
+  String get gearMyProposals;
+
+  /// No description provided for @gearPendingProposals.
+  ///
+  /// In de, this message translates to:
+  /// **'Offene Vorschläge'**
+  String get gearPendingProposals;
+
+  /// No description provided for @gearNoProposals.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Vorschläge.'**
+  String get gearNoProposals;
+
+  /// No description provided for @catalogPending.
+  ///
+  /// In de, this message translates to:
+  /// **'Offen'**
+  String get catalogPending;
+
+  /// No description provided for @catalogApproved.
+  ///
+  /// In de, this message translates to:
+  /// **'Freigegeben'**
+  String get catalogApproved;
+
+  /// No description provided for @catalogRejected.
+  ///
+  /// In de, this message translates to:
+  /// **'Abgelehnt'**
+  String get catalogRejected;
+
+  /// No description provided for @catalogApprove.
+  ///
+  /// In de, this message translates to:
+  /// **'Freigeben'**
+  String get catalogApprove;
+
+  /// No description provided for @catalogReject.
+  ///
+  /// In de, this message translates to:
+  /// **'Ablehnen'**
+  String get catalogReject;
 }
 
 class _AppLocalizationsDelegate
