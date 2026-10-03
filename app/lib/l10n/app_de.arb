@@ -160,5 +160,51 @@
   "catalogApproved": "Freigegeben",
   "catalogRejected": "Abgelehnt",
   "catalogApprove": "Freigeben",
-  "catalogReject": "Ablehnen"
+  "catalogReject": "Ablehnen",
+  "foodTitle": "Essen",
+  "foodEmpty": "Noch keine eigenen Lebensmittel.",
+  "foodNew": "Neues Lebensmittel",
+  "foodEdit": "Lebensmittel bearbeiten",
+  "foodSearchHint": "Name, Marke oder Barcode",
+  "foodScan": "Barcode scannen",
+  "foodEnterBarcode": "Barcode eingeben",
+  "foodBarcode": "Barcode",
+  "foodBarcodeInvalid": "8, 12, 13 oder 14 Ziffern",
+  "foodBrand": "Marke",
+  "foodKcal": "Kalorien (kcal je 100 g)",
+  "foodKcalInvalid": "Zahl zwischen 0 und 900",
+  "foodProtein": "Eiweiß (g)",
+  "foodCarbs": "Kohlenhydrate (g)",
+  "foodSugar": "davon Zucker (g)",
+  "foodFat": "Fett (g)",
+  "foodSalt": "Salz (g)",
+  "foodServing": "Portion (g)",
+  "foodPer100gInvalid": "Zahl zwischen 0 und 100",
+  "foodSugarAboveCarbs": "Zucker kann nicht mehr sein als Kohlenhydrate",
+  "foodMacrosAbove100": "Eiweiß, Kohlenhydrate und Fett ergeben zusammen mehr als 100 g",
+  "foodPer100g": "je 100 g",
+  "foodKcalValue": "{kcal} kcal",
+  "@foodKcalValue": {
+    "placeholders": {
+      "kcal": {
+        "type": "String"
+      }
+    }
+  },
+  "foodOwn": "Eigenes",
+  "foodCatalog": "Katalog",
+  "foodSourceOff": "Daten: Open Food Facts (ODbL)",
+  "foodNotFoundTitle": "Produkt nicht gefunden",
+  "foodNotFoundBody": "Zu diesem Barcode gibt es noch keinen Eintrag. Du kannst das Produkt selbst anlegen.",
+  "foodSourceUnavailable": "Die Produktdatenbank ist gerade nicht erreichbar. Du kannst das Produkt selbst anlegen.",
+  "foodCreateOwn": "Selbst anlegen",
+  "foodCorrect": "Eigene Korrektur speichern",
+  "foodCorrectHint": "Die Änderung wird als deine eigene Kopie gespeichert; der Katalogeintrag bleibt unverändert.",
+  "foodProposeToCatalog": "Im Katalog teilen",
+  "foodProposed": "Vorschlag eingereicht.",
+  "foodAlreadyInCatalog": "Dieses Lebensmittel ist schon mit einem Katalogeintrag verknüpft.",
+  "foodCatalogTitle": "Katalog",
+  "foodScannerUnavailable": "Der Kamera-Scanner steht hier nicht zur Verfügung. Bitte den Barcode eintippen.",
+  "foodScannerHint": "Barcode in den Rahmen halten",
+  "errorBarcodeInCatalog": "Im Katalog gibt es schon ein Produkt mit diesem Barcode."
 }

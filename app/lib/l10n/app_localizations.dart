@@ -891,6 +891,240 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Ablehnen'**
   String get catalogReject;
+
+  /// No description provided for @foodTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Essen'**
+  String get foodTitle;
+
+  /// No description provided for @foodEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch keine eigenen Lebensmittel.'**
+  String get foodEmpty;
+
+  /// No description provided for @foodNew.
+  ///
+  /// In de, this message translates to:
+  /// **'Neues Lebensmittel'**
+  String get foodNew;
+
+  /// No description provided for @foodEdit.
+  ///
+  /// In de, this message translates to:
+  /// **'Lebensmittel bearbeiten'**
+  String get foodEdit;
+
+  /// No description provided for @foodSearchHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Name, Marke oder Barcode'**
+  String get foodSearchHint;
+
+  /// No description provided for @foodScan.
+  ///
+  /// In de, this message translates to:
+  /// **'Barcode scannen'**
+  String get foodScan;
+
+  /// No description provided for @foodEnterBarcode.
+  ///
+  /// In de, this message translates to:
+  /// **'Barcode eingeben'**
+  String get foodEnterBarcode;
+
+  /// No description provided for @foodBarcode.
+  ///
+  /// In de, this message translates to:
+  /// **'Barcode'**
+  String get foodBarcode;
+
+  /// No description provided for @foodBarcodeInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'8, 12, 13 oder 14 Ziffern'**
+  String get foodBarcodeInvalid;
+
+  /// No description provided for @foodBrand.
+  ///
+  /// In de, this message translates to:
+  /// **'Marke'**
+  String get foodBrand;
+
+  /// No description provided for @foodKcal.
+  ///
+  /// In de, this message translates to:
+  /// **'Kalorien (kcal je 100 g)'**
+  String get foodKcal;
+
+  /// No description provided for @foodKcalInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'Zahl zwischen 0 und 900'**
+  String get foodKcalInvalid;
+
+  /// No description provided for @foodProtein.
+  ///
+  /// In de, this message translates to:
+  /// **'Eiweiß (g)'**
+  String get foodProtein;
+
+  /// No description provided for @foodCarbs.
+  ///
+  /// In de, this message translates to:
+  /// **'Kohlenhydrate (g)'**
+  String get foodCarbs;
+
+  /// No description provided for @foodSugar.
+  ///
+  /// In de, this message translates to:
+  /// **'davon Zucker (g)'**
+  String get foodSugar;
+
+  /// No description provided for @foodFat.
+  ///
+  /// In de, this message translates to:
+  /// **'Fett (g)'**
+  String get foodFat;
+
+  /// No description provided for @foodSalt.
+  ///
+  /// In de, this message translates to:
+  /// **'Salz (g)'**
+  String get foodSalt;
+
+  /// No description provided for @foodServing.
+  ///
+  /// In de, this message translates to:
+  /// **'Portion (g)'**
+  String get foodServing;
+
+  /// No description provided for @foodPer100gInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'Zahl zwischen 0 und 100'**
+  String get foodPer100gInvalid;
+
+  /// No description provided for @foodSugarAboveCarbs.
+  ///
+  /// In de, this message translates to:
+  /// **'Zucker kann nicht mehr sein als Kohlenhydrate'**
+  String get foodSugarAboveCarbs;
+
+  /// No description provided for @foodMacrosAbove100.
+  ///
+  /// In de, this message translates to:
+  /// **'Eiweiß, Kohlenhydrate und Fett ergeben zusammen mehr als 100 g'**
+  String get foodMacrosAbove100;
+
+  /// No description provided for @foodPer100g.
+  ///
+  /// In de, this message translates to:
+  /// **'je 100 g'**
+  String get foodPer100g;
+
+  /// No description provided for @foodKcalValue.
+  ///
+  /// In de, this message translates to:
+  /// **'{kcal} kcal'**
+  String foodKcalValue(String kcal);
+
+  /// No description provided for @foodOwn.
+  ///
+  /// In de, this message translates to:
+  /// **'Eigenes'**
+  String get foodOwn;
+
+  /// No description provided for @foodCatalog.
+  ///
+  /// In de, this message translates to:
+  /// **'Katalog'**
+  String get foodCatalog;
+
+  /// No description provided for @foodSourceOff.
+  ///
+  /// In de, this message translates to:
+  /// **'Daten: Open Food Facts (ODbL)'**
+  String get foodSourceOff;
+
+  /// No description provided for @foodNotFoundTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Produkt nicht gefunden'**
+  String get foodNotFoundTitle;
+
+  /// No description provided for @foodNotFoundBody.
+  ///
+  /// In de, this message translates to:
+  /// **'Zu diesem Barcode gibt es noch keinen Eintrag. Du kannst das Produkt selbst anlegen.'**
+  String get foodNotFoundBody;
+
+  /// No description provided for @foodSourceUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Produktdatenbank ist gerade nicht erreichbar. Du kannst das Produkt selbst anlegen.'**
+  String get foodSourceUnavailable;
+
+  /// No description provided for @foodCreateOwn.
+  ///
+  /// In de, this message translates to:
+  /// **'Selbst anlegen'**
+  String get foodCreateOwn;
+
+  /// No description provided for @foodCorrect.
+  ///
+  /// In de, this message translates to:
+  /// **'Eigene Korrektur speichern'**
+  String get foodCorrect;
+
+  /// No description provided for @foodCorrectHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Änderung wird als deine eigene Kopie gespeichert; der Katalogeintrag bleibt unverändert.'**
+  String get foodCorrectHint;
+
+  /// No description provided for @foodProposeToCatalog.
+  ///
+  /// In de, this message translates to:
+  /// **'Im Katalog teilen'**
+  String get foodProposeToCatalog;
+
+  /// No description provided for @foodProposed.
+  ///
+  /// In de, this message translates to:
+  /// **'Vorschlag eingereicht.'**
+  String get foodProposed;
+
+  /// No description provided for @foodAlreadyInCatalog.
+  ///
+  /// In de, this message translates to:
+  /// **'Dieses Lebensmittel ist schon mit einem Katalogeintrag verknüpft.'**
+  String get foodAlreadyInCatalog;
+
+  /// No description provided for @foodCatalogTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Katalog'**
+  String get foodCatalogTitle;
+
+  /// No description provided for @foodScannerUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Kamera-Scanner steht hier nicht zur Verfügung. Bitte den Barcode eintippen.'**
+  String get foodScannerUnavailable;
+
+  /// No description provided for @foodScannerHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Barcode in den Rahmen halten'**
+  String get foodScannerHint;
+
+  /// No description provided for @errorBarcodeInCatalog.
+  ///
+  /// In de, this message translates to:
+  /// **'Im Katalog gibt es schon ein Produkt mit diesem Barcode.'**
+  String get errorBarcodeInCatalog;
 }
 
 class _AppLocalizationsDelegate

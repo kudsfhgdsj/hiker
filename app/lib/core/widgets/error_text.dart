@@ -18,6 +18,8 @@ String describeError(AppLocalizations l10n, Object error) {
     'invalid_token' || 'unauthorized' => l10n.errorSessionExpired,
     'invalid_image' => l10n.errorInvalidImage,
     'already_in_catalog' => l10n.gearAlreadyInCatalog,
+    'barcode_in_catalog' => l10n.errorBarcodeInCatalog,
+    'source_unavailable' => l10n.foodSourceUnavailable,
     _ => switch (error.statusCode) {
       403 => l10n.errorForbidden,
       404 => l10n.errorNotFound,

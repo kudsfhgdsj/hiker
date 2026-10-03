@@ -46,6 +46,7 @@ Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen k
 | App: lokale Daten | Drift speichert die gesehenen Datensätze als JSON-Dokumente je Sammlung (`cached_documents`), nicht als Abbild aller Server-Tabellen | Weniger doppelte Schemapflege; die Typisierung liegt in den Dart-Modellen. Beim Abmelden wird die lokale Kopie gelöscht |
 | App: Lesen ohne Netz | Listen werden beim Laden lokal gespeichert; ist der Server nicht erreichbar, zeigt die App den gespeicherten Stand mit einem Hinweis und wendet Filter lokal an | Änderungen brauchen bis Schritt 12 (Offline-Sync) eine Verbindung |
 | App: Dateiauswahl | `file_picker` (MIT) für Bilder und GPX | Nutzt die Dateiauswahl des Systems, keine Google-Dienste |
+| App: Barcode-Ablauf | Scan oder Eingabe → Server (eigene Produkte, Katalog, Open Food Facts); ohne Netz wird in den schon gesehenen Produkten auf dem Gerät gesucht. Unbekannt oder nicht erreichbar → Formular mit vorbelegtem Barcode | Alles, was die App gesehen hat (Suche, Scans), bleibt lokal gespeichert |
 | App: Kennung | Android-Paketname `internal.lacasa.hiker` (vorläufig) | Vor einer Veröffentlichung auf die endgültige Domain umstellen |
 | Fehlerformat | `{"error": {"code", "message"}}` für fachliche Fehler | Client übersetzt anhand von `code` |
 
@@ -61,7 +62,7 @@ Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen k
 | Karten | MapLibre (`maplibre_gl`) | Open Source; ab Phase 1 für Track, Fotos, Punktauswahl |
 | Kartenquellen | Konfigurierbare Tile-URL (Standard: OpenStreetMap) | Lizenzfragen später |
 | Diagramme | Eigenes Höhenprofil-Widget (Höhe, Herzfrequenz, Foto-Marker) | Foto-Marker und Kartenverknüpfung nötig |
-| Barcode-Scan | `flutter_zxing` (ZXing, lokal) | Kein ML Kit; Paketstatus vor Einsatz prüfen |
+| Barcode-Scan | `flutter_zxing` (ZXing, lokal) | Kein ML Kit. Paketstatus geprüft am 03.10.2026: Version 3.1.0 vom 25.09.2026, MIT, aktiv gepflegt. Kein Web-Support: im Browser wird der Barcode eingetippt |
 | Lebensmitteldaten | Open Food Facts | Kostenlos, Barcode-Abfrage, ODbL (Quelle nennen) |
 | Backend | FastAPI (Python) | OpenAPI-Doku automatisch |
 | Datenbank | PostgreSQL (Dev und Tests: SQLite) | Relational, Historie, Teilen |

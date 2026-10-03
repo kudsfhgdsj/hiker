@@ -437,4 +437,131 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get catalogReject => 'Ablehnen';
+
+  @override
+  String get foodTitle => 'Essen';
+
+  @override
+  String get foodEmpty => 'Noch keine eigenen Lebensmittel.';
+
+  @override
+  String get foodNew => 'Neues Lebensmittel';
+
+  @override
+  String get foodEdit => 'Lebensmittel bearbeiten';
+
+  @override
+  String get foodSearchHint => 'Name, Marke oder Barcode';
+
+  @override
+  String get foodScan => 'Barcode scannen';
+
+  @override
+  String get foodEnterBarcode => 'Barcode eingeben';
+
+  @override
+  String get foodBarcode => 'Barcode';
+
+  @override
+  String get foodBarcodeInvalid => '8, 12, 13 oder 14 Ziffern';
+
+  @override
+  String get foodBrand => 'Marke';
+
+  @override
+  String get foodKcal => 'Kalorien (kcal je 100 g)';
+
+  @override
+  String get foodKcalInvalid => 'Zahl zwischen 0 und 900';
+
+  @override
+  String get foodProtein => 'Eiweiß (g)';
+
+  @override
+  String get foodCarbs => 'Kohlenhydrate (g)';
+
+  @override
+  String get foodSugar => 'davon Zucker (g)';
+
+  @override
+  String get foodFat => 'Fett (g)';
+
+  @override
+  String get foodSalt => 'Salz (g)';
+
+  @override
+  String get foodServing => 'Portion (g)';
+
+  @override
+  String get foodPer100gInvalid => 'Zahl zwischen 0 und 100';
+
+  @override
+  String get foodSugarAboveCarbs =>
+      'Zucker kann nicht mehr sein als Kohlenhydrate';
+
+  @override
+  String get foodMacrosAbove100 =>
+      'Eiweiß, Kohlenhydrate und Fett ergeben zusammen mehr als 100 g';
+
+  @override
+  String get foodPer100g => 'je 100 g';
+
+  @override
+  String foodKcalValue(String kcal) {
+    return '$kcal kcal';
+  }
+
+  @override
+  String get foodOwn => 'Eigenes';
+
+  @override
+  String get foodCatalog => 'Katalog';
+
+  @override
+  String get foodSourceOff => 'Daten: Open Food Facts (ODbL)';
+
+  @override
+  String get foodNotFoundTitle => 'Produkt nicht gefunden';
+
+  @override
+  String get foodNotFoundBody =>
+      'Zu diesem Barcode gibt es noch keinen Eintrag. Du kannst das Produkt selbst anlegen.';
+
+  @override
+  String get foodSourceUnavailable =>
+      'Die Produktdatenbank ist gerade nicht erreichbar. Du kannst das Produkt selbst anlegen.';
+
+  @override
+  String get foodCreateOwn => 'Selbst anlegen';
+
+  @override
+  String get foodCorrect => 'Eigene Korrektur speichern';
+
+  @override
+  String get foodCorrectHint =>
+      'Die Änderung wird als deine eigene Kopie gespeichert; der Katalogeintrag bleibt unverändert.';
+
+  @override
+  String get foodProposeToCatalog => 'Im Katalog teilen';
+
+  @override
+  String get foodProposed => 'Vorschlag eingereicht.';
+
+  @override
+  String get foodAlreadyInCatalog =>
+      'Dieses Lebensmittel ist schon mit einem Katalogeintrag verknüpft.';
+
+  @override
+  String get foodCatalogTitle => 'Katalog';
+
+  @override
+  String get foodScannerUnavailable =>
+      'Der Kamera-Scanner steht hier nicht zur Verfügung. Bitte den Barcode eintippen.';
+
+  @override
+  String get foodScannerHint => 'Barcode in den Rahmen halten';
+
+  @override
+  String get errorBarcodeInCatalog =>
+      'Im Katalog gibt es schon ein Produkt mit diesem Barcode.';
 }
