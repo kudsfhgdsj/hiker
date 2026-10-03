@@ -36,6 +36,11 @@ from app.modules.protocols.elevation import (  # noqa: E402
     ElevationSourceError,
     get_elevation_source,
 )
+from app.modules.protocols.weather import (  # noqa: E402
+    WeatherSourceError,
+    WeatherValues,
+    get_weather_source,
+)
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -71,11 +76,12 @@ def db(session_factory):
 
 
 @pytest.fixture
-def client(session_factory, storage, food_source, elevation_source):
+def client(session_factory, storage, food_source, elevation_source, weather_source):
     app = create_app()
     app.dependency_overrides[get_storage] = lambda: storage
     app.dependency_overrides[get_food_source] = lambda: food_source
     app.dependency_overrides[get_elevation_source] = lambda: elevation_source
+    app.dependency_overrides[get_weather_source] = lambda: weather_source
 
     def _get_db():
         with session_factory() as session:
@@ -119,6 +125,35 @@ class FakeElevationSource:
 @pytest.fixture
 def elevation_source():
     return FakeElevationSource()
+
+
+class FakeWeatherSource:
+    """Stands in for the Open-Meteo weather services."""
+
+    def __init__(self):
+        self.calls: list[tuple] = []
+        self.fail = False
+        self.no_data = False
+
+    def values_at(self, lat, lon, elevation_m, time):
+        self.calls.append((round(lat, 4), round(lon, 4), elevation_m, time))
+        if self.fail:
+            raise WeatherSourceError("unreachable")
+        if self.no_data:
+            return None
+        # Colder with elevation, so that tests can tell the sample points apart.
+        return WeatherValues(
+            source="fake",
+            temperature_c=round(25 - (elevation_m or 0) / 100, 1),
+            wind_speed_kmh=10.0,
+            cloud_cover_pct=40.0,
+            weather_code=2,
+        )
+
+
+@pytest.fixture
+def weather_source():
+    return FakeWeatherSource()
 
 
 @pytest.fixture

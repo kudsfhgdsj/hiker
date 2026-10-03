@@ -213,7 +213,7 @@ Platzhalter → echter User: `contact.linked_user_id` setzen; gilt sofort in all
 **tour_waypoint** (wie bei wanderer): id, tour_id, name, description, icon, lat, lon, track_distance_m, elevation_m
 **tour_photo**: id, tour_id, file_id, thumb_file_id (Vorschaubild, höchstens 400 px), added_by, caption, taken_at, exif_lat/exif_lon/exif_altitude (Position aus dem Bild, damit die automatische Zuordnung wiederherstellbar bleibt), lat, lon, `position_source` (`exif_gps` | `exif_time` | `manual` | `none`), track_distance_m (Position entlang des Tracks), elevation_m, waypoint_id (optional), sort_order. Die Tour speichert zusätzlich `photo_time_offset_seconds`.
 
-**tour_weather**: tour_id, sample_point (`start` | `summit` | `end` | `manual`), lat, lon, elevation_m, time, Werte (Temperatur, gefühlt, Wind, Böen, Niederschlag, Bewölkung, Nullgradgrenze), source, fetched_at
+**tour_weather**: id, tour_id, sample_point (`start` | `summit` | `end` | `manual`, je Tour einmal), lat, lon, elevation_m, time, Werte (temperature_c, apparent_temperature_c, wind_speed_kmh, wind_gusts_kmh, precipitation_mm, cloud_cover_pct, freezing_level_m, weather_code nach WMO), source (`open-meteo-archive` | `open-meteo-forecast`), fetched_at
 
 **track_series**: tour_id, point_count, abgetastete Zeitreihe als Spalten gleicher Länge (Zeit, Distanz, Position, Höhe, Herzfrequenz, Kadenz, Temperatur; höchstens 2000 Punkte, gleichmäßig ausgedünnt); Original-GPX bleibt unverändert im Dateispeicher. Ältere GPX-Dateien bleiben beim Ersetzen erhalten, weil Revisionen auf sie verweisen.
 
@@ -248,6 +248,14 @@ Wer kein Gerät dabei hatte, zeichnet den Track in der App auf der Karte (Punkte
 2. Kein Track → Nutzer setzt Start und Ende auf der Karte, dazu Datum und Uhrzeit (`manual`).
 3. Wetter wird nach dem Speichern automatisch abgerufen: Open-Meteo (Archive für Vergangenheit, Forecast für Zukunft) für Start, Gipfel (höchster Punkt) und Ende, jeweils für die passende Stunde und die Höhe der Position.
 4. Ergebnis wird gespeichert (`tour_weather`). Neuabruf manuell; ändern sich Punkte oder Zeiten, wird er angeboten.
+
+Umsetzung:
+- `PUT /tours/{id}/points` setzt Start und Ende manuell (nur Owner). Mit Track folgen die Positionen dem Track (abweichende Positionen → 409 `points_from_track`); die Ortsnamen lassen sich weiterhin setzen.
+- Automatischer Abruf genau einmal: sobald die Tour nach einem Speichern (Punkte, Track, Tourdokument) mindestens einen Messpunkt mit Zeit hat und noch kein Wetter. Schlägt er fehl, wird trotzdem gespeichert.
+- Spätere Änderungen an Punkten oder Zeiten rufen nicht erneut ab; die Tour meldet dann `weather_outdated = true`, und der Client bietet den Neuabruf an (`POST /tours/{id}/weather/fetch`, nur Owner; optional mit einem zusätzlichen manuellen Messpunkt).
+- Gipfel: höchster Punkt des Tracks zu dessen Zeitstempel; ohne Track der erste Gipfel der Tour mit Koordinaten (Zeit: `reached_at`, sonst Mitte zwischen Start und Ende).
+- Die Höhe des Messpunkts wird an Open-Meteo übergeben, damit die Temperatur zur Höhe passt. Daten älter als fünf Tage kommen aus dem Archiv, alles andere aus der Vorhersage; die Nullgradgrenze liefert nur die Vorhersage.
+- Wetter ist abgeleitet und kein Teil der Historie. Es steht in Tour, Export und öffentlicher Ansicht; bei Links mit `hide_exact_start` fehlt es, weil es die genauen Koordinaten des Starts trägt.
 
 **Kalorienverbrauch**
 Manuell eingegebene Werte haben immer Vorrang (`manual`). Fehlt ein Wert, schätzt der Server (`estimated`, in der UI klar als Schätzung markiert):
@@ -316,7 +324,7 @@ Umsetzung:
 **Export JSON**
 Versioniertes Schema (`schema_version`): Tour, Ausrüstung (Snapshots), Essen, Partner (Anzeigenamen), Wetter, Track-Statistik, Wegpunkte, Foto-Metadaten (inkl. Position) und Verweise auf Dateien oder ZIP mit den Dateien.
 
-Stand `schema_version` 1: Tour (mit effektiven Werten für Dauer und Startgewicht), Partner, Gipfel, Wegpunkte, Ausrüstung, Essen, Track-Statistik und Foto-Metadaten; `weather` ist bis Schritt 9 eine leere Liste. Ein ZIP mit GPX und Bildern gibt es noch nicht. Exportieren darf jeder mit Lesezugriff; die Antwort kommt als Download (`Content-Disposition`).
+Stand `schema_version` 1: Tour (mit effektiven Werten für Dauer und Startgewicht), Partner, Gipfel, Wegpunkte, Ausrüstung, Essen, Track-Statistik und Foto-Metadaten und Wetter. Ein ZIP mit GPX und Bildern gibt es noch nicht. Exportieren darf jeder mit Lesezugriff; die Antwort kommt als Download (`Content-Disposition`).
 
 ## 8. API (Version `/api/v1`)
 
@@ -347,7 +355,7 @@ Stand `schema_version` 1: Tour (mit effektiven Werten für Dauer und Startgewich
 | POST | /tours/{id}/track/drawn | Gezeichneten Track speichern, GPX erzeugen (nur Owner) |
 | GET, DELETE | /tours/{id}/track | Statistik und Zeitreihen für Karte und Diagramme / Track entfernen (nur Owner) |
 | GET | /public/tours/{token}/track | Track einer öffentlich verlinkten Tour |
-| PUT | /tours/{id}/points | Start/Ende manuell setzen (nur Owner) |
+| PUT | /tours/{id}/points | Start/Ende manuell setzen bzw. benennen (nur Owner) |
 | GET, POST | /tours/{id}/photos | Fotos listen / hochladen (multipart, Feld `files`; EXIF-Auswertung, Track-Zuordnung) |
 | PATCH, DELETE | /tours/{id}/photos/{photo_id} | Beschriftung, Position, Wegpunkt, Titelbild / löschen |
 | GET | /tours/{id}/photos/{photo_id}/image?size= | Bild (`full`) oder Vorschaubild (`thumb`) |
@@ -355,7 +363,7 @@ Stand `schema_version` 1: Tour (mit effektiven Werten für Dauer und Startgewich
 | GET | /public/tours/{token}/photos/{index}?size= | Bild einer öffentlich verlinkten Tour |
 | POST | /tours/{id}/waypoints/from-photos | Wegpunkte aus Foto-GPS erzeugen |
 | GET, POST, PATCH, DELETE | /tours/{id}/waypoints | Wegpunkte |
-| POST | /tours/{id}/weather/fetch | Wetter abrufen |
+| POST | /tours/{id}/weather/fetch | Wetter neu abrufen (nur Owner) |
 | POST | /tours/{id}/calories/estimate | Verbrauch schätzen |
 | GET | /tours/{id}/export | JSON-Export |
 | GET, POST | /contacts | Partner-Kontakte listen / anlegen |

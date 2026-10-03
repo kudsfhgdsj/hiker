@@ -11,7 +11,7 @@ from app.core.errors import NotFoundError, UnprocessableError
 from app.core.storage import Storage
 from app.modules.auth import service as auth_service
 from app.modules.auth.models import User
-from app.modules.protocols import photos, snapshots, track, track_service
+from app.modules.protocols import photos, snapshots, track, track_service, weather
 from app.modules.protocols.models import Tour, TourPublicLink
 from app.modules.protocols.schemas import (
     PublicFood,
@@ -175,6 +175,7 @@ def public_tour(db: Session, token: str) -> PublicTourOut:
         track_source=tour.track_source,
         track_stats=track_service.visible_stats(tour.track_stats, health=health),
         photos=_photos(link, tour),
+        weather=[] if hide else weather.weather_out(tour),
         partners=[partner.display_name for partner in snapshots.partner_list(tour)],
         peaks=[PublicPeak(**peak.model_dump(exclude={"id"})) for peak in snapshots.peak_list(tour)],
         waypoints=[

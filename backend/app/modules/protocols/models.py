@@ -178,6 +178,31 @@ class TourPhoto(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
+class TourWeather(Base):
+    """Weather at one sample point of the tour, as fetched from the weather service."""
+
+    __tablename__ = "tour_weather"
+    __table_args__ = (UniqueConstraint("tour_id", "sample_point"),)
+
+    id: Mapped[uuid.UUID] = _id_column()
+    tour_id: Mapped[uuid.UUID] = _tour_id_column()
+    sample_point: Mapped[str] = mapped_column(String(8))
+    lat: Mapped[float] = mapped_column(Float)
+    lon: Mapped[float] = mapped_column(Float)
+    elevation_m: Mapped[float | None] = mapped_column(Float)
+    time: Mapped[datetime] = mapped_column(UTCDateTime)
+    temperature_c: Mapped[float | None] = mapped_column(Float)
+    apparent_temperature_c: Mapped[float | None] = mapped_column(Float)
+    wind_speed_kmh: Mapped[float | None] = mapped_column(Float)
+    wind_gusts_kmh: Mapped[float | None] = mapped_column(Float)
+    precipitation_mm: Mapped[float | None] = mapped_column(Float)
+    cloud_cover_pct: Mapped[float | None] = mapped_column(Float)
+    freezing_level_m: Mapped[float | None] = mapped_column(Float)
+    weather_code: Mapped[int | None] = mapped_column(Integer)
+    source: Mapped[str] = mapped_column(String(32))
+    fetched_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
 class TrackSeries(Base):
     """Thinned-out series of the track for the map and the charts, as columns of equal length."""
 
@@ -273,6 +298,7 @@ class Tour(TimestampMixin, Base):
         cascade="all, delete-orphan", order_by=(TourPeak.sort_order, TourPeak.id)
     )
     partners: Mapped[list[TourPartner]] = relationship(cascade="all, delete-orphan")
+    weather: Mapped[list[TourWeather]] = relationship(cascade="all, delete-orphan")
     photos: Mapped[list[TourPhoto]] = relationship(
         cascade="all, delete-orphan", order_by=(TourPhoto.sort_order, TourPhoto.id)
     )

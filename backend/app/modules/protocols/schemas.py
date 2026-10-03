@@ -124,6 +124,26 @@ class PhotoSnapshot(BaseModel):
     waypoint_id: uuid.UUID | None
 
 
+class WeatherOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    sample_point: Literal["start", "summit", "end", "manual"]
+    lat: float
+    lon: float
+    elevation_m: float | None
+    time: datetime
+    temperature_c: float | None
+    apparent_temperature_c: float | None
+    wind_speed_kmh: float | None
+    wind_gusts_kmh: float | None
+    precipitation_mm: float | None
+    cloud_cover_pct: float | None
+    freezing_level_m: float | None = Field(description="Only available from the forecast service")
+    weather_code: int | None = Field(description="WMO weather code")
+    source: str
+    fetched_at: datetime
+
+
 # --- Tour ---
 
 
@@ -219,6 +239,10 @@ class TourOut(TourBase):
     )
     photo_time_offset_seconds: int
     photo_count: int
+    weather: list[WeatherOut]
+    weather_outdated: bool = Field(
+        description="Points or times changed since the weather was fetched; offer a new fetch"
+    )
     gear: list[TourGearOut]
     food: list[TourFoodOut]
     peaks: list[TourPeakOut]
@@ -463,6 +487,7 @@ class PublicTourOut(BaseModel):
     track_source: Literal["device", "drawn", "none"]
     track_stats: dict | None
     photos: list[PublicPhoto]
+    weather: list[WeatherOut]
     partners: list[str]
     peaks: list[PublicPeak]
     waypoints: list[PublicWaypoint]
@@ -557,7 +582,7 @@ class TourExport(BaseModel):
     gear: list[TourGearOut] = Field(description="Snapshots as stored in the tour")
     food: list[TourFoodOut]
     track: ExportedTrack
-    weather: list[dict]
+    weather: list[WeatherOut]
     photos: list[PhotoOut] = Field(description="Metadata; the images are not part of the JSON")
 
 
@@ -596,3 +621,33 @@ class TrackOut(BaseModel):
         "elevation_source"
     )
     series: TrackSeriesOut | None
+
+
+# --- Points and weather ---
+
+
+class PointIn(BaseModel):
+    lat: Latitude
+    lon: Longitude
+    name: optional_text(200) = None
+
+
+class PointsIn(BaseModel):
+    """Start and end point. With a track the positions come from the track and only
+    the names can be set; send the positions back unchanged."""
+
+    start: PointIn | None = None
+    end: PointIn | None = None
+
+
+class ManualWeatherIn(BaseModel):
+    lat: Latitude
+    lon: Longitude
+    time: AwareDatetime
+    elevation_m: float | None = Field(default=None, ge=-500, le=9000, allow_inf_nan=False)
+
+
+class WeatherFetchIn(BaseModel):
+    manual: ManualWeatherIn | None = Field(
+        default=None, description="An additional sample point chosen by the user"
+    )

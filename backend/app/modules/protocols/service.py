@@ -11,9 +11,17 @@ from app.modules.auth import service as auth_service
 from app.modules.auth.models import User
 from app.modules.gear import service as gear_service
 from app.modules.nutrition import service as nutrition_service
-from app.modules.protocols import contacts, history, photos, snapshots, track_service
+from app.modules.protocols import (
+    contacts,
+    history,
+    photos,
+    snapshots,
+    track_service,
+    weather,
+)
 from app.modules.protocols.models import (
     CALORIES_MANUAL,
+    TRACK_NONE,
     Tour,
     TourFoodEntry,
     TourGear,
@@ -24,6 +32,7 @@ from app.modules.protocols.models import (
 )
 from app.modules.protocols.schemas import (
     GeoPoint,
+    PointsIn,
     TourBase,
     TourCreate,
     TourFoodIn,
@@ -46,6 +55,7 @@ from app.modules.protocols.sharing import (
 )
 
 TEXT_FIELDS = ("title", "summary")
+POINTS_MANUAL = "manual"
 
 
 # --- Lists inside the tour document ---
@@ -273,6 +283,30 @@ def list_tours(
     return items, total
 
 
+def set_points(db: Session, access: TourAccess, data: PointsIn) -> None:
+    """Set start and end point by hand; with a track only their names can change."""
+    tour = access.tour
+    has_track = tour.track_source != TRACK_NONE
+    for prefix, point in (("start", data.start), ("end", data.end)):
+        current = (getattr(tour, f"{prefix}_lat"), getattr(tour, f"{prefix}_lon"))
+        if has_track:
+            moved = point is None or any(
+                abs(new - old) > 1e-6
+                for new, old in zip((point.lat, point.lon), current, strict=True)
+            )
+            if moved:
+                raise ConflictError(
+                    "Start and end point follow the track", code="points_from_track"
+                )
+        else:
+            setattr(tour, f"{prefix}_lat", point.lat if point else None)
+            setattr(tour, f"{prefix}_lon", point.lon if point else None)
+        setattr(tour, f"{prefix}_name", point.name if point else None)
+    if not has_track:
+        tour.points_source = POINTS_MANUAL if (data.start or data.end) else None
+    history.record_change(db, tour, access.user, history.UPDATED)
+
+
 # --- Output ---
 
 
@@ -306,6 +340,8 @@ def tour_out(db: Session, access: TourAccess) -> TourOut:
         track_stats=track_service.visible_stats(tour.track_stats, health=access.is_owner),
         photo_time_offset_seconds=tour.photo_time_offset_seconds,
         photo_count=len(tour.photos),
+        weather=weather.weather_out(tour),
+        weather_outdated=weather.is_outdated(db, tour),
         gear=snapshots.gear_list(tour),
         food=snapshots.food_list(tour),
         peaks=snapshots.peak_list(tour),

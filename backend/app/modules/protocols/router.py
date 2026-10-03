@@ -19,6 +19,7 @@ from app.modules.protocols import (
     service,
     sharing,
     track_service,
+    weather,
 )
 from app.modules.protocols.elevation import Elevations
 from app.modules.protocols.schemas import (
@@ -29,6 +30,7 @@ from app.modules.protocols.schemas import (
     PhotoOut,
     PhotoPatch,
     PhotoTimeOffsetIn,
+    PointsIn,
     PublicLinkIn,
     PublicLinkOut,
     PublicTourOut,
@@ -48,6 +50,7 @@ from app.modules.protocols.schemas import (
     WaypointIn,
     WaypointOut,
     WaypointPatch,
+    WeatherFetchIn,
 )
 from app.modules.protocols.sharing import (
     OWNER,
@@ -56,6 +59,7 @@ from app.modules.protocols.sharing import (
     ReadableTour,
     TourAccess,
 )
+from app.modules.protocols.weather import Weather
 
 router = APIRouter(responses=error_responses(401))
 # Routes that work without login.
@@ -110,7 +114,7 @@ def read_tour(access: ReadableTour, db: DbSession):
     response_model=TourOut,
     responses={**error_responses(403, 404), 409: {"model": VersionConflict}},
 )
-def update_tour(body: TourUpdate, access: EditableTour, db: DbSession):
+def update_tour(body: TourUpdate, access: EditableTour, db: DbSession, source: Weather):
     """Replace the tour document including its lists.
 
     `version` must be the version the change is based on. If the tour was changed
@@ -121,6 +125,7 @@ def update_tour(body: TourUpdate, access: EditableTour, db: DbSession):
     calories burned) must be sent back unchanged.
     """
     service.update_tour(db, access, body)
+    weather.auto_fetch(db, source, access.tour)
     return service.tour_out(db, access)
 
 
@@ -148,7 +153,12 @@ def export_tour(access: ReadableTour, response: Response, db: DbSession):
     "/tours/{tour_id}/gpx", response_model=TourOut, responses=error_responses(403, 404, 413)
 )
 def upload_gpx(
-    file: UploadFile, access: OwnedTour, db: DbSession, storage: FileStorage, elevations: Elevations
+    file: UploadFile,
+    access: OwnedTour,
+    db: DbSession,
+    storage: FileStorage,
+    elevations: Elevations,
+    source: Weather,
 ):
     """Upload a GPX file (multipart field `file`) and evaluate it. Owner only.
 
@@ -161,6 +171,7 @@ def upload_gpx(
     if len(data) > limit:
         raise PayloadTooLargeError(f"File is larger than {get_settings().max_upload_mb} MB")
     track_service.upload_gpx(db, storage, elevations, access, data)
+    weather.auto_fetch(db, source, access.tour)
     return service.tour_out(db, access)
 
 
@@ -186,9 +197,11 @@ def save_drawn_track(
     db: DbSession,
     storage: FileStorage,
     elevations: Elevations,
+    source: Weather,
 ):
     """Save a track drawn on the map as GPX. Missing elevations are looked up. Owner only."""
     track_service.save_drawn_track(db, storage, elevations, access, body)
+    weather.auto_fetch(db, source, access.tour)
     return service.tour_out(db, access)
 
 
@@ -204,6 +217,36 @@ def read_track(access: ReadableTour, db: DbSession):
 def remove_track(access: OwnedTour, db: DbSession):
     """Remove the track from the tour. Owner only."""
     track_service.remove_track(db, access)
+    return service.tour_out(db, access)
+
+
+# --- Points and weather ---
+
+
+@router.put(
+    "/tours/{tour_id}/points", response_model=TourOut, responses=error_responses(403, 404, 409)
+)
+def set_points(body: PointsIn, access: OwnedTour, db: DbSession, source: Weather):
+    """Set start and end point on the map. Owner only.
+
+    With a track the positions follow the track (409 if they differ); the names can
+    still be set. The weather is fetched automatically the first time.
+    """
+    service.set_points(db, access, body)
+    weather.auto_fetch(db, source, access.tour)
+    return service.tour_out(db, access)
+
+
+@router.post(
+    "/tours/{tour_id}/weather/fetch",
+    response_model=TourOut,
+    responses=error_responses(403, 404, 502),
+)
+def fetch_weather(
+    access: OwnedTour, db: DbSession, source: Weather, body: WeatherFetchIn | None = None
+):
+    """Fetch the weather for start, summit and end again. Owner only."""
+    weather.fetch(db, source, access.tour, body.manual if body else None)
     return service.tour_out(db, access)
 
 
