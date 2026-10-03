@@ -330,3 +330,91 @@ class ContactOut(BaseModel):
     id: uuid.UUID
     display_name: str
     linked_user: TourOwner | None
+
+
+# --- Public links ---
+
+
+class PublicLinkIn(BaseModel):
+    expires_at: AwareDatetime | None = Field(default=None, description="Empty = no expiry")
+    hide_exact_start: bool = Field(
+        default=False, description="Show start and end point only roughly (about 1 km)"
+    )
+    strip_photo_gps: bool = Field(default=False, description="Remove the position from photos")
+    show_health_data: bool = Field(
+        default=False, description="Show calories burned and heart rate; hidden by default"
+    )
+
+
+class PublicLinkOut(BaseModel):
+    id: uuid.UUID
+    url: str
+    active: bool
+    created_at: datetime
+    expires_at: datetime | None
+    revoked_at: datetime | None
+    hide_exact_start: bool
+    strip_photo_gps: bool
+    show_health_data: bool
+
+
+class PublicPoint(BaseModel):
+    lat: float
+    lon: float
+    name: str | None
+    approximate: bool
+
+
+class PublicGear(BaseModel):
+    name: str
+    brand: str | None
+    weight_g: int | None
+    quantity: int
+    carried: bool
+
+
+class PublicFood(BaseModel):
+    name: str
+    amount_g: float
+    kcal: float | None
+    carried: bool
+    eaten: bool
+
+
+class PublicPeak(BaseModel):
+    name: str
+    elevation_m: int | None
+    lat: float | None
+    lon: float | None
+    reached_at: datetime | None
+
+
+class PublicWaypoint(BaseModel):
+    name: str
+    description: str | None
+    icon: str | None
+    lat: float
+    lon: float
+    elevation_m: float | None
+
+
+class PublicTourOut(BaseModel):
+    """What a public link shows: no ids, no e-mail addresses, health data only on request."""
+
+    title: str
+    summary: str | None
+    owner_name: str | None
+    start_time: datetime | None
+    end_time: datetime | None
+    duration_minutes: int | None
+    pack_weight_start_g: int | None
+    calories_eaten: float
+    calories_burned: float | None = Field(description="Health data; null unless enabled")
+    calories_burned_source: Literal["manual", "estimated"] | None
+    start_point: PublicPoint | None
+    end_point: PublicPoint | None
+    partners: list[str]
+    peaks: list[PublicPeak]
+    waypoints: list[PublicWaypoint]
+    gear: list[PublicGear]
+    food: list[PublicFood]

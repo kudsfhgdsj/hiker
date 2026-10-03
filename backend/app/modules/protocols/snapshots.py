@@ -3,6 +3,7 @@
 from app.modules.protocols.models import Tour, TourFoodEntry, TourGear
 from app.modules.protocols.schemas import (
     PartnerSnapshot,
+    TourComputed,
     TourFoodOut,
     TourGearOut,
     TourPartnerOut,
@@ -96,3 +97,19 @@ def build_snapshot(tour: Tour) -> dict:
         ],
     )
     return snapshot.model_dump(mode="json")
+
+
+def computed_values(tour: Tour) -> TourComputed:
+    duration = None
+    if tour.start_time and tour.end_time:
+        duration = int((tour.end_time - tour.start_time).total_seconds() // 60)
+    gear_weight = sum(
+        (entry.weight_g_snapshot or 0) * entry.quantity for entry in tour.gear if entry.carried
+    )
+    food_weight = sum(entry.amount_g for entry in tour.food if entry.carried)
+    calories = sum(entry.kcal_snapshot or 0 for entry in tour.food if entry.eaten)
+    return TourComputed(
+        duration_minutes=duration,
+        pack_weight_start_g=round(gear_weight + food_weight),
+        calories_eaten=round(calories, 1),
+    )

@@ -1,18 +1,22 @@
 import uuid
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from pydantic import AwareDatetime
 
 from app.core.deps import DbSession
 from app.core.errors import error_responses
 from app.core.pagination import Page, Paging
+from app.core.ratelimit import rate_limit
 from app.modules.auth.deps import CurrentUser
-from app.modules.protocols import contacts, history, service, sharing
+from app.modules.protocols import contacts, history, public, service, sharing
 from app.modules.protocols.schemas import (
     ContactIn,
     ContactOut,
     ContactPatch,
+    PublicLinkIn,
+    PublicLinkOut,
+    PublicTourOut,
     RevisionComparison,
     RevisionListItem,
     RevisionOut,
@@ -37,6 +41,8 @@ from app.modules.protocols.sharing import (
 )
 
 router = APIRouter(responses=error_responses(401))
+# Routes that work without login.
+public_router = APIRouter()
 
 
 @router.get("/tours", response_model=Page[TourListItem])
@@ -290,3 +296,49 @@ def update_contact(contact_id: uuid.UUID, body: ContactPatch, user: CurrentUser,
 )
 def delete_contact(contact_id: uuid.UUID, user: CurrentUser, db: DbSession):
     contacts.delete_contact(db, contacts.get_owned_contact(db, user, contact_id))
+
+
+# --- Public links ---
+
+
+@router.get(
+    "/tours/{tour_id}/public-link",
+    response_model=list[PublicLinkOut],
+    responses=error_responses(403, 404),
+)
+def list_public_links(access: OwnedTour, db: DbSession):
+    return [public.link_out(link) for link in public.list_links(db, access.tour)]
+
+
+@router.post(
+    "/tours/{tour_id}/public-link",
+    response_model=PublicLinkOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(403, 404),
+)
+def create_public_link(body: PublicLinkIn, access: OwnedTour, db: DbSession):
+    """Create a read-only link that works without login until it expires or is revoked."""
+    return public.link_out(public.create_link(db, access.tour, access.user, body))
+
+
+@router.delete(
+    "/tours/{tour_id}/public-link/{link_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(403, 404),
+)
+def revoke_public_link(link_id: uuid.UUID, access: OwnedTour, db: DbSession):
+    public.revoke_link(db, access.tour, link_id)
+
+
+@public_router.get(
+    "/public/tours/{token}",
+    response_model=PublicTourOut,
+    responses=error_responses(404, 429),
+    dependencies=[Depends(rate_limit("public", limit=60))],
+)
+def read_public_tour(token: str, response: Response, db: DbSession):
+    """The tour behind a public link. No login; not to be indexed or cached."""
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return public.public_tour(db, token)

@@ -24,7 +24,6 @@ from app.modules.protocols.models import (
 from app.modules.protocols.schemas import (
     GeoPoint,
     TourBase,
-    TourComputed,
     TourCreate,
     TourFoodIn,
     TourGearIn,
@@ -276,22 +275,6 @@ def _base(tour: Tour, permission: str, names: dict) -> dict:
     return {"owner": owner, "permission": permission} | {f: getattr(tour, f) for f in fields}
 
 
-def _computed(tour: Tour) -> TourComputed:
-    duration = None
-    if tour.start_time and tour.end_time:
-        duration = int((tour.end_time - tour.start_time).total_seconds() // 60)
-    gear_weight = sum(
-        (entry.weight_g_snapshot or 0) * entry.quantity for entry in tour.gear if entry.carried
-    )
-    food_weight = sum(entry.amount_g for entry in tour.food if entry.carried)
-    calories = sum(entry.kcal_snapshot or 0 for entry in tour.food if entry.eaten)
-    return TourComputed(
-        duration_minutes=duration,
-        pack_weight_start_g=round(gear_weight + food_weight),
-        calories_eaten=round(calories, 1),
-    )
-
-
 def _point(lat: float | None, lon: float | None, name: str | None) -> GeoPoint | None:
     if lat is None or lon is None:
         return None
@@ -308,7 +291,7 @@ def tour_out(db: Session, access: TourAccess) -> TourOut:
         pack_weight_start_g=tour.pack_weight_start_g,
         calories_burned=tour.calories_burned,
         calories_burned_source=tour.calories_burned_source,
-        computed=_computed(tour),
+        computed=snapshots.computed_values(tour),
         start_point=_point(tour.start_lat, tour.start_lon, tour.start_name),
         end_point=_point(tour.end_lat, tour.end_lon, tour.end_name),
         points_source=tour.points_source,

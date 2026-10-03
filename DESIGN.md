@@ -219,7 +219,7 @@ Platzhalter → echter User: `contact.linked_user_id` setzen; gilt sofort in all
 
 ### 6.5 Teilen und Historie
 **tour_share**: tour_id, user_id, permission (`read` | `edit`)
-**tour_public_link**: id, tour_id, token (zufälliges UUIDv4), created_by, created_at, expires_at, revoked_at, Optionen (`hide_exact_start`, `strip_photo_gps`)
+**tour_public_link**: id, tour_id, token (zufälliges UUIDv4), created_by, created_at, expires_at, revoked_at, Optionen (`hide_exact_start`, `strip_photo_gps`, `show_health_data`; alle standardmäßig aus)
 **tour_revision**: id, tour_id, version (je Tour eindeutig), author_user_id (wird beim Entfernen des Nutzers geleert), created_at, kind (`created` | `updated` | `restored` | `deleted`), change_summary (geänderte Felder bzw. wiederhergestellte Version), snapshot (JSON), diff (JSON)
 
 ### 6.6 Dateien (core)
@@ -283,6 +283,14 @@ Empfänger sehen die Tour im Tab „Mit mir geteilt“ und können die Freigabe 
 **Teilen per Link**
 `https://hiker.lacasa.internal/p/<token>`, Token = zufälliges UUIDv4. Nur lesend, widerrufbar, optional befristet, ohne Login, `noindex`, Rate-Limit, ohne E-Mail-Adressen oder interne IDs. Optional: genauen Start verbergen, Foto-GPS entfernen. Die Basis-URL kommt aus der Konfiguration (`PUBLIC_BASE_URL`).
 
+Umsetzung:
+- Je Tour sind mehrere Links möglich (z. B. mit unterschiedlichen Optionen); nur der Owner legt sie an, listet und widerruft sie.
+- Die öffentliche Ansicht enthält Titel, Fazit, Anzeigename des Owners, Zeiten, Dauer, Startgewicht, gegessene Kalorien, Partner (nur Namen), Gipfel, Wegpunkte, Ausrüstung und Essen – ohne IDs und E-Mail-Adressen. Der Kalorienverbrauch zählt zu den Gesundheitsdaten und erscheint nur mit `show_health_data`.
+- `hide_exact_start` rundet Start- und Endpunkt auf zwei Nachkommastellen (rund 1 km) und lässt deren Namen weg. Sobald es einen Track gibt (Schritt 7), muss er dort ebenfalls gekürzt werden.
+- Ungültige, abgelaufene und widerrufene Tokens sowie gelöschte Touren antworten gleich mit 404.
+- Antwort-Header: `X-Robots-Tag: noindex, nofollow`, `Cache-Control: no-store`, `Referrer-Policy: no-referrer`.
+- Das Token steht im Zugriffslog der API nur als `[redacted]` (Filter auf dem uvicorn-Access-Log für `/public/tours/` und `/p/`). Der vorgeschaltete Reverse Proxy braucht dieselbe Regel in seiner Log-Konfiguration (Beispiele in `deploy/`, Schritt 13).
+
 **Export JSON**
 Versioniertes Schema (`schema_version`): Tour, Ausrüstung (Snapshots), Essen, Partner (Anzeigenamen), Wetter, Track-Statistik, Wegpunkte, Foto-Metadaten (inkl. Position) und Verweise auf Dateien oder ZIP mit den Dateien.
 
@@ -308,8 +316,9 @@ Versioniertes Schema (`schema_version`): Tour, Ausrüstung (Snapshots), Essen, P
 | POST | /tours/{id}/revisions/{rev}/restore | Wiederherstellen |
 | GET, POST | /tours/{id}/shares | Freigaben listen / teilen (`read`/`edit`, Nutzer per `/users/lookup` gefunden); nur Owner |
 | PATCH, DELETE | /tours/{id}/shares/{user_id} | Recht ändern (Owner) / entfernen (Owner oder der betroffene Nutzer selbst) |
-| POST, DELETE | /tours/{id}/public-link, …/{link_id} | Link erzeugen / widerrufen |
-| GET | /public/tours/{token} | Öffentliche Ansicht |
+| GET, POST | /tours/{id}/public-link | Links listen / erzeugen (nur Owner) |
+| DELETE | /tours/{id}/public-link/{link_id} | Link widerrufen (nur Owner) |
+| GET | /public/tours/{token} | Öffentliche Ansicht (ohne Login) |
 | PUT | /tours/{id}/gpx | GPX hochladen, auswerten (nur Owner) |
 | POST | /tours/{id}/track/drawn | Gezeichneten Track speichern, GPX erzeugen (nur Owner) |
 | GET | /tours/{id}/track | Zeitreihen für Diagramme |

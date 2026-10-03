@@ -148,6 +148,24 @@ class TourShare(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
+class TourPublicLink(Base):
+    """Read-only access to a tour for anyone who knows the token."""
+
+    __tablename__ = "tour_public_link"
+
+    id: Mapped[uuid.UUID] = _id_column()
+    tour_id: Mapped[uuid.UUID] = _tour_id_column()
+    # Random UUIDv4 (os.urandom); the only secret of the link. Never log it.
+    token: Mapped[uuid.UUID] = mapped_column(Uuid, unique=True, default=uuid.uuid4)
+    created_by: Mapped[uuid.UUID | None] = _user_reference()
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    hide_exact_start: Mapped[bool] = mapped_column(Boolean, default=False)
+    strip_photo_gps: Mapped[bool] = mapped_column(Boolean, default=False)
+    show_health_data: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
 class TourRevision(Base):
     """One entry of the change history. Rows are only ever inserted."""
 
