@@ -418,3 +418,48 @@ class PublicTourOut(BaseModel):
     waypoints: list[PublicWaypoint]
     gear: list[PublicGear]
     food: list[PublicFood]
+
+
+# --- Export ---
+
+
+class ExportedTour(BaseModel):
+    id: uuid.UUID
+    title: str
+    summary: str | None
+    owner_name: str | None
+    start_time: datetime | None
+    end_time: datetime | None
+    duration_minutes: int | None = Field(description="Manual value, otherwise the computed one")
+    pack_weight_start_g: int | None = Field(description="Manual value, otherwise the computed one")
+    calories_eaten: float
+    calories_burned: float | None
+    calories_burned_source: Literal["manual", "estimated"] | None
+    start_point: GeoPoint | None
+    end_point: GeoPoint | None
+    points_source: Literal["gpx", "manual"] | None
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class ExportedTrack(BaseModel):
+    source: Literal["device", "drawn", "none"]
+    stats: dict | None
+    file: str | None = Field(description="Name of the GPX file inside a ZIP export")
+
+
+class TourExport(BaseModel):
+    """Versioned export format; `schema_version` rises with every incompatible change."""
+
+    schema_version: int
+    exported_at: datetime
+    tour: ExportedTour
+    partners: list[str] = Field(description="Display names")
+    peaks: list[TourPeakOut]
+    waypoints: list[WaypointOut]
+    gear: list[TourGearOut] = Field(description="Snapshots as stored in the tour")
+    food: list[TourFoodOut]
+    track: ExportedTrack
+    weather: list[dict]
+    photos: list[dict]

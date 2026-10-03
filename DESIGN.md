@@ -294,6 +294,8 @@ Umsetzung:
 **Export JSON**
 Versioniertes Schema (`schema_version`): Tour, Ausrüstung (Snapshots), Essen, Partner (Anzeigenamen), Wetter, Track-Statistik, Wegpunkte, Foto-Metadaten (inkl. Position) und Verweise auf Dateien oder ZIP mit den Dateien.
 
+Stand `schema_version` 1: Tour (mit effektiven Werten für Dauer und Startgewicht), Partner, Gipfel, Wegpunkte, Ausrüstung, Essen und Track-Statistik; `weather` und `photos` sind bis zu den Schritten 8 und 9 leere Listen, ein ZIP mit Dateien folgt mit GPX und Fotos. Exportieren darf jeder mit Lesezugriff; die Antwort kommt als Download (`Content-Disposition`).
+
 ## 8. API (Version `/api/v1`)
 
 ### Auth und Profil

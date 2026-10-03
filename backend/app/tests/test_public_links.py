@@ -266,3 +266,68 @@ def test_access_logger_has_the_redaction_filter_installed(client):
     filters = logging.getLogger(ACCESS_LOGGER).filters
 
     assert any(isinstance(log_filter, PathRedactionFilter) for log_filter in filters)
+
+
+# --- Export ---
+
+
+def test_export_contains_the_whole_tour_in_a_versioned_format(client, anna, full_tour):  # noqa: F811
+    response = client.get(f"{TOURS}/{full_tour['id']}/export", headers=anna.headers)
+
+    assert response.status_code == 200
+    assert response.headers["content-disposition"] == 'attachment; filename="tour-santis.json"'
+    data = response.json()
+    assert data["schema_version"] == 1
+    assert data["exported_at"] is not None
+    assert set(data) == {
+        "schema_version",
+        "exported_at",
+        "tour",
+        "partners",
+        "peaks",
+        "waypoints",
+        "gear",
+        "food",
+        "track",
+        "weather",
+        "photos",
+    }
+    tour = data["tour"]
+    assert (tour["id"], tour["title"], tour["owner_name"]) == (full_tour["id"], "Säntis", "Anna")
+    assert (tour["duration_minutes"], tour["pack_weight_start_g"]) == (480, 9000)
+    assert (tour["calories_eaten"], tour["calories_burned"]) == (240.0, 3200.0)
+    assert tour["start_point"] == {"lat": 47.283456, "lon": 9.412345, "name": "Zuhause"}
+    assert data["partners"] == ["Dani"]
+    assert data["gear"] == full_tour["gear"]
+    assert data["food"] == full_tour["food"]
+    assert data["peaks"] == full_tour["peaks"]
+    assert [waypoint["name"] for waypoint in data["waypoints"]] == ["Hütte"]
+    assert data["track"] == {"source": "none", "stats": None, "file": None}
+    assert "@" not in response.text
+
+
+def test_export_uses_computed_values_when_nothing_is_set_manually(client, anna):  # noqa: F811
+    tent = gear_item(client, anna, weight_g=1500)
+    tour = create_tour(
+        client,
+        anna,
+        title="  Über den Grat! ",
+        start_time="2026-08-01T06:00:00Z",
+        end_time="2026-08-01T08:30:00Z",
+        gear=[{"gear_item_id": tent["id"]}],
+    )
+
+    response = client.get(f"{TOURS}/{tour['id']}/export", headers=anna.headers)
+
+    assert response.json()["tour"]["duration_minutes"] == 150
+    assert response.json()["tour"]["pack_weight_start_g"] == 1500
+    assert "tour-uber-den-grat.json" in response.headers["content-disposition"]
+
+
+def test_export_follows_the_tour_permissions(client, people, shared_tour):  # noqa: F811
+    url = f"{TOURS}/{shared_tour['id']}/export"
+
+    for name in ("anna", "bea", "cleo"):
+        assert client.get(url, headers=people[name].headers).status_code == 200
+    assert client.get(url, headers=people["dora"].headers).status_code == 404
+    assert client.get(url).status_code == 401

@@ -9,7 +9,7 @@ from app.core.errors import error_responses
 from app.core.pagination import Page, Paging
 from app.core.ratelimit import rate_limit
 from app.modules.auth.deps import CurrentUser
-from app.modules.protocols import contacts, history, public, service, sharing
+from app.modules.protocols import contacts, export, history, public, service, sharing
 from app.modules.protocols.schemas import (
     ContactIn,
     ContactOut,
@@ -24,6 +24,7 @@ from app.modules.protocols.schemas import (
     ShareOut,
     SharePatch,
     TourCreate,
+    TourExport,
     TourListItem,
     TourOut,
     TourUpdate,
@@ -114,6 +115,14 @@ def update_tour(body: TourUpdate, access: EditableTour, db: DbSession):
 )
 def delete_tour(access: OwnedTour, db: DbSession):
     service.delete_tour(db, access)
+
+
+@router.get("/tours/{tour_id}/export", response_model=TourExport, responses=error_responses(404))
+def export_tour(access: ReadableTour, response: Response, db: DbSession):
+    """The tour as a JSON document in a versioned format, offered as a download."""
+    filename = export.export_filename(access.tour.title)
+    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return export.export_tour(db, access)
 
 
 # --- Waypoints ---
