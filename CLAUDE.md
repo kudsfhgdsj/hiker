@@ -1,9 +1,9 @@
-# hikr – Projektregeln für Claude Code
+# hiker – Projektregeln für Claude Code
 
 Lies zuerst `DESIGN.md`. Sie ist die verbindliche Grundlage für Architektur, Datenmodell, API und Phasenplan.
 
 ## Projekt in Kürze
-Android-App (Flutter) mit späterer Web-Version und eigenem Backend (FastAPI + PostgreSQL), selbst gehostet unter `hiker.xy.com` auf Ubuntu 26.04. Module: auth, gear, nutrition, protocols (jetzt); planning, reports (später). Aktuell gilt Phase 1 aus `DESIGN.md`.
+Android-App (Flutter) mit späterer Web-Version und eigenem Backend (FastAPI + PostgreSQL), selbst gehostet unter `hiker.lacasa.internal` (vorläufig, wird später auf die endgültige Domain umgestellt) auf Ubuntu 26.04. Module: auth, gear, nutrition, protocols (jetzt); planning, reports (später). Aktuell gilt Phase 1 aus `DESIGN.md`.
 
 ## Sprache
 - UI-Texte und Dokumentation: Deutsch (UI-Texte über ARB-Dateien).

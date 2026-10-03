@@ -1,0 +1,48 @@
+# Entwurf (Phase 1, Schritt 1). Läuft neben anderen Diensten auf einem geteilten Server:
+# keine Ports 80/443, die API ist nur über 127.0.0.1 erreichbar; der vorhandene
+# Reverse Proxy leitet dorthin weiter. Konfiguration über .env (siehe .env.example).
+name: hiker
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hiker}
+      POSTGRES_USER: ${POSTGRES_USER:-hiker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD fehlt in .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    cpus: 1.0
+    mem_limit: 512m
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-hiker}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hiker}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY fehlt in .env}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?PUBLIC_BASE_URL fehlt in .env}
+      ENABLED_MODULES: ${ENABLED_MODULES:-auth}
+      REGISTRATION_MODE: ${REGISTRATION_MODE:-open}
+    ports:
+      - "127.0.0.1:${API_PORT:-8010}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    cpus: 1.0
+    mem_limit: 512m
+
+volumes:
+  db-data:

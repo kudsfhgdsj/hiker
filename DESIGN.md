@@ -19,7 +19,7 @@ Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen k
 
 | Thema | Entscheidung | Auswirkung |
 |---|---|---|
-| Hosting | Eigener, bereits vorhandener Server, Ubuntu 26.04, Domain `hiker.lacasa.internal` | Läuft neben anderen Diensten, Reverse-Proxy-Konzept in Abschnitt 11 |
+| Hosting | Eigener, bereits vorhandener Server, Ubuntu 26.04, Domain vorläufig `hiker.lacasa.internal` (endgültige Domain später, nur über `PUBLIC_BASE_URL`) | Läuft neben anderen Diensten, Reverse-Proxy-Konzept in Abschnitt 11 |
 | Teilen mit Usern | `read` und `edit` | Edit = Textfelder, Listen und Fotos, **nicht** GPX/Punkte/Freigaben/Löschen |
 | Historie | Jede Änderung wird als Revision gespeichert | Abschnitt 6.5 |
 | Partner | Per Nutzerkonto verknüpfbar, sonst Platzhalter, später austauschbar | Kontakte (6.4) |
@@ -31,6 +31,12 @@ Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen k
 | GPX-Quelle | Meist Garmin-Uhr; zusätzlich einfache, manuell erstellte Tracks | Tolerante Auswertung + Zeichenwerkzeug |
 | Fotos auf Tracks | Darstellung angelehnt an wanderer (Abschnitt 9) | Fotos werden dem Track zugeordnet |
 | Wetter | Automatisch aus Track, sonst Start/Ende auf Karte | Karte schon in Phase 1 |
+| Registrierung | Per `REGISTRATION_MODE` schaltbar (`open` \| `closed`); Einladungen bei Bedarf später | Nach dem Anlegen der Konten auf `closed` stellen |
+| Admin | Der erste registrierte Nutzer wird `admin` | Katalogmoderation |
+| Refresh-Tokens | Zufällige Tokens, gehasht in der Datenbank, Rotation bei jeder Nutzung, widerrufbar | Tabelle `refresh_token`; erneute Nutzung eines verbrauchten Tokens beendet alle Sitzungen des Nutzers |
+| Datenbankzugriff | SQLAlchemy 2 synchron (psycopg), Endpunkte im Threadpool | Einfacher Code und einfache Tests |
+| Migrationen | Je Modul ein eigener Alembic-Zweig in `modules/<name>/migrations` | `alembic upgrade heads`; Schema umfasst alle installierten Module |
+| Fehlerformat | `{"error": {"code", "message"}}` für fachliche Fehler | Client übersetzt anhand von `code` |
 
 ## 3. Technologie-Stack
 
@@ -47,11 +53,11 @@ Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen k
 | Barcode-Scan | `flutter_zxing` (ZXing, lokal) | Kein ML Kit; Paketstatus vor Einsatz prüfen |
 | Lebensmitteldaten | Open Food Facts | Kostenlos, Barcode-Abfrage, ODbL (Quelle nennen) |
 | Backend | FastAPI (Python) | OpenAPI-Doku automatisch |
-| Datenbank | PostgreSQL (Dev: SQLite) | Relational, Historie, Teilen |
+| Datenbank | PostgreSQL (Dev und Tests: SQLite) | Relational, Historie, Teilen |
 | Dateispeicher | Lokales Dateisystem oder MinIO hinter Interface | Austauschbar; für den Start reicht Dateisystem |
 | GPX | gpxpy plus eigener Leser für Sensor-Erweiterungen; FIT später | Garmin-Daten |
 | Höhendaten | Open-Meteo Elevation API (nur wenn der Track keine Höhe hat) | Für manuell gezeichnete Tracks |
-| Auth | E-Mail + Passwort, JWT (Access + Refresh) | Kein Drittanbieter |
+| Auth | E-Mail + Passwort (argon2), JWT als Access-Token, Refresh-Token in der Datenbank | Kein Drittanbieter |
 | Wetter | Open-Meteo (Forecast + Archive) | Kostenlos, kein Key |
 | Deployment | Docker Compose, Anbindung an vorhandenen Reverse Proxy | Siehe Abschnitt 11 |
 
@@ -91,10 +97,10 @@ hiker/
 ```
 backend/app/
 ├── main.py                   # lädt Module über Registry
-├── core/                     # config, db, security, storage, deps, errors, geo, history
+├── core/                     # config, db, security, registry, storage, deps, errors, geo, history
 │   └── storage/              # Interface + local_fs.py + s3.py
 ├── modules/
-│   ├── auth/                 # Nutzer, Profil, Login, Tokens
+│   ├── auth/                 # Nutzer, Profil, Login, Tokens (+ migrations/ je Modul)
 │   ├── gear/                 # Ausrüstung + Katalog
 │   ├── nutrition/            # Lebensmittel + Katalog + Barcode (Open Food Facts)
 │   ├── protocols/
@@ -109,7 +115,7 @@ backend/app/
 │   └── reports/              # Phase 3
 └── tests/
 ```
-Jedes Modul exportiert `register(app)` und `MODULE_INFO` (Name, Version, `depends_on`). Aktivierung über `ENABLED_MODULES=auth,gear,nutrition,protocols`.
+Jedes Modul exportiert `register(app)` und `MODULE_INFO` (Name, Version, `depends_on`). Aktivierung über `ENABLED_MODULES=auth,gear,nutrition,protocols`. Die Registry bricht den Start ab, wenn eine Abhängigkeit nicht aktiv ist oder ein Zyklus besteht. Alembic-Umgebung (`migrations/`) und `alembic.ini` liegen in `backend/`.
 
 ### Flutter
 ```
@@ -133,8 +139,9 @@ Jedes Feature registriert sich über ein `FeatureModule` (Routen, Navigationsein
 Alle IDs sind UUIDs und clientseitig erzeugbar. Hauptdaten haben `created_at`, `updated_at`, `deleted_at` (Soft Delete für Sync).
 
 ### 6.1 Nutzer (Modul auth)
-**user**: id, email, display_name, password_hash, role (`user` | `admin`), created_at
-**user_profile** (optional, für Kalorienschätzung): weight_kg, birth_year, sex (optional), max_heart_rate (optional), resting_heart_rate (optional)
+**user** (Tabelle `user_account`, da `user` in PostgreSQL reserviert ist): id, email (kleingeschrieben, eindeutig), display_name, password_hash, role (`user` | `admin`), created_at
+**user_profile** (optional, für Kalorienschätzung): weight_kg, birth_year, sex (`female` | `male` | `trans` | `undisclosed` = keine Angabe, optional), max_heart_rate (optional), resting_heart_rate (optional)
+**refresh_token**: id, user_id, token_hash (SHA-256), created_at, expires_at, revoked_at
 
 ### 6.2 Ausrüstung (Modul gear)
 **gear_item** (persönliche Gegenstände)
@@ -217,7 +224,7 @@ Wer kein Gerät dabei hatte, zeichnet den Track in der App auf der Karte (Punkte
 
 **Kalorienverbrauch**
 Manuell eingegebene Werte haben immer Vorrang (`manual`). Fehlt ein Wert, schätzt der Server (`estimated`, in der UI klar als Schätzung markiert):
-- Mit Herzfrequenzdaten und Nutzerprofil (Gewicht, Alter, Geschlecht): pulsbasierte Formel.
+- Mit Herzfrequenzdaten und Nutzerprofil (Gewicht, Alter, Geschlecht): pulsbasierte Formel. Bei `trans`, `undisclosed` oder fehlender Angabe wird der Mittelwert der Formeln für `female` und `male` verwendet.
 - Ohne Puls: Berechnung aus Körper- plus Rucksackgewicht, Distanz, Höhenmetern und Dauer mit einer anerkannten Geh-/Wanderformel.
 - Ohne Profil oder Track: keine Schätzung, Hinweis zur Eingabe.
 Die verwendete Formel und Parameter werden im Code dokumentiert und als Tooltip erklärt. Änderungen an Track, Gewicht oder Profil lösen eine Neuberechnung aus, solange der Wert nicht manuell ist.
@@ -259,9 +266,12 @@ Versioniertes Schema (`schema_version`): Tour, Ausrüstung (Snapshots), Essen, P
 ### Auth und Profil
 | Methode | Pfad | Zweck |
 |---|---|---|
-| POST | /auth/register, /auth/login, /auth/refresh | Konto/Tokens |
-| GET | /users/lookup?email= | Nutzer für Freigabe/Partner finden |
+| POST | /auth/register, /auth/login, /auth/refresh | Konto/Tokens (Refresh rotiert das Token) |
+| POST | /auth/logout | Refresh-Token widerrufen |
+| GET | /users/lookup?email= | Nutzer für Freigabe/Partner finden (exakte Adresse; liefert nur ID und Anzeigename) |
+| GET | /me | Eigenes Konto |
 | GET/PUT | /me/profile | Profil für Kalorienschätzung |
+| GET | /modules | Aktive Module (ohne Login), damit der Client nur vorhandene Funktionen zeigt |
 
 ### Protokolle
 | Methode | Pfad | Zweck |
@@ -354,7 +364,7 @@ Ziel: Ubuntu 26.04, Domain `hiker.lacasa.internal`, läuft auf dem bereits genut
 - Docker über das offizielle Docker-Repository installieren; Stack per Docker Compose: `api`, `db` (PostgreSQL), optional `minio`.
 - **Keine festen Ports 80/443 im Stack.** Die API lauscht nur auf `127.0.0.1:<Port>`. Der bereits vorhandene Webserver bzw. Reverse Proxy (nginx, Apache oder Caddy) leitet `hiker.lacasa.internal` dorthin; TLS über Let's Encrypt (certbot oder Caddy). Beispielkonfigurationen für nginx und Caddy liegen in `deploy/`. Läuft auf dem Server noch kein Proxy, wird einer ergänzt.
 - DNS: A-/AAAA-Eintrag für `hiker.lacasa.internal` auf den Server.
-- Konfiguration in `.env` (nicht im Repository): Datenbankpasswort, `SECRET_KEY`, `PUBLIC_BASE_URL=https://hiker.lacasa.internal`, Speicherpfad, `ENABLED_MODULES`.
+- Konfiguration in `.env` (nicht im Repository, Vorlage `.env.example`): Datenbankpasswort, `SECRET_KEY`, `PUBLIC_BASE_URL=https://hiker.lacasa.internal`, Speicherpfad, `ENABLED_MODULES`, `REGISTRATION_MODE`.
 - Upload-Größen im Proxy erhöhen (Fotos, GPX).
 - Backups: Nächtlicher `pg_dump` plus Sicherung des Foto-/GPX-Verzeichnisses nach `/var/backups/hiker`, 14 Tage Rotation, per systemd-Timer. Eine Kopie außerhalb des Servers ist empfohlen (Ziel noch offen). Wiederherstellung einmal testen.
 - Datenbankmigrationen mit Alembic, Updates über neue Images.
@@ -391,6 +401,5 @@ Stehen in der separaten Datei `CLAUDE.md` im Repository-Hauptverzeichnis.
 1. Backup-Ziel außerhalb des Servers (z. B. zweiter Server, externer Speicher).
 2. Welcher Webserver bzw. Reverse Proxy läuft auf dem Server bereits (nginx, Apache, Caddy)? Davon hängt die Beispielkonfiguration in `deploy/` ab.
 3. Kartenquellen und Lizenzen (bis Phase 2).
-4. Wer ist Admin für die Katalogmoderation (zunächst der erste registrierte Nutzer)?
-5. Soll Registrierung offen sein oder nur per Einladung (empfohlen bei öffentlich erreichbarem Server)?
-6. Genauer Wunsch zur Foto-Darstellung nach Sichtung der wanderer-Demo (Abschnitt 9), falls etwas anders sein soll.
+4. Rate-Limit für Login (Abschnitt 10) ist noch nicht umgesetzt; im Proxy oder in der API, spätestens mit Schritt 13.
+5. Genauer Wunsch zur Foto-Darstellung nach Sichtung der wanderer-Demo (Abschnitt 9), falls etwas anders sein soll.
