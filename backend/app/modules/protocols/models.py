@@ -148,6 +148,36 @@ class TourShare(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
+class TourPhoto(Base):
+    __tablename__ = "tour_photo"
+
+    id: Mapped[uuid.UUID] = _id_column()
+    tour_id: Mapped[uuid.UUID] = _tour_id_column()
+    file_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("file_object.id", ondelete="SET NULL")
+    )
+    thumb_file_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("file_object.id", ondelete="SET NULL")
+    )
+    added_by: Mapped[uuid.UUID | None] = _user_reference()
+    caption: Mapped[str | None] = mapped_column(String(500))
+    taken_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # Position as read from the image; kept so that the automatic position can come back.
+    exif_lat: Mapped[float | None] = mapped_column(Float)
+    exif_lon: Mapped[float | None] = mapped_column(Float)
+    exif_altitude: Mapped[float | None] = mapped_column(Float)
+    lat: Mapped[float | None] = mapped_column(Float)
+    lon: Mapped[float | None] = mapped_column(Float)
+    position_source: Mapped[str] = mapped_column(String(10), default="none")
+    track_distance_m: Mapped[float | None] = mapped_column(Float)
+    elevation_m: Mapped[float | None] = mapped_column(Float)
+    waypoint_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("tour_waypoint.id", ondelete="SET NULL")
+    )
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
 class TrackSeries(Base):
     """Thinned-out series of the track for the map and the charts, as columns of equal length."""
 
@@ -225,6 +255,8 @@ class Tour(TimestampMixin, Base):
     track_source: Mapped[str] = mapped_column(String(8), default=TRACK_NONE)
     track_stats: Mapped[dict | None] = mapped_column(JSON)
     cover_photo_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    # Added to the capture time of photos before they are matched to the track by time.
+    photo_time_offset_seconds: Mapped[int] = mapped_column(Integer, default=0)
     # Revision counter; raised by history.record_change on every change.
     version: Mapped[int] = mapped_column(Integer, default=0)
 
@@ -241,6 +273,9 @@ class Tour(TimestampMixin, Base):
         cascade="all, delete-orphan", order_by=(TourPeak.sort_order, TourPeak.id)
     )
     partners: Mapped[list[TourPartner]] = relationship(cascade="all, delete-orphan")
+    photos: Mapped[list[TourPhoto]] = relationship(
+        cascade="all, delete-orphan", order_by=(TourPhoto.sort_order, TourPhoto.id)
+    )
     waypoints: Mapped[list[TourWaypoint]] = relationship(
         cascade="all, delete-orphan", order_by=(TourWaypoint.created_at, TourWaypoint.id)
     )

@@ -107,6 +107,23 @@ class PartnerSnapshot(BaseModel):
     name: str
 
 
+PositionSource = Literal["exif_gps", "exif_time", "manual", "none"]
+
+
+class PhotoSnapshot(BaseModel):
+    """Metadata of a photo in the history; `name` is its caption."""
+
+    id: uuid.UUID
+    name: str | None
+    taken_at: datetime | None
+    lat: float | None
+    lon: float | None
+    position_source: PositionSource
+    track_distance_m: float | None
+    elevation_m: float | None
+    waypoint_id: uuid.UUID | None
+
+
 # --- Tour ---
 
 
@@ -174,7 +191,9 @@ class TourBase(BaseModel):
     title: str
     start_time: datetime | None
     end_time: datetime | None
-    cover_photo_id: uuid.UUID | None
+    cover_photo_id: uuid.UUID | None = Field(
+        description="Load it from /tours/{id}/photos/{cover_photo_id}/image"
+    )
     version: int
     created_at: datetime
     updated_at: datetime
@@ -198,6 +217,8 @@ class TourOut(TourBase):
     track_stats: dict | None = Field(
         description="Statistics of the track; heart rate only for the owner. See GET .../track"
     )
+    photo_time_offset_seconds: int
+    photo_count: int
     gear: list[TourGearOut]
     food: list[TourFoodOut]
     peaks: list[TourPeakOut]
@@ -258,6 +279,9 @@ class TourSnapshot(BaseModel):
     peaks: list[TourPeakOut]
     waypoints: list[WaypointOut]
     partners: list[PartnerSnapshot] = Field(default_factory=list)
+    photos: list[PhotoSnapshot] = Field(default_factory=list)
+    cover_photo_id: uuid.UUID | None = None
+    photo_time_offset_seconds: int = 0
     track_source: Literal["device", "drawn", "none"] = "none"
     gpx_file_id: uuid.UUID | None = None
     points_source: Literal["gpx", "manual"] | None = None
@@ -410,6 +434,17 @@ class PublicWaypoint(BaseModel):
     elevation_m: float | None
 
 
+class PublicPhoto(BaseModel):
+    index: int = Field(description="Load the image from /public/tours/{token}/photos/{index}")
+    caption: str | None
+    taken_at: datetime | None
+    lat: float | None
+    lon: float | None
+    track_distance_m: float | None
+    elevation_m: float | None
+    is_cover: bool
+
+
 class PublicTourOut(BaseModel):
     """What a public link shows: no ids, no e-mail addresses, health data only on request."""
 
@@ -427,11 +462,58 @@ class PublicTourOut(BaseModel):
     end_point: PublicPoint | None
     track_source: Literal["device", "drawn", "none"]
     track_stats: dict | None
+    photos: list[PublicPhoto]
     partners: list[str]
     peaks: list[PublicPeak]
     waypoints: list[PublicWaypoint]
     gear: list[PublicGear]
     food: list[PublicFood]
+
+
+# --- Photos ---
+
+
+class PhotoOut(BaseModel):
+    id: uuid.UUID
+    caption: str | None
+    taken_at: datetime | None
+    lat: float | None
+    lon: float | None
+    position_source: PositionSource
+    track_distance_m: float | None = Field(description="Position along the track")
+    elevation_m: float | None
+    waypoint_id: uuid.UUID | None
+    is_cover: bool
+
+
+class PhotoPatch(BaseModel):
+    """Only the given fields change. Set the position with lat/lon (map) or with
+    track_distance_m (elevation profile); auto_position brings back the automatic one."""
+
+    caption: optional_text(500) = None
+    lat: Latitude | None = None
+    lon: Longitude | None = None
+    track_distance_m: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    auto_position: bool | None = None
+    waypoint_id: uuid.UUID | None = None
+    is_cover: bool | None = None
+
+    @model_validator(mode="after")
+    def _one_way_to_set_the_position(self):
+        if (self.lat is None) != (self.lon is None):
+            raise ValueError("lat and lon must be given together")
+        ways = [self.lat is not None, self.track_distance_m is not None, bool(self.auto_position)]
+        if sum(ways) > 1:
+            raise ValueError("use only one of lat/lon, track_distance_m and auto_position")
+        return self
+
+
+class PhotoTimeOffsetIn(BaseModel):
+    seconds: int = Field(
+        ge=-172_800,
+        le=172_800,
+        description="Added to the capture time of all photos, e.g. -7200 for a camera on CEST",
+    )
 
 
 # --- Export ---
@@ -476,7 +558,7 @@ class TourExport(BaseModel):
     food: list[TourFoodOut]
     track: ExportedTrack
     weather: list[dict]
-    photos: list[dict]
+    photos: list[PhotoOut] = Field(description="Metadata; the images are not part of the JSON")
 
 
 # --- Track ---

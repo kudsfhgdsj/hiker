@@ -14,6 +14,7 @@ Formulas and parameters:
   comes from the user profile, otherwise 220 minus age, otherwise no zones.
 """
 
+import bisect
 import math
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
@@ -347,3 +348,90 @@ def trim_series_ends(series: dict, radius_m: float) -> dict:
         column: None if series.get(column) is None else series[column][first : last + 1]
         for column in SERIES_COLUMNS
     }
+
+
+# --- Positions on the series ---
+
+
+@dataclass(frozen=True)
+class SeriesPosition:
+    lat: float
+    lon: float
+    distance_m: float
+    elevation_m: float | None
+    # How far the requested position is away from the track.
+    offset_m: float = 0.0
+
+
+def _elevation_at(series: dict, index: int) -> float | None:
+    return series["elevation_m"][index] if series.get("elevation_m") else None
+
+
+def _between(series: dict, index: int, share: float) -> SeriesPosition:
+    """The position `share` (0..1) of the way from point `index` to the next one."""
+    following = min(index + 1, len(series["lat"]) - 1)
+
+    def mix(column: str) -> float:
+        return series[column][index] + (series[column][following] - series[column][index]) * share
+
+    low, high = _elevation_at(series, index), _elevation_at(series, following)
+    elevation = None if low is None or high is None else round(low + (high - low) * share, 1)
+    return SeriesPosition(
+        lat=round(mix("lat"), 6),
+        lon=round(mix("lon"), 6),
+        distance_m=round(mix("distance_m"), 1),
+        elevation_m=elevation,
+    )
+
+
+def nearest_on_series(series: dict, lat: float, lon: float) -> SeriesPosition | None:
+    """The point of the series that is closest to the given position."""
+    if not series["lat"]:
+        return None
+    offsets = [
+        haversine_m(lat, lon, point_lat, point_lon)
+        for point_lat, point_lon in zip(series["lat"], series["lon"], strict=True)
+    ]
+    index = min(range(len(offsets)), key=offsets.__getitem__)
+    return replace(_between(series, index, 0.0), offset_m=round(offsets[index], 1))
+
+
+def position_at_distance(series: dict, distance_m: float) -> SeriesPosition | None:
+    distances = series["distance_m"]
+    if not distances:
+        return None
+    distance_m = min(max(distance_m, distances[0]), distances[-1])
+    index = max(0, bisect.bisect_right(distances, distance_m) - 1)
+    if index >= len(distances) - 1:
+        return _between(series, len(distances) - 1, 0.0)
+    span = distances[index + 1] - distances[index]
+    return _between(series, index, (distance_m - distances[index]) / span if span else 0.0)
+
+
+def position_at_time(series: dict, moment: datetime, tolerance_s: float) -> SeriesPosition | None:
+    """Interpolated position at a point in time; None outside the track (plus tolerance)."""
+    if not series.get("time"):
+        return None
+    known = [
+        (datetime.fromisoformat(text.replace("Z", "+00:00")), index)
+        for index, text in enumerate(series["time"])
+        if text is not None
+    ]
+    if not known:
+        return None
+    known.sort()
+    times = [time for time, _ in known]
+    if moment < times[0]:
+        early = (times[0] - moment).total_seconds() <= tolerance_s
+        return _between(series, known[0][1], 0.0) if early else None
+    if moment >= times[-1]:
+        late = (moment - times[-1]).total_seconds() <= tolerance_s
+        return _between(series, known[-1][1], 0.0) if late else None
+    place = bisect.bisect_right(times, moment) - 1
+    (before, index), (after, following) = known[place], known[place + 1]
+    span = (after - before).total_seconds()
+    share = (moment - before).total_seconds() / span if span else 0.0
+    if following != index + 1:
+        # Points without time in between: stay at the last point with a known time.
+        return _between(series, index, 0.0)
+    return _between(series, index, share)

@@ -6,11 +6,12 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.db import utcnow
 from app.core.errors import ConflictError, NotFoundError, UnprocessableError
+from app.core.storage import Storage
 from app.modules.auth import service as auth_service
 from app.modules.auth.models import User
 from app.modules.gear import service as gear_service
 from app.modules.nutrition import service as nutrition_service
-from app.modules.protocols import contacts, history, snapshots, track_service
+from app.modules.protocols import contacts, history, photos, snapshots, track_service
 from app.modules.protocols.models import (
     CALORIES_MANUAL,
     Tour,
@@ -205,10 +206,16 @@ def update_tour(db: Session, access: TourAccess, data: TourUpdate) -> Tour:
     return access.tour
 
 
-def delete_tour(db: Session, access: TourAccess) -> None:
-    """Soft delete; the tour disappears for everyone it was shared with."""
-    access.tour.deleted_at = utcnow()
-    history.record_change(db, access.tour, access.user, history.DELETED)
+def delete_tour(db: Session, storage: Storage, access: TourAccess) -> None:
+    """Soft delete; the tour disappears for everyone it was shared with.
+
+    The row stays for the offline sync, but photos and GPX files are removed for good.
+    """
+    tour = access.tour
+    tour.deleted_at = utcnow()
+    history.record_change(db, tour, access.user, history.DELETED)
+    photos.delete_all_files(db, storage, tour)
+    track_service.delete_all_files(db, storage, tour)
 
 
 def list_tours(
@@ -297,6 +304,8 @@ def tour_out(db: Session, access: TourAccess) -> TourOut:
         points_source=tour.points_source,
         track_source=tour.track_source,
         track_stats=track_service.visible_stats(tour.track_stats, health=access.is_owner),
+        photo_time_offset_seconds=tour.photo_time_offset_seconds,
+        photo_count=len(tour.photos),
         gear=snapshots.gear_list(tour),
         food=snapshots.food_list(tour),
         peaks=snapshots.peak_list(tour),
@@ -318,6 +327,7 @@ def create_waypoint(db: Session, access: TourAccess, data: WaypointIn) -> TourWa
     _check_new_id(db, TourWaypoint, data.id)
     waypoint = TourWaypoint(**data.model_dump(exclude_none=True))
     access.tour.waypoints.append(waypoint)
+    photos.locate_waypoint(db, access.tour, waypoint)
     history.record_change(db, access.tour, access.user, history.UPDATED)
     return waypoint
 
@@ -330,11 +340,16 @@ def update_waypoint(
         raise UnprocessableError("name, lat and lon cannot be empty")
     for field, value in changes.items():
         setattr(waypoint, field, value)
+    if "lat" in changes or "lon" in changes:
+        photos.locate_waypoint(db, access.tour, waypoint)
     history.record_change(db, access.tour, access.user, history.UPDATED)
     return waypoint
 
 
 def delete_waypoint(db: Session, access: TourAccess, waypoint: TourWaypoint) -> None:
+    for photo in access.tour.photos:
+        if photo.waypoint_id == waypoint.id:
+            photo.waypoint_id = None
     access.tour.waypoints.remove(waypoint)
     history.record_change(db, access.tour, access.user, history.UPDATED)
 

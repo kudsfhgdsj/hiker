@@ -211,7 +211,7 @@ Platzhalter → echter User: `contact.linked_user_id` setzen; gilt sofort in all
 **tour_peak**: id, tour_id, name, elevation_m, lat, lon, reached_at, sort_order
 
 **tour_waypoint** (wie bei wanderer): id, tour_id, name, description, icon, lat, lon, track_distance_m, elevation_m
-**tour_photo**: id, tour_id, file_id, caption, taken_at, lat, lon, `position_source` (`exif_gps` | `exif_time` | `manual` | `none`), track_distance_m (Position entlang des Tracks), elevation_m, waypoint_id (optional), sort_order
+**tour_photo**: id, tour_id, file_id, thumb_file_id (Vorschaubild, höchstens 400 px), added_by, caption, taken_at, exif_lat/exif_lon/exif_altitude (Position aus dem Bild, damit die automatische Zuordnung wiederherstellbar bleibt), lat, lon, `position_source` (`exif_gps` | `exif_time` | `manual` | `none`), track_distance_m (Position entlang des Tracks), elevation_m, waypoint_id (optional), sort_order. Die Tour speichert zusätzlich `photo_time_offset_seconds`.
 
 **tour_weather**: tour_id, sample_point (`start` | `summit` | `end` | `manual`), lat, lon, elevation_m, time, Werte (Temperatur, gefühlt, Wind, Böen, Niederschlag, Bewölkung, Nullgradgrenze), source, fetched_at
 
@@ -263,6 +263,18 @@ Die verwendete Formel und Parameter werden im Code dokumentiert und als Tooltip 
 4. Funktion „Aus Fotos“: Aus Fotos mit GPS lassen sich Wegpunkte automatisch anlegen.
 5. Ein Foto lässt sich als Titelbild (`cover_photo_id`) festlegen.
 
+Umsetzung (Regeln und Parameter stehen in `protocols/photos.py`):
+- Upload von bis zu 20 Fotos je Anfrage (JPEG, PNG, WebP), höchstens 500 je Tour. Ein ungültiges Bild lehnt den ganzen Upload ab. Gespeichert werden ein neu kodiertes Bild und ein Vorschaubild, beide ohne EXIF-Daten.
+- EXIF-GPS: nächster Punkt des Tracks, sofern er höchstens 1 km entfernt ist; sonst behält das Foto seine GPS-Position ohne Lage am Track.
+- Aufnahmezeit: Position wird auf dem Track interpoliert, wenn die Zeit im Zeitraum des Tracks liegt (Toleranz 10 Minuten an beiden Enden). Zeiten ohne Zeitzone gelten als UTC; der Zeitversatz der Tour (`photo_time_offset_seconds`, z. B. −7200 für eine Kamera auf Sommerzeit) wird vorher addiert und gilt für alle Fotos.
+- Manuell: Position auf der Karte (`lat`/`lon`) oder im Höhenprofil (`track_distance_m`); `auto_position` stellt die automatische Zuordnung wieder her. Manuelle Positionen bleiben bei neuem Track oder geändertem Zeitversatz erhalten.
+- Wird der Track ersetzt oder entfernt, werden alle nicht manuell gesetzten Fotos und die Wegpunkte neu zugeordnet.
+- Reihenfolge der Galerie: entlang des Tracks, Fotos ohne Position am Ende.
+- „Aus Fotos“ legt Wegpunkte aus Fotos mit EXIF-GPS an, die noch keinem Wegpunkt zugeordnet sind; Fotos im Umkreis von 30 m teilen sich einen Wegpunkt.
+- Historie: Foto-Metadaten (Beschriftung, Position, Wegpunkt, Titelbild, Zeitversatz) stehen in den Revisionen. Das Löschen eines Fotos entfernt seine Dateien endgültig; Wiederherstellen stellt deshalb nur Metadaten noch vorhandener Fotos wieder her und löscht nie Fotos.
+- Öffentliche Links zeigen die Fotos ohne IDs (Adresse über die Position in der Galerie). `strip_photo_gps` blendet die Positionen aus; `hide_exact_start` blendet sie bei Fotos im Umkreis von 500 m um Start und Ende aus.
+- Wird eine Tour gelöscht, werden ihre Fotos und GPX-Dateien endgültig aus dem Speicher entfernt.
+
 **Ausrüstung in Touren**
 Auswahl aus der Datenbank oder per Packlisten-Vorlage. Startgewicht = Summe der mitgeführten Gegenstände (plus geplantes Essen), überschreibbar.
 
@@ -304,7 +316,7 @@ Umsetzung:
 **Export JSON**
 Versioniertes Schema (`schema_version`): Tour, Ausrüstung (Snapshots), Essen, Partner (Anzeigenamen), Wetter, Track-Statistik, Wegpunkte, Foto-Metadaten (inkl. Position) und Verweise auf Dateien oder ZIP mit den Dateien.
 
-Stand `schema_version` 1: Tour (mit effektiven Werten für Dauer und Startgewicht), Partner, Gipfel, Wegpunkte, Ausrüstung, Essen und Track-Statistik; `weather` und `photos` sind bis zu den Schritten 8 und 9 leere Listen, ein ZIP mit Dateien folgt mit GPX und Fotos. Exportieren darf jeder mit Lesezugriff; die Antwort kommt als Download (`Content-Disposition`).
+Stand `schema_version` 1: Tour (mit effektiven Werten für Dauer und Startgewicht), Partner, Gipfel, Wegpunkte, Ausrüstung, Essen, Track-Statistik und Foto-Metadaten; `weather` ist bis Schritt 9 eine leere Liste. Ein ZIP mit GPX und Bildern gibt es noch nicht. Exportieren darf jeder mit Lesezugriff; die Antwort kommt als Download (`Content-Disposition`).
 
 ## 8. API (Version `/api/v1`)
 
@@ -336,8 +348,11 @@ Stand `schema_version` 1: Tour (mit effektiven Werten für Dauer und Startgewich
 | GET, DELETE | /tours/{id}/track | Statistik und Zeitreihen für Karte und Diagramme / Track entfernen (nur Owner) |
 | GET | /public/tours/{token}/track | Track einer öffentlich verlinkten Tour |
 | PUT | /tours/{id}/points | Start/Ende manuell setzen (nur Owner) |
-| POST | /tours/{id}/photos | Fotos hochladen (EXIF-Auswertung, Track-Zuordnung) |
-| PATCH, DELETE | /tours/{id}/photos/{photo_id} | Beschriftung, Position, Titelbild / löschen |
+| GET, POST | /tours/{id}/photos | Fotos listen / hochladen (multipart, Feld `files`; EXIF-Auswertung, Track-Zuordnung) |
+| PATCH, DELETE | /tours/{id}/photos/{photo_id} | Beschriftung, Position, Wegpunkt, Titelbild / löschen |
+| GET | /tours/{id}/photos/{photo_id}/image?size= | Bild (`full`) oder Vorschaubild (`thumb`) |
+| PUT | /tours/{id}/photos/time-offset | Zeitversatz für alle Fotos setzen und neu zuordnen |
+| GET | /public/tours/{token}/photos/{index}?size= | Bild einer öffentlich verlinkten Tour |
 | POST | /tours/{id}/waypoints/from-photos | Wegpunkte aus Foto-GPS erzeugen |
 | GET, POST, PATCH, DELETE | /tours/{id}/waypoints | Wegpunkte |
 | POST | /tours/{id}/weather/fetch | Wetter abrufen |

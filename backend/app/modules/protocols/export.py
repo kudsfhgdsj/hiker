@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import utcnow
 from app.modules.auth import service as auth_service
-from app.modules.protocols import snapshots, track_service
+from app.modules.protocols import photos, snapshots, track_service
 from app.modules.protocols.schemas import ExportedTour, ExportedTrack, GeoPoint, TourExport
 from app.modules.protocols.sharing import TourAccess
 
@@ -62,7 +62,7 @@ def export_tour(db: Session, access: TourAccess) -> TourExport:
             file=None,
         ),
         weather=[],
-        photos=[],
+        photos=photos.photos_out(tour),
     )
 
 

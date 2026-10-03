@@ -14,6 +14,7 @@ from app.modules.protocols import (
     contacts,
     export,
     history,
+    photos,
     public,
     service,
     sharing,
@@ -25,6 +26,9 @@ from app.modules.protocols.schemas import (
     ContactOut,
     ContactPatch,
     DrawnTrackIn,
+    PhotoOut,
+    PhotoPatch,
+    PhotoTimeOffsetIn,
     PublicLinkIn,
     PublicLinkOut,
     PublicTourOut,
@@ -125,8 +129,8 @@ def update_tour(body: TourUpdate, access: EditableTour, db: DbSession):
     status_code=status.HTTP_204_NO_CONTENT,
     responses=error_responses(403, 404),
 )
-def delete_tour(access: OwnedTour, db: DbSession):
-    service.delete_tour(db, access)
+def delete_tour(access: OwnedTour, db: DbSession, storage: FileStorage):
+    service.delete_tour(db, storage, access)
 
 
 @router.get("/tours/{tour_id}/export", response_model=TourExport, responses=error_responses(404))
@@ -201,6 +205,110 @@ def remove_track(access: OwnedTour, db: DbSession):
     """Remove the track from the tour. Owner only."""
     track_service.remove_track(db, access)
     return service.tour_out(db, access)
+
+
+# --- Photos ---
+
+IMAGE_RESPONSE = {200: {"content": {"image/jpeg": {}}}}
+ImageSize = Annotated[Literal["full", "thumb"], Query(description="thumb: at most 400 px")]
+
+
+def _image_response(file, data: bytes) -> Response:
+    headers = {"Cache-Control": "private, max-age=86400", "ETag": f'"{file.sha256}"'}
+    return Response(content=data, media_type=file.mime, headers=headers)
+
+
+def _read_upload(upload: UploadFile) -> bytes:
+    limit = get_settings().max_upload_mb * 1024 * 1024
+    data = upload.file.read(limit + 1)
+    if len(data) > limit:
+        raise PayloadTooLargeError(f"File is larger than {get_settings().max_upload_mb} MB")
+    return data
+
+
+@router.get(
+    "/tours/{tour_id}/photos", response_model=list[PhotoOut], responses=error_responses(404)
+)
+def list_photos(access: ReadableTour):
+    """Photos in gallery order: along the track, photos without position at the end."""
+    return photos.photos_out(access.tour)
+
+
+@router.post(
+    "/tours/{tour_id}/photos",
+    response_model=list[PhotoOut],
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(403, 404, 409, 413),
+)
+def upload_photos(
+    files: list[UploadFile], access: EditableTour, db: DbSession, storage: FileStorage
+):
+    """Upload photos (multipart, field `files`, several at once).
+
+    EXIF capture time and GPS are read and the photo is matched to the track. The
+    images are re-encoded and stored without EXIF data. One bad file rejects the upload.
+    """
+    added = photos.add_photos(db, storage, access, [_read_upload(file) for file in files])
+    return [photos.photo_out(access.tour, photo) for photo in added]
+
+
+@router.put(
+    "/tours/{tour_id}/photos/time-offset",
+    response_model=list[PhotoOut],
+    responses=error_responses(403, 404),
+)
+def set_photo_time_offset(body: PhotoTimeOffsetIn, access: EditableTour, db: DbSession):
+    """Correct the camera clock for all photos of the tour and match them to the track again."""
+    photos.set_time_offset(db, access, body.seconds)
+    return photos.photos_out(access.tour)
+
+
+@router.patch(
+    "/tours/{tour_id}/photos/{photo_id}",
+    response_model=PhotoOut,
+    responses=error_responses(403, 404),
+)
+def update_photo(photo_id: uuid.UUID, body: PhotoPatch, access: EditableTour, db: DbSession):
+    """Change caption, position, waypoint or make the photo the cover of the tour."""
+    photo = photos.get_photo(access.tour, photo_id)
+    photos.update_photo(db, access, photo, body)
+    return photos.photo_out(access.tour, photo)
+
+
+@router.delete(
+    "/tours/{tour_id}/photos/{photo_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(403, 404),
+)
+def delete_photo(photo_id: uuid.UUID, access: EditableTour, db: DbSession, storage: FileStorage):
+    photos.delete_photo(db, storage, access, photos.get_photo(access.tour, photo_id))
+
+
+@router.get(
+    "/tours/{tour_id}/photos/{photo_id}/image",
+    response_class=Response,
+    responses={**IMAGE_RESPONSE, **error_responses(404)},
+)
+def read_photo_image(
+    photo_id: uuid.UUID,
+    access: ReadableTour,
+    db: DbSession,
+    storage: FileStorage,
+    size: ImageSize = "full",
+):
+    photo = photos.get_photo(access.tour, photo_id)
+    return _image_response(*photos.image(db, storage, photo, size))
+
+
+@router.post(
+    "/tours/{tour_id}/waypoints/from-photos",
+    response_model=list[WaypointOut],
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(403, 404),
+)
+def waypoints_from_photos(access: EditableTour, db: DbSession):
+    """Create waypoints from photos with GPS; photos close together share a waypoint."""
+    return photos.waypoints_from_photos(db, access)
 
 
 # --- Waypoints ---
@@ -442,3 +550,18 @@ def read_public_track(token: str, response: Response, db: DbSession):
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     response.headers["Cache-Control"] = "no-store"
     return public.public_track(db, token)
+
+
+@public_router.get(
+    "/public/tours/{token}/photos/{index}",
+    response_class=Response,
+    responses={**IMAGE_RESPONSE, **error_responses(404, 429)},
+    dependencies=[Depends(rate_limit("public-image", limit=600))],
+)
+def read_public_photo(
+    token: str, index: int, db: DbSession, storage: FileStorage, size: ImageSize = "full"
+):
+    """An image of a publicly linked tour, addressed by its position in the gallery."""
+    file, data = public.public_photo_image(db, storage, token, index, size)
+    headers = {"X-Robots-Tag": "noindex, nofollow", "Cache-Control": "private, max-age=3600"}
+    return Response(content=data, media_type=file.mime, headers=headers)

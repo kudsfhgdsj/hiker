@@ -3,6 +3,7 @@
 from app.modules.protocols.models import Tour, TourFoodEntry, TourGear
 from app.modules.protocols.schemas import (
     PartnerSnapshot,
+    PhotoSnapshot,
     TourComputed,
     TourFoodOut,
     TourGearOut,
@@ -21,6 +22,8 @@ SCALAR_FIELDS = (
     "pack_weight_start_g",
     "calories_burned",
     "calories_burned_source",
+    "cover_photo_id",
+    "photo_time_offset_seconds",
     "track_source",
     "gpx_file_id",
     "points_source",
@@ -33,7 +36,7 @@ SCALAR_FIELDS = (
 )
 # Scalars that belong to the track and the points; only the owner changes them.
 TRACK_FIELDS = SCALAR_FIELDS[SCALAR_FIELDS.index("track_source") :]
-LIST_FIELDS = ("gear", "food", "peaks", "waypoints", "partners")
+LIST_FIELDS = ("gear", "food", "peaks", "waypoints", "partners", "photos")
 
 
 def _gear_out(entry: TourGear) -> TourGearOut:
@@ -105,6 +108,20 @@ def build_snapshot(tour: Tour) -> dict:
         partners=[
             PartnerSnapshot(id=partner.contact_id, name=partner.contact.display_name)
             for partner in _partners(tour)
+        ],
+        photos=[
+            PhotoSnapshot(
+                id=photo.id,
+                name=photo.caption,
+                taken_at=photo.taken_at,
+                lat=photo.lat,
+                lon=photo.lon,
+                position_source=photo.position_source,
+                track_distance_m=photo.track_distance_m,
+                elevation_m=photo.elevation_m,
+                waypoint_id=photo.waypoint_id,
+            )
+            for photo in sorted(tour.photos, key=lambda photo: (photo.sort_order, str(photo.id)))
         ],
     )
     return snapshot.model_dump(mode="json")

@@ -1,8 +1,10 @@
 """Tracks of tours: storing the GPX file, statistics, series and start/end point."""
 
 import logging
+import uuid
 from datetime import datetime
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core import files
@@ -11,9 +13,9 @@ from app.core.errors import NotFoundError
 from app.core.storage import Storage
 from app.modules.auth import service as auth_service
 from app.modules.auth.models import User
-from app.modules.protocols import history, track
+from app.modules.protocols import history, photos, track
 from app.modules.protocols.elevation import ElevationSource, ElevationSourceError, lookup_along
-from app.modules.protocols.models import TRACK_NONE, Tour, TrackSeries
+from app.modules.protocols.models import TRACK_NONE, Tour, TourRevision, TrackSeries
 from app.modules.protocols.schemas import DrawnTrackIn, TrackOut
 from app.modules.protocols.sharing import TourAccess
 from app.modules.protocols.track import TrackPoint
@@ -41,6 +43,13 @@ def _max_heart_rate(db: Session, user: User) -> int | None:
     if profile.birth_year:
         return 220 - (utcnow().year - profile.birth_year)
     return None
+
+
+def _relocate(db: Session, tour: Tour) -> None:
+    """Photos and waypoints follow the track they are attached to."""
+    photos.relocate_all(db, tour)
+    for waypoint in tour.waypoints:
+        photos.locate_waypoint(db, tour, waypoint)
 
 
 def _fill_elevations(points: list[TrackPoint], source: ElevationSource) -> tuple[list, str | None]:
@@ -74,6 +83,8 @@ def _derive(db: Session, tour: Tour, user: User, points: list[TrackPoint], eleva
     series.data = track.build_series(points)
     series.point_count = len(series.data["lat"])
     db.add(series)
+    db.flush()
+    _relocate(db, tour)
     return stats
 
 
@@ -127,6 +138,8 @@ def _clear(db: Session, tour: Tour) -> None:
     series = db.get(TrackSeries, tour.id)
     if series is not None:
         db.delete(series)
+        db.flush()
+    _relocate(db, tour)
     tour.gpx_file_id = None
     tour.track_source = TRACK_NONE
     tour.track_stats = None
@@ -154,6 +167,19 @@ def rebuild_from_file(db: Session, storage: Storage, tour: Tour, user: User) -> 
     points = track.parse_gpx(data)
     elevation = "track" if any(point.ele is not None for point in points) else None
     _derive(db, tour, user, points, elevation)
+
+
+def delete_all_files(db: Session, storage: Storage, tour: Tour) -> None:
+    """Remove every GPX file the tour ever had (when the tour is deleted)."""
+    snapshots = db.scalars(select(TourRevision.snapshot).where(TourRevision.tour_id == tour.id))
+    file_ids = {snapshot.get("gpx_file_id") for snapshot in snapshots} - {None}
+    series = db.get(TrackSeries, tour.id)
+    if series is not None:
+        db.delete(series)
+    tour.track_stats = None
+    db.commit()
+    for file_id in file_ids:
+        files.delete_file(db, storage, uuid.UUID(file_id))
 
 
 def gpx_file(db: Session, storage: Storage, tour: Tour) -> bytes:

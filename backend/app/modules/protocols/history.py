@@ -173,6 +173,30 @@ def _restore_entries(model, current: list, entries: list, to_columns) -> list:
     return result
 
 
+def _restore_photos(tour: Tour, state: TourSnapshot) -> None:
+    """Restore the metadata of photos that still exist.
+
+    A restore never deletes photos and cannot bring back deleted ones, because
+    deleting a photo removes its files for good.
+    """
+    waypoint_ids = {waypoint.id for waypoint in state.waypoints}
+    photos = {photo.id: photo for photo in tour.photos}
+    for entry in state.photos:
+        photo = photos.get(entry.id)
+        if photo is None:
+            continue
+        photo.caption = entry.name
+        photo.lat, photo.lon = entry.lat, entry.lon
+        photo.position_source = entry.position_source
+        photo.track_distance_m, photo.elevation_m = entry.track_distance_m, entry.elevation_m
+        photo.waypoint_id = entry.waypoint_id if entry.waypoint_id in waypoint_ids else None
+    for photo in tour.photos:
+        if photo.waypoint_id not in waypoint_ids:
+            photo.waypoint_id = None
+    if tour.cover_photo_id not in photos:
+        tour.cover_photo_id = None
+
+
 def restore(
     db: Session, storage: Storage, access: TourAccess, revision: TourRevision
 ) -> TourRevision | None:
@@ -251,4 +275,5 @@ def restore(
     db.flush()
     for field, rows in restored.items():
         setattr(tour, field, rows)
+    _restore_photos(tour, state)
     return record_change(db, tour, user, RESTORED, f"version {revision.version}")

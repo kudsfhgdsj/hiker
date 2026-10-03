@@ -8,9 +8,10 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.db import utcnow
 from app.core.errors import NotFoundError, UnprocessableError
+from app.core.storage import Storage
 from app.modules.auth import service as auth_service
 from app.modules.auth.models import User
-from app.modules.protocols import snapshots, track_service
+from app.modules.protocols import photos, snapshots, track, track_service
 from app.modules.protocols.models import Tour, TourPublicLink
 from app.modules.protocols.schemas import (
     PublicFood,
@@ -18,6 +19,7 @@ from app.modules.protocols.schemas import (
     PublicLinkIn,
     PublicLinkOut,
     PublicPeak,
+    PublicPhoto,
     PublicPoint,
     PublicTourOut,
     PublicWaypoint,
@@ -100,6 +102,46 @@ def _resolve(db: Session, token: str) -> tuple[TourPublicLink, Tour]:
     return link, tour
 
 
+def _near_hidden_point(tour: Tour, lat: float, lon: float) -> bool:
+    points = ((tour.start_lat, tour.start_lon), (tour.end_lat, tour.end_lon))
+    return any(
+        point_lat is not None
+        and track.haversine_m(point_lat, point_lon, lat, lon) < track_service.HIDDEN_START_RADIUS_M
+        for point_lat, point_lon in points
+    )
+
+
+def _photos(link: TourPublicLink, tour: Tour) -> list[PublicPhoto]:
+    result = []
+    for index, photo in enumerate(photos.ordered(tour)):
+        # Without position: on request, and near a start or end point that is hidden.
+        show_position = photo.lat is not None and not link.strip_photo_gps
+        if show_position and link.hide_exact_start:
+            show_position = not _near_hidden_point(tour, photo.lat, photo.lon)
+        result.append(
+            PublicPhoto(
+                index=index,
+                caption=photo.caption,
+                taken_at=photo.taken_at,
+                lat=photo.lat if show_position else None,
+                lon=photo.lon if show_position else None,
+                track_distance_m=photo.track_distance_m if show_position else None,
+                elevation_m=photo.elevation_m,
+                is_cover=tour.cover_photo_id == photo.id,
+            )
+        )
+    return result
+
+
+def public_photo_image(db: Session, storage: Storage, token: str, index: int, size: str):
+    """An image of a publicly linked tour. The stored images carry no EXIF data."""
+    _link, tour = _resolve(db, token)
+    ordered = photos.ordered(tour)
+    if not 0 <= index < len(ordered):
+        raise NotFoundError("Photo not found")
+    return photos.image(db, storage, ordered[index], size)
+
+
 def public_track(db: Session, token: str) -> TrackOut:
     link, tour = _resolve(db, token)
     return track_service.track_out(
@@ -132,6 +174,7 @@ def public_tour(db: Session, token: str) -> PublicTourOut:
         end_point=_point(tour.end_lat, tour.end_lon, tour.end_name, hide),
         track_source=tour.track_source,
         track_stats=track_service.visible_stats(tour.track_stats, health=health),
+        photos=_photos(link, tour),
         partners=[partner.display_name for partner in snapshots.partner_list(tour)],
         peaks=[PublicPeak(**peak.model_dump(exclude={"id"})) for peak in snapshots.peak_list(tour)],
         waypoints=[
