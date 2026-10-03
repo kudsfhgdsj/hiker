@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     registration_mode: Literal["open", "closed"] = "open"
     access_token_ttl_minutes: int = Field(default=15, gt=0)
     refresh_token_ttl_days: int = Field(default=30, gt=0)
+    storage_path: str = "./data/files"
+    max_upload_mb: int = Field(default=15, gt=0)
+    image_max_edge_px: int = Field(default=2000, ge=200)
 
     @property
     def module_names(self) -> list[str]:

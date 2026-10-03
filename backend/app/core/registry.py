@@ -92,6 +92,7 @@ def import_all_models(package: str = MODULES_PACKAGE) -> None:
     Used by Alembic. The schema covers all installed modules, independent of
     ENABLED_MODULES, so that disabling a module never orphans its migrations.
     """
+    importlib.import_module("app.core.files")
     root = importlib.import_module(package)
     for found in pkgutil.iter_modules(root.__path__):
         models = f"{package}.{found.name}.models"

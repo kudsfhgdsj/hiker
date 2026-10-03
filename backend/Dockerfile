@@ -16,7 +16,8 @@ COPY alembic.ini ./
 COPY migrations ./migrations
 COPY app ./app
 
-RUN useradd --system --uid 10001 --no-create-home hiker
+RUN useradd --system --uid 10001 --no-create-home hiker \
+    && mkdir -p /data/files && chown -R hiker /data
 USER hiker
 
 EXPOSE 8000

@@ -13,8 +13,11 @@ os.environ.update(
     }
 )
 
+from io import BytesIO  # noqa: E402
+
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+from PIL import Image  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
@@ -22,6 +25,8 @@ from app.core.config import get_settings  # noqa: E402
 from app.core.db import Base, create_db_engine  # noqa: E402
 from app.core.deps import get_db  # noqa: E402
 from app.core.registry import import_all_models  # noqa: E402
+from app.core.storage import get_storage  # noqa: E402
+from app.core.storage.local_fs import LocalFsStorage  # noqa: E402
 from app.main import create_app  # noqa: E402
 
 
@@ -48,8 +53,9 @@ def db(session_factory):
 
 
 @pytest.fixture
-def client(session_factory):
+def client(session_factory, storage):
     app = create_app()
+    app.dependency_overrides[get_storage] = lambda: storage
 
     def _get_db():
         with session_factory() as session:
@@ -60,7 +66,22 @@ def client(session_factory):
         yield test_client
 
 
+@pytest.fixture
+def storage(tmp_path):
+    return LocalFsStorage(tmp_path / "files")
+
+
 PASSWORD = "correct-horse-battery"
+
+
+def make_image(size=(64, 48), image_format="JPEG", mode="RGB", exif_gps=False) -> bytes:
+    image = Image.new(mode, size, 1 if mode == "P" else (200, 120, 40, 128)[: len(mode)])
+    exif = Image.Exif()
+    if exif_gps:
+        exif[0x8825] = {1: "N", 2: (46.0, 30.0, 0.0), 3: "E", 4: (8.0, 0.0, 0.0)}
+    output = BytesIO()
+    image.save(output, format=image_format, **({"exif": exif} if exif_gps else {}))
+    return output.getvalue()
 
 
 def register(client, email="anna@example.org", display_name="Anna", password=PASSWORD):

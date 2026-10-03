@@ -16,6 +16,8 @@ dependencies = [
     "pydantic-settings>=2.4",   # MIT – configuration from environment
     "argon2-cffi>=23.1",        # MIT – password hashing
     "pyjwt>=2.9",               # MIT – access tokens
+    "pillow>=11",               # HPND – validate and re-encode uploaded images
+    "python-multipart>=0.0.20", # Apache-2.0 – multipart uploads in FastAPI
 ]
 
 [project.optional-dependencies]
@@ -31,6 +33,10 @@ include = ["app*"]
 [tool.pytest.ini_options]
 testpaths = ["app/tests"]
 addopts = "-q"
+filterwarnings = [
+    # SQLite stores NUMERIC as float; production uses PostgreSQL.
+    "ignore:Dialect sqlite\\+pysqlite does \\*not\\* support Decimal:sqlalchemy.exc.SAWarning",
+]
 
 [tool.ruff]
 line-length = 100

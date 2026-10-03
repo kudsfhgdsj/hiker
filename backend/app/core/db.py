@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from functools import lru_cache
 
 from sqlalchemy import DateTime, Engine, MetaData, create_engine, event
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 from sqlalchemy.types import TypeDecorator
 
 from app.core.config import get_settings
@@ -41,6 +41,14 @@ class UTCDateTime(TypeDecorator):
 
 def utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+class TimestampMixin:
+    """Columns of all main records; `deleted_at` is a soft delete for the offline sync."""
+
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
 
 def create_db_engine(url: str, **kwargs) -> Engine:
