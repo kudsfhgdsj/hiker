@@ -565,7 +565,8 @@ def test_track_changes_are_part_of_the_history_and_can_be_restored(client, anna)
 
     assert second["track_stats"]["point_count"] == 21
     diff = revision(client, anna, tour, 3)["diff"]
-    assert set(diff) == {"gpx_file_id", "end_lat", "end_time"}
+    # The highest point moved with the longer track, so the waypoints changed too.
+    assert set(diff) == {"gpx_file_id", "end_lat", "end_time", "waypoints"}
 
     restored = restore(client, anna, tour, 2).json()
 

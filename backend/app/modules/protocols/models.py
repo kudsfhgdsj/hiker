@@ -3,6 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     Float,
     ForeignKey,
@@ -91,6 +92,8 @@ class TourPeak(Base):
     lon: Mapped[float | None] = mapped_column(Float)
     reached_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    # manual, or osm for peaks found automatically along the track.
+    source: Mapped[str] = mapped_column(String(8), default="manual")
 
 
 class TourWaypoint(Base):
@@ -105,6 +108,12 @@ class TourWaypoint(Base):
     lon: Mapped[float] = mapped_column(Float)
     track_distance_m: Mapped[float | None] = mapped_column(Float)
     elevation_m: Mapped[float | None] = mapped_column(Float)
+    # custom | photo | peak | saddle | waypoint | high_point
+    kind: Mapped[str] = mapped_column(String(12), default="custom")
+    # manual | photo | osm | gpx | track; the last three are found automatically.
+    source: Mapped[str] = mapped_column(String(8), default="manual")
+    osm_id: Mapped[int | None] = mapped_column(BigInteger)
+    reached_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 

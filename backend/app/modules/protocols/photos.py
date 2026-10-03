@@ -377,6 +377,8 @@ def waypoints_from_photos(db: Session, access: TourAccess) -> list[TourWaypoint]
                 id=uuid.uuid4(),
                 name=photo.caption or f"Foto {len(created) + 1}",
                 icon="photo",
+                kind="photo",
+                source="photo",
                 lat=photo.lat,
                 lon=photo.lon,
                 elevation_m=photo.elevation_m,

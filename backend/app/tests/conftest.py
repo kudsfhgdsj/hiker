@@ -36,6 +36,7 @@ from app.modules.protocols.elevation import (  # noqa: E402
     ElevationSourceError,
     get_elevation_source,
 )
+from app.modules.protocols.places import PlaceSourceError, get_place_source  # noqa: E402
 from app.modules.protocols.weather import (  # noqa: E402
     WeatherSourceError,
     WeatherValues,
@@ -76,12 +77,13 @@ def db(session_factory):
 
 
 @pytest.fixture
-def client(session_factory, storage, food_source, elevation_source, weather_source):
+def client(session_factory, storage, food_source, elevation_source, weather_source, place_source):
     app = create_app()
     app.dependency_overrides[get_storage] = lambda: storage
     app.dependency_overrides[get_food_source] = lambda: food_source
     app.dependency_overrides[get_elevation_source] = lambda: elevation_source
     app.dependency_overrides[get_weather_source] = lambda: weather_source
+    app.dependency_overrides[get_place_source] = lambda: place_source
 
     def _get_db():
         with session_factory() as session:
@@ -154,6 +156,26 @@ class FakeWeatherSource:
 @pytest.fixture
 def weather_source():
     return FakeWeatherSource()
+
+
+class FakePlaceSource:
+    """Stands in for the Overpass API of OpenStreetMap."""
+
+    def __init__(self):
+        self.places: list = []
+        self.calls: list[tuple] = []
+        self.fail = False
+
+    def places_in(self, south, west, north, east):
+        self.calls.append((south, west, north, east))
+        if self.fail:
+            raise PlaceSourceError("unreachable")
+        return [p for p in self.places if south <= p.lat <= north and west <= p.lon <= east]
+
+
+@pytest.fixture
+def place_source():
+    return FakePlaceSource()
 
 
 @pytest.fixture

@@ -30,6 +30,19 @@ lässt sich beim Bauen setzen: `--dart-define=API_BASE_URL=https://hiker.example
 Android-Emulator ist der Rechner unter
 `http://10.0.2.2:<Port>` erreichbar.
 
+## APK bauen
+
+Dafür braucht es ein JDK (21) und das Android-SDK (Plattform 36, Build-Tools 36.0.0, NDK
+28.2). Flutter muss beide kennen:
+
+```sh
+flutter config --android-sdk ~/Android/Sdk --jdk-dir ~/development/jdk
+flutter build apk --debug      # build/app/outputs/flutter-apk/app-debug.apk
+flutter build apk              # Release; bisher mit dem Debug-Schlüssel signiert
+```
+
+Für eine Veröffentlichung fehlt noch ein eigener Signaturschlüssel.
+
 ## Aufbau
 
 ```

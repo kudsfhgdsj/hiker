@@ -50,6 +50,7 @@ Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen k
 | App: Kennung | Android-Paketname `internal.lacasa.hiker` (vorläufig) | Vor einer Veröffentlichung auf die endgültige Domain umstellen |
 | Clients | Flutter nur für Android; das Web-Frontend ist ein eigenes Projekt mit Python Flask (`web/`), entschieden am 03.10.2026 | Keine Web-Plattform im Flutter-Projekt; zwei Oberflächen, die getrennt gepflegt werden |
 | Web-Frontend | Flask rendert die Seiten auf dem Server (Jinja2) und spricht ausschließlich mit der REST-API, nie direkt mit der Datenbank | API-first bleibt erhalten; Rechte, Historie und Konfliktschutz gelten wie in der App. Einzelheiten in Abschnitt 9a |
+| Gipfel und Pässe am Track | Werden nach jedem Track-Upload automatisch gefunden: benannte Gipfel, Sättel und Pässe aus OpenStreetMap (Overpass-API), die höchstens 10 m neben der Tracklinie liegen, dazu die Wegpunkte aus der GPX-Datei und der höchste Punkt | Einträge sind änderbar und löschbar; Gipfel landen zusätzlich in der Gipfelliste. Toleranz über `PLACE_MAX_DISTANCE_M` einstellbar |
 | Fehlerformat | `{"error": {"code", "message"}}` für fachliche Fehler | Client übersetzt anhand von `code` |
 
 ## 3. Technologie-Stack
@@ -74,6 +75,7 @@ Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen k
 | Höhendaten | Open-Meteo Elevation API (nur wenn der Track keine Höhe hat) | Für manuell gezeichnete Tracks |
 | Auth | E-Mail + Passwort (argon2), JWT als Access-Token, Refresh-Token in der Datenbank | Kein Drittanbieter |
 | Wetter | Open-Meteo (Forecast + Archive) | Kostenlos, kein Key |
+| Gipfel und Pässe | OpenStreetMap über die Overpass-API | Kostenlos, kein Key, ODbL (Quelle nennen); öffentliche Instanz ist zeitweise überlastet, URL konfigurierbar |
 | Deployment | Docker Compose, Anbindung an vorhandenen Reverse Proxy | Siehe Abschnitt 11 |
 
 ## 4. Gesamtarchitektur
@@ -222,9 +224,9 @@ Momentaufnahmen entstehen beim Hinzufügen und ändern sich nicht, wenn Gegensta
 
 Platzhalter → echter User: `contact.linked_user_id` setzen; gilt sofort in allen Touren des Owners.
 
-**tour_peak**: id, tour_id, name, elevation_m, lat, lon, reached_at, sort_order
+**tour_peak**: id, tour_id, name, elevation_m, lat, lon, reached_at, sort_order, source (`manual` | `osm` = automatisch am Track gefunden)
 
-**tour_waypoint** (wie bei wanderer): id, tour_id, name, description, icon, lat, lon, track_distance_m, elevation_m
+**tour_waypoint** (wie bei wanderer): id, tour_id, name, description, icon, lat, lon, track_distance_m, elevation_m, kind (`custom` | `photo` | `peak` | `saddle` | `waypoint` | `high_point`), source (`manual` | `photo` | `osm` | `gpx` | `track`), osm_id, reached_at (Zeitpunkt, zu dem der Track die Stelle erreicht)
 **tour_photo**: id, tour_id, file_id, thumb_file_id (Vorschaubild, höchstens 400 px), added_by, caption, taken_at, exif_lat/exif_lon/exif_altitude (Position aus dem Bild, damit die automatische Zuordnung wiederherstellbar bleibt), lat, lon, `position_source` (`exif_gps` | `exif_time` | `manual` | `none`), track_distance_m (Position entlang des Tracks), elevation_m, waypoint_id (optional), sort_order. Die Tour speichert zusätzlich `photo_time_offset_seconds`.
 
 **tour_weather**: id, tour_id, sample_point (`start` | `summit` | `end` | `manual`, je Tour einmal), lat, lon, elevation_m, time, Werte (temperature_c, apparent_temperature_c, wind_speed_kmh, wind_gusts_kmh, precipitation_mm, cloud_cover_pct, freezing_level_m, weather_code nach WMO), source (`open-meteo-archive` | `open-meteo-forecast`), fetched_at
@@ -253,6 +255,19 @@ Umsetzung der Auswertung (Formeln und Parameter stehen in `protocols/track.py`):
 - Herzfrequenz (Statistik und Zeitreihe) sieht nur der Owner; in Freigaben, Export für andere und Public Links fehlt sie, bei Links außer mit `show_health_data`. Das Original-GPX lädt nur der Owner herunter.
 - Public Links mit `hide_exact_start` schneiden an beiden Enden des Tracks alles im Umkreis von 500 m um Start und Ende ab.
 - Track-Änderungen stehen in der Historie; Wiederherstellen baut Statistik und Zeitreihe aus der damaligen GPX-Datei neu auf. Track und Punkte zählen dabei zu den Owner-Feldern.
+
+**Gipfel, Pässe und markante Stellen am Track**
+Nach jedem Speichern eines Tracks (Upload oder gezeichnet) sucht der Server die Stellen, an denen der Track vorbeiführt, und trägt sie in die Tour ein:
+- Benannte Gipfel (`natural=peak`), Sättel (`natural=saddle`) und Pässe (`mountain_pass=yes`) aus OpenStreetMap, die höchstens `PLACE_MAX_DISTANCE_M` (Standard 10 m) neben der Tracklinie liegen. Gemessen wird zur Linie zwischen den Punkten, nicht nur zu den Punkten selbst.
+- Die benannten Wegpunkte (`<wpt>`) aus der GPX-Datei.
+- Der höchste Punkt des Tracks, wenn dort (±100 m entlang des Tracks) kein Gipfel gefunden wurde.
+- Je Stelle: Art, Name, Höhe (vermessene Höhe aus OpenStreetMap, sonst Höhe des Tracks), Lage am Track und Uhrzeit des Erreichens.
+- Die Stellen stehen als Wegpunkte in der Tour (mit `kind` und `source`); Gipfel kommen zusätzlich in die Gipfelliste, sofern dort kein gleichnamiger Eintrag steht. Alles lässt sich umbenennen und löschen.
+- Bei einem neuen Track werden die automatisch gefundenen Einträge ersetzt; von Hand angelegte bleiben. Wird der Track entfernt, verschwinden die automatischen Einträge.
+- An OpenStreetMap geht nur der umschließende Kartenausschnitt, nie der Track. Ist der Dienst nicht erreichbar, wird der Track trotzdem gespeichert; `POST /tours/{id}/track/places` holt die Erkennung nach.
+- OpenStreetMap-Daten stehen unter der ODbL: Wo Stellen mit `source = osm` gezeigt werden, wird die Quelle genannt (`attribution` in der Übersicht).
+
+Die **Übersicht** (`GET /tours/{id}/overview`) orientiert sich am Kopf eines Tourenberichts auf hikr.org (Wegpunkte, Zeitbedarf, Aufstieg, Abstieg, Strecke): Kennzahlen der Tour und darunter der Wegverlauf von Start bis Ende mit allen Stellen in Track-Reihenfolge, je mit Höhe und Uhrzeit. Von hikr.org wurden weder Inhalte noch Gestaltung übernommen.
 
 **Einfache, manuell erstellte Tracks**
 Wer kein Gerät dabei hatte, zeichnet den Track in der App auf der Karte (Punkte setzen, verschieben, löschen). Daraus erzeugt die App ein GPX (`track_source = drawn`). Fehlen Höhen, werden sie über die Open-Meteo-Elevation-API ergänzt. Zeiten gibt der Nutzer manuell an; Dauer und Tempo sind dann Schätzwerte oder manuell. Auch ein einfaches, extern erstelltes GPX ohne Zeit und Puls lässt sich hochladen.
@@ -376,6 +391,8 @@ Stand `schema_version` 1: Tour (mit effektiven Werten für Dauer und Startgewich
 | POST | /tours/{id}/track/drawn | Gezeichneten Track speichern, GPX erzeugen (nur Owner) |
 | GET, DELETE | /tours/{id}/track | Statistik und Zeitreihen für Karte und Diagramme / Track entfernen (nur Owner) |
 | GET | /public/tours/{token}/track | Track einer öffentlich verlinkten Tour |
+| GET | /tours/{id}/overview | Übersicht: Kennzahlen und Wegverlauf mit Gipfeln, Pässen und Wegpunkten in Track-Reihenfolge |
+| POST | /tours/{id}/track/places | Stellen am Track neu erkennen (nur Owner) |
 | PUT | /tours/{id}/points | Start/Ende manuell setzen bzw. benennen (nur Owner) |
 | GET, POST | /tours/{id}/photos | Fotos listen / hochladen (multipart, Feld `files`; EXIF-Auswertung, Track-Zuordnung) |
 | PATCH, DELETE | /tours/{id}/photos/{photo_id} | Beschriftung, Position, Wegpunkt, Titelbild / löschen |

@@ -16,6 +16,7 @@ from app.modules.protocols import (
     contacts,
     history,
     photos,
+    places,
     snapshots,
     track_service,
     weather,
@@ -34,6 +35,8 @@ from app.modules.protocols.models import (
 from app.modules.protocols.schemas import (
     CaloriesEstimate,
     GeoPoint,
+    OverviewFacts,
+    OverviewStation,
     PointsIn,
     TourBase,
     TourCreate,
@@ -42,6 +45,7 @@ from app.modules.protocols.schemas import (
     TourIn,
     TourListItem,
     TourOut,
+    TourOverview,
     TourOwner,
     TourPartnerIn,
     TourPeakIn,
@@ -427,3 +431,71 @@ def revision_items(db: Session, revisions: list, schema):
         fields = {f: getattr(revision, f) for f in schema.model_fields if f != "author"}
         items.append(schema(author=author, **fields))
     return items
+
+
+# --- Overview ---
+
+
+def overview(tour: Tour) -> TourOverview:
+    """Key figures and the places on the way, in the order along the track."""
+    stats = tour.track_stats or {}
+    computed = snapshots.computed_values(tour)
+    duration = tour.duration_minutes
+    stations = [
+        OverviewStation(
+            kind=waypoint.kind,
+            name=waypoint.name or None,
+            lat=waypoint.lat,
+            lon=waypoint.lon,
+            elevation_m=waypoint.elevation_m,
+            track_distance_m=waypoint.track_distance_m,
+            time=waypoint.reached_at,
+            source=waypoint.source,
+        )
+        for waypoint in tour.waypoints
+    ]
+    stations.sort(key=lambda s: (s.track_distance_m is None, s.track_distance_m or 0))
+    if tour.start_lat is not None:
+        stations.insert(
+            0,
+            OverviewStation(
+                kind="start",
+                name=tour.start_name,
+                lat=tour.start_lat,
+                lon=tour.start_lon,
+                elevation_m=stats.get("start_elevation_m"),
+                track_distance_m=0.0 if tour.track_stats else None,
+                time=tour.start_time,
+                source=None,
+            ),
+        )
+    if tour.end_lat is not None:
+        stations.append(
+            OverviewStation(
+                kind="end",
+                name=tour.end_name,
+                lat=tour.end_lat,
+                lon=tour.end_lon,
+                elevation_m=stats.get("end_elevation_m"),
+                track_distance_m=stats.get("distance_m"),
+                time=tour.end_time,
+                source=None,
+            )
+        )
+    from_map = any(waypoint.source == places.SOURCE_OSM for waypoint in tour.waypoints)
+    return TourOverview(
+        title=tour.title,
+        facts=OverviewFacts(
+            start_time=tour.start_time,
+            end_time=tour.end_time,
+            duration_minutes=duration if duration is not None else computed.duration_minutes,
+            moving_time_s=stats.get("moving_time_s"),
+            distance_m=stats.get("distance_m"),
+            ascent_m=stats.get("ascent_m"),
+            descent_m=stats.get("descent_m"),
+            min_elevation_m=stats.get("min_elevation_m"),
+            max_elevation_m=stats.get("max_elevation_m"),
+        ),
+        stations=stations,
+        attribution=places.OSM_ATTRIBUTION if from_map else None,
+    )

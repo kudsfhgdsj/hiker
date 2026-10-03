@@ -79,7 +79,12 @@ def peak_list(tour: Tour) -> list[TourPeakOut]:
 
 
 def waypoint_list(tour: Tour) -> list[WaypointOut]:
-    return [WaypointOut.model_validate(waypoint) for waypoint in tour.waypoints]
+    """Waypoints in the order along the track; those without a position on it last."""
+    ordered = sorted(
+        tour.waypoints,
+        key=lambda w: (w.track_distance_m is None, w.track_distance_m or 0, w.name, str(w.id)),
+    )
+    return [WaypointOut.model_validate(waypoint) for waypoint in ordered]
 
 
 def _partners(tour: Tour) -> list:

@@ -13,9 +13,10 @@ from app.core.errors import NotFoundError
 from app.core.storage import Storage
 from app.modules.auth import service as auth_service
 from app.modules.auth.models import User
-from app.modules.protocols import history, photos, track
+from app.modules.protocols import history, photos, places, track
 from app.modules.protocols.elevation import ElevationSource, ElevationSourceError, lookup_along
 from app.modules.protocols.models import TRACK_NONE, Tour, TourRevision, TrackSeries
+from app.modules.protocols.places import PlaceSource
 from app.modules.protocols.schemas import DrawnTrackIn, TrackOut
 from app.modules.protocols.sharing import TourAccess
 from app.modules.protocols.track import TrackPoint
@@ -96,9 +97,11 @@ def _store(
     points: list[TrackPoint],
     source: str,
     elevation: str | None,
+    place_source: PlaceSource,
 ) -> None:
     tour = access.tour
     stats = _derive(db, tour, access.user, points, elevation)
+    places.apply_to_tour(db, tour, access.user, points, data, place_source)
     # The time window of the tour follows the track if it has time stamps.
     if stats["start_time"] is not None:
         tour.start_time = _parse_time(stats["start_time"])
@@ -113,17 +116,32 @@ def _store(
 
 
 def upload_gpx(
-    db: Session, storage: Storage, elevations: ElevationSource, access: TourAccess, data: bytes
+    db: Session,
+    storage: Storage,
+    elevations: ElevationSource,
+    place_source: PlaceSource,
+    access: TourAccess,
+    data: bytes,
 ) -> None:
     """Store an uploaded GPX file unchanged and evaluate it."""
     points, elevation = _fill_elevations(track.parse_gpx(data), elevations)
-    _store(db, storage, access, data, points, TRACK_DEVICE, elevation)
+    _store(db, storage, access, data, points, TRACK_DEVICE, elevation, place_source)
+
+
+def detect_places(
+    db: Session, storage: Storage, place_source: PlaceSource, access: TourAccess
+) -> None:
+    """Find the places along the stored track again, e.g. after the map service was down."""
+    _file, data = files.load_file(db, storage, access.tour.gpx_file_id)
+    places.apply_to_tour(db, access.tour, access.user, track.parse_gpx(data), data, place_source)
+    history.record_change(db, access.tour, access.user, history.UPDATED)
 
 
 def save_drawn_track(
     db: Session,
     storage: Storage,
     elevations: ElevationSource,
+    place_source: PlaceSource,
     access: TourAccess,
     body: DrawnTrackIn,
 ) -> None:
@@ -131,10 +149,17 @@ def save_drawn_track(
     points = [TrackPoint(lat=p.lat, lon=p.lon, ele=p.elevation_m, time=p.time) for p in body.points]
     points, elevation = _fill_elevations(points, elevations)
     data = track.points_to_gpx(points, access.tour.title)
-    _store(db, storage, access, data, points, TRACK_DRAWN, elevation)
+    _store(db, storage, access, data, points, TRACK_DRAWN, elevation, place_source)
 
 
 def _clear(db: Session, tour: Tour) -> None:
+    # What was found along the track goes with it; entries added by hand stay.
+    removed = {w.id for w in tour.waypoints if w.source in places.AUTOMATIC_SOURCES}
+    for photo in tour.photos:
+        if photo.waypoint_id in removed:
+            photo.waypoint_id = None
+    tour.waypoints = [w for w in tour.waypoints if w.id not in removed]
+    tour.peaks = [peak for peak in tour.peaks if peak.source not in places.AUTOMATIC_SOURCES]
     series = db.get(TrackSeries, tour.id)
     if series is not None:
         db.delete(series)

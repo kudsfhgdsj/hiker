@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     openfoodfacts_cache_days: int = Field(default=30, gt=0)
     # Empty value disables the elevation lookup for tracks without elevation.
     open_meteo_elevation_url: str = "https://api.open-meteo.com/v1/elevation"
+    # Peaks and passes along a track come from OpenStreetMap; empty disables the lookup.
+    overpass_url: str = "https://overpass-api.de/api/interpreter"
+    # How close a place of the map must be to the track line to count as passed.
+    place_max_distance_m: float = Field(default=10, gt=0, le=500)
     # Empty values disable the weather lookup.
     open_meteo_forecast_url: str = "https://api.open-meteo.com/v1/forecast"
     open_meteo_archive_url: str = "https://archive-api.open-meteo.com/v1/archive"

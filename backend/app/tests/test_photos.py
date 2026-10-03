@@ -449,7 +449,10 @@ def test_waypoints_from_photos_groups_nearby_gps_photos(client, anna, tour):  # 
     photos = client.get(photos_url(tour), headers=anna.headers).json()
     linked = [p["waypoint_id"] for p in photos]
     assert linked == [waypoints[0]["id"], waypoints[0]["id"], None, waypoints[1]["id"]]
-    assert client.get(f"{TOURS}/{tour['id']}/waypoints", headers=anna.headers).json() == waypoints
+    stored = client.get(f"{TOURS}/{tour['id']}/waypoints", headers=anna.headers).json()
+    # Next to them: the highest point, found automatically when the track was stored.
+    assert [w for w in stored if w["kind"] == "photo"] == waypoints
+    assert {w["kind"] for w in waypoints} == {"photo"}
     # Photos that already belong to a waypoint are not used again.
     assert client.post(url, headers=anna.headers).json() == []
 

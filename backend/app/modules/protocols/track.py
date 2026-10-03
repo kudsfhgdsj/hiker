@@ -276,6 +276,8 @@ def compute_stats(points: list[TrackPoint], max_heart_rate: int | None = None) -
     return {
         "point_count": len(points),
         "distance_m": round(distances[-1]),
+        "start_elevation_m": points[0].ele,
+        "end_elevation_m": points[-1].ele,
         **_elevation_stats(points),
         **_time_stats(points, distances, intervals),
         "heart_rate": _heart_rate_stats(points, intervals, max_heart_rate),

@@ -18,10 +18,12 @@ from app.modules.protocols import (
     public,
     service,
     sharing,
+    snapshots,
     track_service,
     weather,
 )
 from app.modules.protocols.elevation import Elevations
+from app.modules.protocols.places import Places
 from app.modules.protocols.schemas import (
     ContactIn,
     ContactOut,
@@ -44,6 +46,7 @@ from app.modules.protocols.schemas import (
     TourExport,
     TourListItem,
     TourOut,
+    TourOverview,
     TourUpdate,
     TrackOut,
     VersionConflict,
@@ -158,6 +161,7 @@ def upload_gpx(
     db: DbSession,
     storage: FileStorage,
     elevations: Elevations,
+    place_source: Places,
     source: Weather,
 ):
     """Upload a GPX file (multipart field `file`) and evaluate it. Owner only.
@@ -170,7 +174,7 @@ def upload_gpx(
     data = file.file.read(limit + 1)
     if len(data) > limit:
         raise PayloadTooLargeError(f"File is larger than {get_settings().max_upload_mb} MB")
-    track_service.upload_gpx(db, storage, elevations, access, data)
+    track_service.upload_gpx(db, storage, elevations, place_source, access, data)
     weather.auto_fetch(db, source, access.tour)
     return service.tour_out(db, access)
 
@@ -197,12 +201,33 @@ def save_drawn_track(
     db: DbSession,
     storage: FileStorage,
     elevations: Elevations,
+    place_source: Places,
     source: Weather,
 ):
     """Save a track drawn on the map as GPX. Missing elevations are looked up. Owner only."""
-    track_service.save_drawn_track(db, storage, elevations, access, body)
+    track_service.save_drawn_track(db, storage, elevations, place_source, access, body)
     weather.auto_fetch(db, source, access.tour)
     return service.tour_out(db, access)
+
+
+@router.post(
+    "/tours/{tour_id}/track/places", response_model=TourOut, responses=error_responses(403, 404)
+)
+def detect_places(access: OwnedTour, db: DbSession, storage: FileStorage, place_source: Places):
+    """Find peaks, passes and waypoints along the track again. Owner only.
+
+    Runs automatically after every upload; entries added by hand are kept.
+    """
+    track_service.detect_places(db, storage, place_source, access)
+    return service.tour_out(db, access)
+
+
+@router.get(
+    "/tours/{tour_id}/overview", response_model=TourOverview, responses=error_responses(404)
+)
+def read_overview(access: ReadableTour):
+    """The course of the tour: key figures and the places on the way, in track order."""
+    return service.overview(access.tour)
 
 
 @router.get("/tours/{tour_id}/track", response_model=TrackOut, responses=error_responses(404))
@@ -376,7 +401,8 @@ def waypoints_from_photos(access: EditableTour, db: DbSession):
     "/tours/{tour_id}/waypoints", response_model=list[WaypointOut], responses=error_responses(404)
 )
 def list_waypoints(access: ReadableTour):
-    return access.tour.waypoints
+    """Waypoints in the order along the track, including the places found automatically."""
+    return snapshots.waypoint_list(access.tour)
 
 
 @router.post(

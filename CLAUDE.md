@@ -16,7 +16,7 @@ Android-App (Flutter, nur Android), Web-Frontend (Python Flask) und eigenes Back
 - Local-first in der Android-App (Drift), Sync über `/sync/*`.
 - Flutter wird nur für Android gebaut; keine Web-Plattform und kein web-spezifischer Code im Flutter-Projekt.
 - Das Web-Frontend (Flask, `web/`) spricht ausschließlich mit der REST-API, nie direkt mit Datenbank oder Dateispeicher, und enthält keine eigene Fachlogik. Tokens bleiben serverseitig in der Sitzung; Formulare sind gegen CSRF geschützt. JavaScript-Bibliotheken werden vom eigenen Server ausgeliefert, nicht von einem CDN.
-- Externe Dienste (Open-Meteo, Open-Meteo-Elevation, Open Food Facts, Dateispeicher, später hikr.org) nur über Adapter-Interfaces ansprechen.
+- Externe Dienste (Open-Meteo, Open-Meteo-Elevation, Open Food Facts, OpenStreetMap/Overpass, Dateispeicher, später hikr.org) nur über Adapter-Interfaces ansprechen.
 - Datenbankänderungen nur über Alembic-Migrationen.
 - Konfiguration über Umgebungsvariablen; keine Geheimnisse oder feste Domains im Code (`PUBLIC_BASE_URL`).
 
@@ -24,7 +24,8 @@ Android-App (Flutter, nur Android), Web-Frontend (Python Flask) und eigenes Back
 - Keine Google-Dienste oder -SDKs: Firebase, Google Maps, FCM, Google Sign-In, ML Kit. Barcode-Scan mit ZXing (`flutter_zxing`); vor dem Einsatz Pflegezustand des Pakets prüfen.
 - Neue Abhängigkeiten nur mit kurzer Begründung; Lizenz muss Open Source sein.
 - wanderer (open-wanderer/wanderer, AGPLv3) ist nur UX-Vorbild für die Foto- und Wegpunktdarstellung. Keinen Code, keine Texte, keine Grafiken übernehmen.
-- Open-Food-Facts-Daten stehen unter ODbL: Quelle in der App nennen.
+- Open-Food-Facts- und OpenStreetMap-Daten stehen unter ODbL: Quelle in der App nennen.
+- An OpenStreetMap (Overpass) geht nur der Kartenausschnitt einer Tour, nie der Track selbst.
 
 ## Fachliche Regeln
 - Jede Änderung an einer Tour erzeugt eine `tour_revision`; Historie nie überschreiben oder verkürzen. Wiederherstellen erzeugt eine neue Revision.
