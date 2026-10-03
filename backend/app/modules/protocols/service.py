@@ -10,7 +10,7 @@ from app.modules.auth import service as auth_service
 from app.modules.auth.models import User
 from app.modules.gear import service as gear_service
 from app.modules.nutrition import service as nutrition_service
-from app.modules.protocols import contacts, history, snapshots
+from app.modules.protocols import contacts, history, snapshots, track_service
 from app.modules.protocols.models import (
     CALORIES_MANUAL,
     Tour,
@@ -296,6 +296,7 @@ def tour_out(db: Session, access: TourAccess) -> TourOut:
         end_point=_point(tour.end_lat, tour.end_lon, tour.end_name),
         points_source=tour.points_source,
         track_source=tour.track_source,
+        track_stats=track_service.visible_stats(tour.track_stats, health=access.is_owner),
         gear=snapshots.gear_list(tour),
         food=snapshots.food_list(tour),
         peaks=snapshots.peak_list(tour),

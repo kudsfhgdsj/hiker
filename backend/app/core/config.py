@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     # Empty value disables the lookup at Open Food Facts.
     openfoodfacts_base_url: str = "https://world.openfoodfacts.org"
     openfoodfacts_cache_days: int = Field(default=30, gt=0)
+    # Empty value disables the elevation lookup for tracks without elevation.
+    open_meteo_elevation_url: str = "https://api.open-meteo.com/v1/elevation"
 
     @property
     def module_names(self) -> list[str]:

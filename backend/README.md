@@ -58,8 +58,9 @@ Endpunkte des jeweiligen Moduls, die die Berechtigung prüfen.
 ## Externe Dienste
 
 Externe Dienste werden nur über Adapter angesprochen. `nutrition` nutzt Open Food Facts
-(`app/modules/nutrition/sources.py`, Interface `FoodSource`); die Tests ersetzen den Adapter
-durch eine Attrappe und brauchen kein Netz. Die Daten stehen unter der ODbL: Bei
+(`app/modules/nutrition/sources.py`, Interface `FoodSource`), `protocols` die Höhenabfrage von
+Open-Meteo (`app/modules/protocols/elevation.py`, Interface `ElevationSource`). Die Tests
+ersetzen die Adapter durch Attrappen und brauchen kein Netz. Die Daten stehen unter der ODbL: Bei
 Lebensmitteln mit `source = openfoodfacts` muss die App die Quelle nennen.
 
 ## Migrationen

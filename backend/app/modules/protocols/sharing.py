@@ -89,7 +89,7 @@ def check_owner_only_fields(access: TourAccess, values: dict) -> None:
     """Reject a change of owner-only fields by anyone but the owner."""
     if access.is_owner:
         return
-    changed = [field for field in OWNER_ONLY_FIELDS if values[field] != getattr(access.tour, field)]
+    changed = [field for field, value in values.items() if value != getattr(access.tour, field)]
     if changed:
         raise ForbiddenError(
             f"Only the owner can change: {', '.join(changed)}", code="owner_only_field"

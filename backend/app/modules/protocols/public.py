@@ -10,7 +10,7 @@ from app.core.db import utcnow
 from app.core.errors import NotFoundError, UnprocessableError
 from app.modules.auth import service as auth_service
 from app.modules.auth.models import User
-from app.modules.protocols import snapshots
+from app.modules.protocols import snapshots, track_service
 from app.modules.protocols.models import Tour, TourPublicLink
 from app.modules.protocols.schemas import (
     PublicFood,
@@ -21,6 +21,7 @@ from app.modules.protocols.schemas import (
     PublicPoint,
     PublicTourOut,
     PublicWaypoint,
+    TrackOut,
 )
 
 # Path of the public page in the client and of the API behind it; both carry the token.
@@ -83,8 +84,8 @@ def _point(lat, lon, name, approximate: bool) -> PublicPoint | None:
     )
 
 
-def public_tour(db: Session, token: str) -> PublicTourOut:
-    """The public view for a token; every failure looks the same to the caller."""
+def _resolve(db: Session, token: str) -> tuple[TourPublicLink, Tour]:
+    """Link and tour for a token; every failure looks the same to the caller."""
     not_found = NotFoundError("This link does not exist or is no longer valid")
     try:
         token_value = uuid.UUID(token)
@@ -96,6 +97,18 @@ def public_tour(db: Session, token: str) -> PublicTourOut:
     tour = db.get(Tour, link.tour_id)
     if tour is None or tour.deleted_at is not None:
         raise not_found
+    return link, tour
+
+
+def public_track(db: Session, token: str) -> TrackOut:
+    link, tour = _resolve(db, token)
+    return track_service.track_out(
+        db, tour, health=link.show_health_data, hide_ends=link.hide_exact_start
+    )
+
+
+def public_tour(db: Session, token: str) -> PublicTourOut:
+    link, tour = _resolve(db, token)
 
     computed = snapshots.computed_values(tour)
     health = link.show_health_data
@@ -117,6 +130,8 @@ def public_tour(db: Session, token: str) -> PublicTourOut:
         calories_burned_source=tour.calories_burned_source if health else None,
         start_point=_point(tour.start_lat, tour.start_lon, tour.start_name, hide),
         end_point=_point(tour.end_lat, tour.end_lon, tour.end_name, hide),
+        track_source=tour.track_source,
+        track_stats=track_service.visible_stats(tour.track_stats, health=health),
         partners=[partner.display_name for partner in snapshots.partner_list(tour)],
         peaks=[PublicPeak(**peak.model_dump(exclude={"id"})) for peak in snapshots.peak_list(tour)],
         waypoints=[

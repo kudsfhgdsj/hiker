@@ -1,19 +1,30 @@
 import uuid
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Response, UploadFile, status
 from pydantic import AwareDatetime
 
-from app.core.deps import DbSession
-from app.core.errors import error_responses
+from app.core.config import get_settings
+from app.core.deps import DbSession, FileStorage
+from app.core.errors import PayloadTooLargeError, error_responses
 from app.core.pagination import Page, Paging
 from app.core.ratelimit import rate_limit
 from app.modules.auth.deps import CurrentUser
-from app.modules.protocols import contacts, export, history, public, service, sharing
+from app.modules.protocols import (
+    contacts,
+    export,
+    history,
+    public,
+    service,
+    sharing,
+    track_service,
+)
+from app.modules.protocols.elevation import Elevations
 from app.modules.protocols.schemas import (
     ContactIn,
     ContactOut,
     ContactPatch,
+    DrawnTrackIn,
     PublicLinkIn,
     PublicLinkOut,
     PublicTourOut,
@@ -28,6 +39,7 @@ from app.modules.protocols.schemas import (
     TourListItem,
     TourOut,
     TourUpdate,
+    TrackOut,
     VersionConflict,
     WaypointIn,
     WaypointOut,
@@ -125,6 +137,72 @@ def export_tour(access: ReadableTour, response: Response, db: DbSession):
     return export.export_tour(db, access)
 
 
+# --- Track ---
+
+
+@router.put(
+    "/tours/{tour_id}/gpx", response_model=TourOut, responses=error_responses(403, 404, 413)
+)
+def upload_gpx(
+    file: UploadFile, access: OwnedTour, db: DbSession, storage: FileStorage, elevations: Elevations
+):
+    """Upload a GPX file (multipart field `file`) and evaluate it. Owner only.
+
+    The file is stored unchanged. Missing time, elevation or heart rate is no error.
+    Start and end point and, if the track has time stamps, the times of the tour follow
+    the track.
+    """
+    limit = get_settings().max_upload_mb * 1024 * 1024
+    data = file.file.read(limit + 1)
+    if len(data) > limit:
+        raise PayloadTooLargeError(f"File is larger than {get_settings().max_upload_mb} MB")
+    track_service.upload_gpx(db, storage, elevations, access, data)
+    return service.tour_out(db, access)
+
+
+@router.get(
+    "/tours/{tour_id}/gpx",
+    response_class=Response,
+    responses={200: {"content": {"application/gpx+xml": {}}}, **error_responses(403, 404)},
+)
+def download_gpx(access: OwnedTour, db: DbSession, storage: FileStorage):
+    """The GPX file as stored. Owner only, because it can contain heart rate data."""
+    data = track_service.gpx_file(db, storage, access.tour)
+    filename = export.export_filename(access.tour.title).removesuffix(".json") + ".gpx"
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return Response(content=data, media_type=track_service.GPX_MIME, headers=headers)
+
+
+@router.post(
+    "/tours/{tour_id}/track/drawn", response_model=TourOut, responses=error_responses(403, 404)
+)
+def save_drawn_track(
+    body: DrawnTrackIn,
+    access: OwnedTour,
+    db: DbSession,
+    storage: FileStorage,
+    elevations: Elevations,
+):
+    """Save a track drawn on the map as GPX. Missing elevations are looked up. Owner only."""
+    track_service.save_drawn_track(db, storage, elevations, access, body)
+    return service.tour_out(db, access)
+
+
+@router.get("/tours/{tour_id}/track", response_model=TrackOut, responses=error_responses(404))
+def read_track(access: ReadableTour, db: DbSession):
+    """Statistics and series for the map and the charts. Heart rate only for the owner."""
+    return track_service.track_out(db, access.tour, health=access.is_owner)
+
+
+@router.delete(
+    "/tours/{tour_id}/track", response_model=TourOut, responses=error_responses(403, 404)
+)
+def remove_track(access: OwnedTour, db: DbSession):
+    """Remove the track from the tour. Owner only."""
+    track_service.remove_track(db, access)
+    return service.tour_out(db, access)
+
+
 # --- Waypoints ---
 
 
@@ -215,12 +293,12 @@ def compare_revisions(version: int, other_version: int, access: ReadableTour, db
     response_model=TourOut,
     responses=error_responses(403, 404),
 )
-def restore_revision(version: int, access: EditableTour, db: DbSession):
+def restore_revision(version: int, access: EditableTour, db: DbSession, storage: FileStorage):
     """Bring the tour back to an earlier state. The history grows by one revision.
 
     With `edit` permission this only works if the owner-only fields stay as they are.
     """
-    history.restore(db, access, history.get_revision(db, access.tour, version))
+    history.restore(db, storage, access, history.get_revision(db, access.tour, version))
     return service.tour_out(db, access)
 
 
@@ -351,3 +429,16 @@ def read_public_tour(token: str, response: Response, db: DbSession):
     response.headers["Cache-Control"] = "no-store"
     response.headers["Referrer-Policy"] = "no-referrer"
     return public.public_tour(db, token)
+
+
+@public_router.get(
+    "/public/tours/{token}/track",
+    response_model=TrackOut,
+    responses=error_responses(404, 429),
+    dependencies=[Depends(rate_limit("public", limit=60))],
+)
+def read_public_track(token: str, response: Response, db: DbSession):
+    """Track of a publicly linked tour; shortened at both ends if the start is hidden."""
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    response.headers["Cache-Control"] = "no-store"
+    return public.public_track(db, token)

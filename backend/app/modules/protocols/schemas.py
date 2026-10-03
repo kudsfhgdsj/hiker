@@ -195,6 +195,9 @@ class TourOut(TourBase):
     end_point: GeoPoint | None
     points_source: Literal["gpx", "manual"] | None
     track_source: Literal["device", "drawn", "none"]
+    track_stats: dict | None = Field(
+        description="Statistics of the track; heart rate only for the owner. See GET .../track"
+    )
     gear: list[TourGearOut]
     food: list[TourFoodOut]
     peaks: list[TourPeakOut]
@@ -255,6 +258,15 @@ class TourSnapshot(BaseModel):
     peaks: list[TourPeakOut]
     waypoints: list[WaypointOut]
     partners: list[PartnerSnapshot] = Field(default_factory=list)
+    track_source: Literal["device", "drawn", "none"] = "none"
+    gpx_file_id: uuid.UUID | None = None
+    points_source: Literal["gpx", "manual"] | None = None
+    start_lat: float | None = None
+    start_lon: float | None = None
+    start_name: str | None = None
+    end_lat: float | None = None
+    end_lon: float | None = None
+    end_name: str | None = None
 
 
 class RevisionListItem(BaseModel):
@@ -413,6 +425,8 @@ class PublicTourOut(BaseModel):
     calories_burned_source: Literal["manual", "estimated"] | None
     start_point: PublicPoint | None
     end_point: PublicPoint | None
+    track_source: Literal["device", "drawn", "none"]
+    track_stats: dict | None
     partners: list[str]
     peaks: list[PublicPeak]
     waypoints: list[PublicWaypoint]
@@ -463,3 +477,40 @@ class TourExport(BaseModel):
     track: ExportedTrack
     weather: list[dict]
     photos: list[dict]
+
+
+# --- Track ---
+
+
+class DrawnPoint(BaseModel):
+    lat: Latitude
+    lon: Longitude
+    elevation_m: float | None = Field(default=None, ge=-500, le=9000, allow_inf_nan=False)
+    time: AwareDatetime | None = None
+
+
+class DrawnTrackIn(BaseModel):
+    points: list[DrawnPoint] = Field(min_length=2, max_length=5000)
+
+
+class TrackSeriesOut(BaseModel):
+    """Columns of equal length; a column is null if the track has no such values."""
+
+    time: list[datetime | None] | None
+    distance_m: list[float]
+    lat: list[float]
+    lon: list[float]
+    elevation_m: list[float | None] | None
+    heart_rate: list[int | None] | None = Field(description="Health data: owner only")
+    cadence: list[int | None] | None
+    temperature: list[float | None] | None
+
+
+class TrackOut(BaseModel):
+    source: Literal["device", "drawn", "none"]
+    stats: dict | None = Field(
+        description="distance_m, ascent_m, descent_m, min/max_elevation_m, start/end_time, "
+        "total_time_s, moving_time_s, heart_rate (owner only), cadence, temperature, "
+        "elevation_source"
+    )
+    series: TrackSeriesOut | None

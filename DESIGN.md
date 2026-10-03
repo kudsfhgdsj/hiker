@@ -60,7 +60,7 @@ Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen k
 | Backend | FastAPI (Python) | OpenAPI-Doku automatisch |
 | Datenbank | PostgreSQL (Dev und Tests: SQLite) | Relational, Historie, Teilen |
 | Dateispeicher | Lokales Dateisystem oder MinIO hinter Interface | Austauschbar; für den Start reicht Dateisystem |
-| GPX | gpxpy plus eigener Leser für Sensor-Erweiterungen; FIT später | Garmin-Daten |
+| GPX | Eigener, toleranter Leser und Schreiber auf Basis der Python-Standardbibliothek (kein gpxpy: es bricht bei einzelnen fehlerhaften Werten die ganze Datei ab); FIT später | Garmin-Daten |
 | Höhendaten | Open-Meteo Elevation API (nur wenn der Track keine Höhe hat) | Für manuell gezeichnete Tracks |
 | Auth | E-Mail + Passwort (argon2), JWT als Access-Token, Refresh-Token in der Datenbank | Kein Drittanbieter |
 | Wetter | Open-Meteo (Forecast + Archive) | Kostenlos, kein Key |
@@ -215,7 +215,7 @@ Platzhalter → echter User: `contact.linked_user_id` setzen; gilt sofort in all
 
 **tour_weather**: tour_id, sample_point (`start` | `summit` | `end` | `manual`), lat, lon, elevation_m, time, Werte (Temperatur, gefühlt, Wind, Böen, Niederschlag, Bewölkung, Nullgradgrenze), source, fetched_at
 
-**track_series**: tour_id, abgetastete Zeitreihe (Zeit, Distanz, Höhe, Herzfrequenz, Kadenz, Temperatur); Original-GPX bleibt unverändert im Dateispeicher.
+**track_series**: tour_id, point_count, abgetastete Zeitreihe als Spalten gleicher Länge (Zeit, Distanz, Position, Höhe, Herzfrequenz, Kadenz, Temperatur; höchstens 2000 Punkte, gleichmäßig ausgedünnt); Original-GPX bleibt unverändert im Dateispeicher. Ältere GPX-Dateien bleiben beim Ersetzen erhalten, weil Revisionen auf sie verweisen.
 
 ### 6.5 Teilen und Historie
 **tour_share**: tour_id, user_id, permission (`read` | `edit`)
@@ -229,6 +229,16 @@ Platzhalter → echter User: `contact.linked_user_id` setzen; gilt sofort in all
 
 **GPX von Garmin und anderen Quellen**
 Upload → serverseitig parsen. Neben Position, Höhe und Zeit werden Sensor-Erweiterungen gelesen (Garmin TrackPointExtension: Herzfrequenz, Kadenz, Temperatur). Daraus entstehen `track_stats`: Distanz, Höhenmeter hoch/runter, tiefster/höchster Punkt, Gesamt- und Bewegungszeit, Herzfrequenz (Durchschnitt, Maximum, Zeit je Zone), Kadenz, Temperatur. Der Parser ist tolerant: Fehlende Felder (z. B. keine Zeitstempel, keine Höhe, kein Puls) führen nie zu einem Fehler, die jeweilige Auswertung bleibt leer. Spätere Erweiterung: FIT-Dateien direkt importieren.
+
+Umsetzung der Auswertung (Formeln und Parameter stehen in `protocols/track.py`):
+- Gelesen werden alle Trackpunkte (mehrere Tracks und Segmente hintereinander); gibt es keine, die Routenpunkte. Einzelne unlesbare Werte werden ignoriert, Punkte ohne gültige Position übersprungen. Dateien mit `DOCTYPE` oder ohne Punkte werden abgelehnt (422 `invalid_gpx`).
+- Distanz: Summe der Großkreisabstände. Höhenmeter: Änderungen zählen erst ab 3 m seit dem letzten gezählten Punkt (filtert Sensorrauschen). Bewegungszeit: Abschnitte mit mindestens 0,3 m/s.
+- Herzfrequenz: Durchschnitt zeitgewichtet, Minimum, Maximum und Zeit je Zone. Zonen: bis 60 %, 60–70 %, 70–80 %, 80–90 % und ab 90 % der Maximalherzfrequenz. Diese stammt aus dem Profil, sonst 220 minus Alter; ohne beides oder ohne Zeitstempel gibt es keine Zonen.
+- Hat der Track gar keine Höhe, wird sie über Open-Meteo ergänzt (bei langen Tracks an höchstens 300 Stützpunkten, dazwischen interpoliert); `elevation_source` nennt die Herkunft (`track` | `open-meteo`). Ist der Dienst nicht erreichbar, bleibt die Höhenauswertung leer.
+- Start- und Endpunkt der Tour folgen dem Track (`points_source = gpx`); hat der Track Zeitstempel, auch Start- und Endzeit der Tour.
+- Herzfrequenz (Statistik und Zeitreihe) sieht nur der Owner; in Freigaben, Export für andere und Public Links fehlt sie, bei Links außer mit `show_health_data`. Das Original-GPX lädt nur der Owner herunter.
+- Public Links mit `hide_exact_start` schneiden an beiden Enden des Tracks alles im Umkreis von 500 m um Start und Ende ab.
+- Track-Änderungen stehen in der Historie; Wiederherstellen baut Statistik und Zeitreihe aus der damaligen GPX-Datei neu auf. Track und Punkte zählen dabei zu den Owner-Feldern.
 
 **Einfache, manuell erstellte Tracks**
 Wer kein Gerät dabei hatte, zeichnet den Track in der App auf der Karte (Punkte setzen, verschieben, löschen). Daraus erzeugt die App ein GPX (`track_source = drawn`). Fehlen Höhen, werden sie über die Open-Meteo-Elevation-API ergänzt. Zeiten gibt der Nutzer manuell an; Dauer und Tempo sind dann Schätzwerte oder manuell. Auch ein einfaches, extern erstelltes GPX ohne Zeit und Puls lässt sich hochladen.
@@ -321,9 +331,10 @@ Stand `schema_version` 1: Tour (mit effektiven Werten für Dauer und Startgewich
 | GET, POST | /tours/{id}/public-link | Links listen / erzeugen (nur Owner) |
 | DELETE | /tours/{id}/public-link/{link_id} | Link widerrufen (nur Owner) |
 | GET | /public/tours/{token} | Öffentliche Ansicht (ohne Login) |
-| PUT | /tours/{id}/gpx | GPX hochladen, auswerten (nur Owner) |
+| PUT, GET | /tours/{id}/gpx | GPX hochladen und auswerten (multipart, Feld `file`) / Original herunterladen; nur Owner |
 | POST | /tours/{id}/track/drawn | Gezeichneten Track speichern, GPX erzeugen (nur Owner) |
-| GET | /tours/{id}/track | Zeitreihen für Diagramme |
+| GET, DELETE | /tours/{id}/track | Statistik und Zeitreihen für Karte und Diagramme / Track entfernen (nur Owner) |
+| GET | /public/tours/{token}/track | Track einer öffentlich verlinkten Tour |
 | PUT | /tours/{id}/points | Start/Ende manuell setzen (nur Owner) |
 | POST | /tours/{id}/photos | Fotos hochladen (EXIF-Auswertung, Track-Zuordnung) |
 | PATCH, DELETE | /tours/{id}/photos/{photo_id} | Beschriftung, Position, Titelbild / löschen |

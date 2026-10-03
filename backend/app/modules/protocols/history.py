@@ -12,6 +12,7 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from app.core.db import utcnow
 from app.core.errors import ConflictError, NotFoundError
+from app.core.storage import Storage
 from app.modules.auth.models import User
 from app.modules.gear import service as gear_service
 from app.modules.nutrition import service as nutrition_service
@@ -27,7 +28,12 @@ from app.modules.protocols.models import (
 )
 from app.modules.protocols.schemas import TourSnapshot
 from app.modules.protocols.sharing import OWNER_ONLY_FIELDS, TourAccess, check_owner_only_fields
-from app.modules.protocols.snapshots import LIST_FIELDS, SCALAR_FIELDS, build_snapshot
+from app.modules.protocols.snapshots import (
+    LIST_FIELDS,
+    SCALAR_FIELDS,
+    TRACK_FIELDS,
+    build_snapshot,
+)
 
 CREATED = "created"
 UPDATED = "updated"
@@ -167,12 +173,21 @@ def _restore_entries(model, current: list, entries: list, to_columns) -> list:
     return result
 
 
-def restore(db: Session, access: TourAccess, revision: TourRevision) -> TourRevision | None:
+def restore(
+    db: Session, storage: Storage, access: TourAccess, revision: TourRevision
+) -> TourRevision | None:
     """Bring the tour back to the state of a revision; this adds a new revision."""
     tour, user = access.tour, access.user
     state = TourSnapshot.model_validate(revision.snapshot)
-    check_owner_only_fields(access, {field: getattr(state, field) for field in OWNER_ONLY_FIELDS})
+    owner_only = (*OWNER_ONLY_FIELDS, *TRACK_FIELDS)
+    check_owner_only_fields(access, {field: getattr(state, field) for field in owner_only})
 
+    if state.gpx_file_id != tour.gpx_file_id:
+        # Statistics and series are derived data: build them again from the old file.
+        from app.modules.protocols import track_service
+
+        tour.gpx_file_id = state.gpx_file_id
+        track_service.rebuild_from_file(db, storage, tour, user)
     for field in SCALAR_FIELDS:
         setattr(tour, field, getattr(state, field))
 

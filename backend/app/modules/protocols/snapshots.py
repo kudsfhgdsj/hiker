@@ -21,7 +21,18 @@ SCALAR_FIELDS = (
     "pack_weight_start_g",
     "calories_burned",
     "calories_burned_source",
+    "track_source",
+    "gpx_file_id",
+    "points_source",
+    "start_lat",
+    "start_lon",
+    "start_name",
+    "end_lat",
+    "end_lon",
+    "end_name",
 )
+# Scalars that belong to the track and the points; only the owner changes them.
+TRACK_FIELDS = SCALAR_FIELDS[SCALAR_FIELDS.index("track_source") :]
 LIST_FIELDS = ("gear", "food", "peaks", "waypoints", "partners")
 
 

@@ -148,6 +148,18 @@ class TourShare(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
+class TrackSeries(Base):
+    """Thinned-out series of the track for the map and the charts, as columns of equal length."""
+
+    __tablename__ = "track_series"
+
+    tour_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("tour.id", ondelete="CASCADE"), primary_key=True
+    )
+    point_count: Mapped[int] = mapped_column(Integer)
+    data: Mapped[dict] = mapped_column(JSON)
+
+
 class TourPublicLink(Base):
     """Read-only access to a tour for anyone who knows the token."""
 

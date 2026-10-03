@@ -18,7 +18,7 @@ dependencies = [
     "pyjwt>=2.9",               # MIT – access tokens
     "pillow>=11",               # HPND – validate and re-encode uploaded images
     "python-multipart>=0.0.20", # Apache-2.0 – multipart uploads in FastAPI
-    "httpx2>=2.13",             # BSD-3 – HTTP client for external services (Open Food Facts)
+    "httpx2>=2.13",             # BSD-3 – HTTP client for external services
 ]
 
 [project.optional-dependencies]

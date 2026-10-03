@@ -32,6 +32,10 @@ from app.core.storage.local_fs import LocalFsStorage  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.modules.nutrition.deps import get_food_source  # noqa: E402
 from app.modules.nutrition.sources import FoodData, FoodSourceError  # noqa: E402
+from app.modules.protocols.elevation import (  # noqa: E402
+    ElevationSourceError,
+    get_elevation_source,
+)
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -67,10 +71,11 @@ def db(session_factory):
 
 
 @pytest.fixture
-def client(session_factory, storage, food_source):
+def client(session_factory, storage, food_source, elevation_source):
     app = create_app()
     app.dependency_overrides[get_storage] = lambda: storage
     app.dependency_overrides[get_food_source] = lambda: food_source
+    app.dependency_overrides[get_elevation_source] = lambda: elevation_source
 
     def _get_db():
         with session_factory() as session:
@@ -94,6 +99,26 @@ class FakeFoodSource:
         if self.fail:
             raise FoodSourceError("unreachable")
         return self.products.get(barcode)
+
+
+class FakeElevationSource:
+    """Stands in for the Open-Meteo elevation API."""
+
+    def __init__(self):
+        self.calls: list[int] = []
+        self.fail = False
+
+    def elevations(self, coordinates):
+        self.calls.append(len(coordinates))
+        if self.fail:
+            raise ElevationSourceError("unreachable")
+        # A slope that depends on the latitude, so that tests get ascent.
+        return [round(1000 + (lat - 47) * 10_000, 1) for lat, _ in coordinates]
+
+
+@pytest.fixture
+def elevation_source():
+    return FakeElevationSource()
 
 
 @pytest.fixture

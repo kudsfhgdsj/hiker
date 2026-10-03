@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import utcnow
 from app.modules.auth import service as auth_service
-from app.modules.protocols import snapshots
+from app.modules.protocols import snapshots, track_service
 from app.modules.protocols.schemas import ExportedTour, ExportedTrack, GeoPoint, TourExport
 from app.modules.protocols.sharing import TourAccess
 
@@ -56,7 +56,11 @@ def export_tour(db: Session, access: TourAccess) -> TourExport:
         waypoints=snapshots.waypoint_list(tour),
         gear=snapshots.gear_list(tour),
         food=snapshots.food_list(tour),
-        track=ExportedTrack(source=tour.track_source, stats=tour.track_stats, file=None),
+        track=ExportedTrack(
+            source=tour.track_source,
+            stats=track_service.visible_stats(tour.track_stats, health=access.is_owner),
+            file=None,
+        ),
         weather=[],
         photos=[],
     )
