@@ -1971,6 +1971,60 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Die Tour braucht erst Start oder Ende mit einer Zeit.'**
   String get errorNoSamplePoints;
+
+  /// No description provided for @tourRoute.
+  ///
+  /// In de, this message translates to:
+  /// **'Wegverlauf'**
+  String get tourRoute;
+
+  /// No description provided for @stationStart.
+  ///
+  /// In de, this message translates to:
+  /// **'Start'**
+  String get stationStart;
+
+  /// No description provided for @stationEnd.
+  ///
+  /// In de, this message translates to:
+  /// **'Ende'**
+  String get stationEnd;
+
+  /// No description provided for @stationHighPoint.
+  ///
+  /// In de, this message translates to:
+  /// **'Höchster Punkt'**
+  String get stationHighPoint;
+
+  /// No description provided for @stationPeak.
+  ///
+  /// In de, this message translates to:
+  /// **'Gipfel'**
+  String get stationPeak;
+
+  /// No description provided for @stationSaddle.
+  ///
+  /// In de, this message translates to:
+  /// **'Pass'**
+  String get stationSaddle;
+
+  /// No description provided for @stationWaypoint.
+  ///
+  /// In de, this message translates to:
+  /// **'Wegpunkt'**
+  String get stationWaypoint;
+
+  /// No description provided for @tourDetectPlaces.
+  ///
+  /// In de, this message translates to:
+  /// **'Gipfel und Pässe neu erkennen'**
+  String get tourDetectPlaces;
+
+  /// No description provided for @osmAttribution.
+  ///
+  /// In de, this message translates to:
+  /// **'Namen: © OpenStreetMap-Mitwirkende (ODbL)'**
+  String get osmAttribution;
 }
 
 class _AppLocalizationsDelegate

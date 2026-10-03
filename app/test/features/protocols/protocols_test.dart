@@ -189,6 +189,33 @@ FakeApi tourApi({Map<String, dynamic>? tour, List<Object?>? saved}) {
     'GET /tours/tour-1': (_, _) => ok(current),
     'GET /tours/tour-1/track': (_, _) => ok(trackJson),
     'GET /tours/tour-1/photos': (_, _) => ok(photosJson),
+    'GET /tours/tour-1/overview': (_, _) => ok({
+      'title': 'Säntis',
+      'facts': <String, dynamic>{},
+      'attribution': '© OpenStreetMap contributors (ODbL)',
+      'stations': [
+        {
+          'kind': 'start',
+          'name': null,
+          'elevation_m': 1000.0,
+          'time': '2026-08-01T06:00:00Z',
+        },
+        {
+          'kind': 'saddle',
+          'name': 'Rotsteinpass',
+          'elevation_m': 2120.0,
+          'time': null,
+        },
+        {'kind': 'peak', 'name': 'Säntis', 'elevation_m': 2502.0, 'time': null},
+        {
+          'kind': 'high_point',
+          'name': null,
+          'elevation_m': 2490.0,
+          'time': null,
+        },
+        {'kind': 'end', 'name': null, 'elevation_m': 1100.0, 'time': null},
+      ],
+    }),
     'GET /tours/tour-1/waypoints': (_, _) => ok([
       {'id': 'w1', 'name': 'Hütte', 'lat': 47.002, 'lon': 9.0},
     ]),
@@ -493,6 +520,22 @@ void main() {
         expect(map.content!.highlight, const GeoPoint(47.003, 9.0));
       },
     );
+
+    testWidgets('lists the course of the tour and names OpenStreetMap', (
+      tester,
+    ) async {
+      await openDetail(tester, tourApi());
+
+      expect(find.text('Wegverlauf'), findsOneWidget);
+      expect(find.text('Rotsteinpass'), findsOneWidget);
+      expect(find.text('2.120 m'), findsOneWidget);
+      expect(find.text('Höchster Punkt'), findsWidgets);
+      expect(find.text('2.490 m'), findsOneWidget);
+      expect(
+        find.text('Namen: © OpenStreetMap-Mitwirkende (ODbL)'),
+        findsOneWidget,
+      );
+    });
 
     testWidgets('readers get no actions that change the tour', (tester) async {
       await openDetail(tester, tourApi(tour: tourJson(permission: 'read')));

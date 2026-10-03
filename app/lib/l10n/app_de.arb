@@ -405,5 +405,14 @@
   "errorInvalidGpx": "Die Datei ist keine lesbare GPX-Datei.",
   "errorOwnerOnly": "Das kann nur der Besitzer der Tour ändern.",
   "errorPointsFromTrack": "Start und Ende folgen dem Track.",
-  "errorNoSamplePoints": "Die Tour braucht erst Start oder Ende mit einer Zeit."
+  "errorNoSamplePoints": "Die Tour braucht erst Start oder Ende mit einer Zeit.",
+  "tourRoute": "Wegverlauf",
+  "stationStart": "Start",
+  "stationEnd": "Ende",
+  "stationHighPoint": "Höchster Punkt",
+  "stationPeak": "Gipfel",
+  "stationSaddle": "Pass",
+  "stationWaypoint": "Wegpunkt",
+  "tourDetectPlaces": "Gipfel und Pässe neu erkennen",
+  "osmAttribution": "Namen: © OpenStreetMap-Mitwirkende (ODbL)"
 }

@@ -1018,4 +1018,31 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get errorNoSamplePoints =>
       'Die Tour braucht erst Start oder Ende mit einer Zeit.';
+
+  @override
+  String get tourRoute => 'Wegverlauf';
+
+  @override
+  String get stationStart => 'Start';
+
+  @override
+  String get stationEnd => 'Ende';
+
+  @override
+  String get stationHighPoint => 'Höchster Punkt';
+
+  @override
+  String get stationPeak => 'Gipfel';
+
+  @override
+  String get stationSaddle => 'Pass';
+
+  @override
+  String get stationWaypoint => 'Wegpunkt';
+
+  @override
+  String get tourDetectPlaces => 'Gipfel und Pässe neu erkennen';
+
+  @override
+  String get osmAttribution => 'Namen: © OpenStreetMap-Mitwirkende (ODbL)';
 }

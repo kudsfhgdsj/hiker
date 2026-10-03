@@ -29,6 +29,10 @@ class Format {
 
   static String dateTime(DateTime date) => _dateTime.format(date.toLocal());
 
+  static final _time = DateFormat('HH:mm', 'de');
+
+  static String time(DateTime date) => _time.format(date.toLocal());
+
   /// 135 → "2 h 15 min".
   static String duration(int? minutes) {
     if (minutes == null) return '–';

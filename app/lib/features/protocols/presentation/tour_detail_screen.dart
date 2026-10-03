@@ -39,6 +39,7 @@ class _TourDetailScreenState extends ConsumerState<TourDetailScreen> {
     ref.invalidate(tourTrackProvider(_id));
     ref.invalidate(tourPhotosProvider(_id));
     ref.invalidate(tourWaypointsProvider(_id));
+    ref.invalidate(tourOverviewProvider(_id));
     ref.invalidate(tourListProvider);
   }
 
@@ -187,6 +188,11 @@ class _TourDetailScreenState extends ConsumerState<TourDetailScreen> {
                               _refresh();
                             },
                             child: Text(l10n.tourSetPoints),
+                          ),
+                        if (tour.hasTrack)
+                          PopupMenuItem(
+                            value: () => _run((r) => r.detectPlaces(_id)),
+                            child: Text(l10n.tourDetectPlaces),
                           ),
                         PopupMenuItem(
                           value: () => _run((r) => r.fetchWeather(_id)),
@@ -355,6 +361,9 @@ class _TourDetailScreenState extends ConsumerState<TourDetailScreen> {
           ),
         _FactsSection(tour: tour),
         if (tour.trackStats != null) _TrackSection(stats: tour.trackStats!),
+        _RouteSection(
+          overview: ref.watch(tourOverviewProvider(_id)).asData?.value,
+        ),
         _ListSection(
           title: l10n.tourGear,
           trailing: Format.weight(tour.packWeightG),
@@ -570,6 +579,65 @@ class _TrackSection extends StatelessWidget {
             l10n.tourHeartRate,
             l10n.tourHeartRateValue('${heart['avg']}', '${heart['max']}'),
           ),
+      ],
+    );
+  }
+}
+
+/// The course of the tour: start, peaks, passes, waypoints and end in track order.
+class _RouteSection extends StatelessWidget {
+  const _RouteSection({required this.overview});
+
+  final Json? overview;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final stations = [
+      ...?(overview?['stations'] as List<dynamic>?)?.cast<Json>(),
+    ];
+    // Start and end alone are no course worth showing.
+    if (stations.length < 3) return const SizedBox.shrink();
+    final kinds = {
+      'start': (l10n.stationStart, Icons.play_arrow),
+      'end': (l10n.stationEnd, Icons.flag),
+      'peak': (l10n.stationPeak, Icons.terrain),
+      'saddle': (l10n.stationSaddle, Icons.compare_arrows),
+      'high_point': (l10n.stationHighPoint, Icons.vertical_align_top),
+      'photo': (l10n.tourPhotos, Icons.photo_outlined),
+    };
+    final theme = Theme.of(context);
+    return _Section(
+      title: l10n.tourRoute,
+      children: [
+        for (final station in stations)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              children: [
+                Icon(kinds[station['kind']]?.$2 ?? Icons.place, size: 18),
+                const SizedBox(width: AppSpacing.s),
+                Expanded(
+                  child: Text(
+                    (station['name'] as String?) ??
+                        kinds[station['kind']]?.$1 ??
+                        l10n.stationWaypoint,
+                  ),
+                ),
+                Text(
+                  [
+                    if (station['elevation_m'] != null)
+                      Format.meters(station['elevation_m'] as num),
+                    if (station['time'] != null)
+                      Format.time(DateTime.parse(station['time'] as String)),
+                  ].join(' · '),
+                ),
+              ],
+            ),
+          ),
+        if (overview?['attribution'] != null)
+          // OpenStreetMap data is under the ODbL: the source must be named.
+          Text(l10n.osmAttribution, style: theme.textTheme.bodySmall),
       ],
     );
   }

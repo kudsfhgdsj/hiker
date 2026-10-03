@@ -25,6 +25,7 @@ class TourRepository {
   static const _list = 'tour_list';
   static const _tracks = 'tour_tracks';
   static const _photos = 'tour_photos';
+  static const _overviews = 'tour_overviews';
 
   Future<Tour> _stored(Future<Response<Json>> Function() request) async {
     final response = await apiCall(request);
@@ -141,6 +142,24 @@ class TourRepository {
       },
     ),
   );
+
+  /// Key figures and the places on the way, in the order along the track.
+  Future<Json> overview(String id) async {
+    try {
+      final response = await apiCall(
+        () => _dio.get<Json>('/tours/$id/overview'),
+      );
+      await _db.putDocument(_overviews, id, response.data!);
+      return response.data!;
+    } on ApiException catch (error) {
+      final cached = await _db.getDocument(_overviews, id);
+      if (error.code != ApiException.network || cached == null) rethrow;
+      return cached;
+    }
+  }
+
+  Future<Tour> detectPlaces(String id) =>
+      _stored(() => _dio.post<Json>('/tours/$id/track/places'));
 
   Future<Tour> removeTrack(String id) =>
       _stored(() => _dio.delete<Json>('/tours/$id/track'));
@@ -330,6 +349,10 @@ final tourProvider = FutureProvider.autoDispose.family<Loaded<Tour>, String>(
 
 final tourTrackProvider = FutureProvider.autoDispose.family<TrackData, String>(
   (ref, id) => ref.watch(tourRepositoryProvider).track(id),
+);
+
+final tourOverviewProvider = FutureProvider.autoDispose.family<Json, String>(
+  (ref, id) => ref.watch(tourRepositoryProvider).overview(id),
 );
 
 final tourPhotosProvider = FutureProvider.autoDispose
