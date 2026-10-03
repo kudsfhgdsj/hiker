@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% from "macros.html" import field, csrf %}
+{% block title %}{{ tour.title }} – {{ t('action.edit') }}{% endblock %}
+{% macro time_field(name, label) %}
+<label class="field"><span>{{ label }}</span>
+  <input type="datetime-local" data-utc-target="{{ name }}"></label>
+{% endmacro %}
+{% block content %}
+<h1>{{ t('action.edit') }}: {{ tour.title }}</h1>
+{% if conflict is not none %}
+<section class="card conflict">
+  <h2 style="margin-top:0">{{ t('tour.conflict_title') }}</h2>
+  {% if conflict %}
+  <table>
+    <thead><tr><th>{{ t('tour.conflict_field') }}</th><th>{{ t('tour.conflict_current') }}</th><th>{{ t('tour.conflict_mine') }}</th></tr></thead>
+    <tbody>
+      {% for row in conflict %}
+      <tr><td>{{ label(row.field) }}</td>
+        {% for value in (row.current, row.mine) %}
+        <td>{% if value is none %}{{ t('value.none') }}{% elif row.field.endswith('_time') %}<time datetime="{{ value }}" class="local-time">{{ value|datetime }}</time>{% else %}{{ value }}{% endif %}</td>
+        {% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p>{{ t('tour.conflict_none') }}</p>{% endif %}
+  <p class="meta">{{ t('tour.conflict_lists') }}</p>
+  <a class="button" href="{{ url_for('protocols.tour_edit', tour_id=tour.id) }}">{{ t('tour.discard') }}</a>
+</section>
+{% endif %}
+<form method="post" class="stack" action="{{ url_for('protocols.tour_edit', tour_id=tour.id) }}">
+  {{ csrf() }}
+  <input type="hidden" name="version" value="{{ tour.version }}">
+  {# The values the form was loaded with: after a conflict only changed fields are kept. #}
+  <input type="hidden" name="base" value="{{ base|tojson|forceescape }}">
+  {{ field('title', t('tour.title'), tour.title, required=True, attrs='maxlength="200"') }}
+  <label class="field"><span>{{ t('tour.summary') }}</span><textarea name="summary" rows="8">{{ tour.summary or '' }}</textarea></label>
+
+  {# The server gets UTC through the hidden fields; the visible inputs hold local time. #}
+  <input type="hidden" name="start_time" id="start_time" value="{{ tour.start_time or '' }}">
+  <input type="hidden" name="end_time" id="end_time" value="{{ tour.end_time or '' }}">
+  {% if is_owner %}
+  <div class="row">{{ time_field('start_time', t('tour.start_time')) }}{{ time_field('end_time', t('tour.end_time')) }}</div>
+  {% if tour.track_source == 'device' %}<p class="meta">{{ t('tour.time_follows_track') }}</p>{% endif %}
+  <fieldset class="stack"><legend>{{ t('tour.manual_values') }}</legend>
+    <div class="row">
+      {{ field('duration_minutes', t('tour.duration_minutes'), tour.duration_minutes, attrs='inputmode="numeric" placeholder="' ~ (tour.computed.duration_minutes if tour.computed.duration_minutes is not none else '') ~ '"') }}
+      {{ field('pack_weight_start_g', t('tour.pack_weight_g'), tour.pack_weight_start_g, attrs='inputmode="numeric" placeholder="' ~ tour.computed.pack_weight_start_g ~ '"') }}
+      {{ field('calories_burned', t('tour.calories_burned_manual'), tour.calories_burned, attrs='inputmode="decimal" placeholder="' ~ (tour.computed.calories_burned|round|int if tour.computed.calories_burned is not none else '') ~ '"') }}
+    </div>
+  </fieldset>
+  {% else %}
+  <p class="meta">{{ t('tour.owner_only_hint') }}</p>
+  {% for name in ('duration_minutes', 'pack_weight_start_g', 'calories_burned') %}
+  <input type="hidden" name="{{ name }}" value="{{ tour[name] if tour[name] is not none else '' }}">
+  {% endfor %}
+  {% endif %}
+
+  <h2>{{ t('tour.peaks') }}</h2>
+  <table>
+    <thead><tr><th>{{ t('common.name') }}</th><th>{{ t('field.elevation_m') }}</th><th>{{ t('tour.remove') }}</th></tr></thead>
+    <tbody>
+      {% for peak in tour.peaks %}
+      <tr><td><input type="hidden" name="peak_id" value="{{ peak.id }}">
+          <input type="hidden" name="peak_lat" value="{{ peak.lat if peak.lat is not none else '' }}">
+          <input type="hidden" name="peak_lon" value="{{ peak.lon if peak.lon is not none else '' }}">
+          <input type="hidden" name="peak_reached_at" value="{{ peak.reached_at or '' }}">
+          <input name="peak_name" value="{{ peak.name }}" required maxlength="200" aria-label="{{ t('common.name') }}"></td>
+        <td><input name="peak_elevation" value="{{ peak.elevation_m if peak.elevation_m is not none else '' }}" inputmode="numeric" aria-label="{{ t('field.elevation_m') }}"></td>
+        <td><input type="checkbox" name="peak_remove" value="{{ peak.id }}" aria-label="{{ t('tour.remove') }}"></td></tr>
+      {% endfor %}
+      <tr><td><input name="peak_new_name" maxlength="200" placeholder="{{ t('tour.add_peak') }}" aria-label="{{ t('tour.add_peak') }}"></td>
+        <td><input name="peak_new_elevation" inputmode="numeric" aria-label="{{ t('field.elevation_m') }}"></td><td></td></tr>
+    </tbody>
+  </table>
+
+  <h2>{{ t('tour.partners') }}</h2>
+  {% if contacts or other_partners %}
+  <fieldset class="field">
+    {% for partner in other_partners %}
+    <label><input type="checkbox" name="partners" value="{{ partner.contact_id }}"{% if partner.contact_id in chosen_partners %} checked{% endif %}> {{ partner.display_name or '?' }}</label>
+    {% endfor %}
+    {% for contact in contacts %}
+    <label><input type="checkbox" name="partners" value="{{ contact.id }}"{% if contact.id in chosen_partners %} checked{% endif %}> {{ contact.display_name }}</label>
+    {% endfor %}
+  </fieldset>
+  {% else %}<p class="meta">{{ t('tour.no_contacts') }}</p>{% endif %}
+  <p><a href="{{ url_for('protocols.contacts') }}">{{ t('tour.manage_contacts') }}</a></p>
+
+  <h2>{{ t('tour.gear') }}</h2>
+  <table>
+    <thead><tr><th>{{ t('common.name') }}</th><th>{{ t('tour.quantity') }}</th><th>{{ t('tour.carried') }}</th><th>{{ t('tour.remove') }}</th></tr></thead>
+    <tbody>
+      {% for row in tour.gear %}
+      <tr><td><input type="hidden" name="gear_id" value="{{ row.id }}">{{ row.name }} <span class="meta">{{ row.weight_g|weight }}</span></td>
+        <td><input name="gear_quantity" value="{{ row.quantity }}" inputmode="numeric" size="4" aria-label="{{ t('tour.quantity') }}"></td>
+        <td><input type="checkbox" name="gear_carried" value="{{ row.id }}"{% if row.carried %} checked{% endif %} aria-label="{{ t('tour.carried') }}"></td>
+        <td><input type="checkbox" name="gear_remove" value="{{ row.id }}" aria-label="{{ t('tour.remove') }}"></td></tr>
+      {% endfor %}
+      {% if gear_items %}
+      <tr><td><select name="gear_new" aria-label="{{ t('tour.add_gear') }}"><option value="">{{ t('tour.add_gear') }} {{ t('tour.choose') }}</option>
+            {% for item in gear_items %}<option value="{{ item.id }}">{{ item.name }}{% if item.weight_g is not none %} ({{ item.weight_g|weight }}){% endif %}</option>{% endfor %}</select></td>
+        <td><input name="gear_new_quantity" value="1" inputmode="numeric" size="4" aria-label="{{ t('tour.quantity') }}"></td>
+        <td><input type="checkbox" name="gear_new_carried" checked aria-label="{{ t('tour.carried') }}"></td><td></td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <h2>{{ t('tour.food') }}</h2>
+  <table>
+    <thead><tr><th>{{ t('common.name') }}</th><th>{{ t('tour.amount') }}</th><th>{{ t('tour.carried') }}</th><th>{{ t('tour.eaten') }}</th><th>{{ t('tour.remove') }}</th></tr></thead>
+    <tbody>
+      {% for row in tour.food %}
+      <tr><td><input type="hidden" name="food_id" value="{{ row.id }}"><input type="hidden" name="food_eaten_at" value="{{ row.eaten_at or '' }}">{{ row.name }}</td>
+        <td><input name="food_amount" value="{{ row.amount_g }}" inputmode="decimal" size="6" required aria-label="{{ t('tour.amount') }}"></td>
+        <td><input type="checkbox" name="food_carried" value="{{ row.id }}"{% if row.carried %} checked{% endif %} aria-label="{{ t('tour.carried') }}"></td>
+        <td><input type="checkbox" name="food_eaten" value="{{ row.id }}"{% if row.eaten %} checked{% endif %} aria-label="{{ t('tour.eaten') }}"></td>
+        <td><input type="checkbox" name="food_remove" value="{{ row.id }}" aria-label="{{ t('tour.remove') }}"></td></tr>
+      {% endfor %}
+      {% if foods %}
+      <tr><td><select name="food_new" aria-label="{{ t('tour.add_food') }}"><option value="">{{ t('tour.add_food') }} {{ t('tour.choose') }}</option>
+            {% for food in foods %}<option value="{{ food.id }}">{{ food.name }}{% if food.brand %} ({{ food.brand }}){% endif %}</option>{% endfor %}</select></td>
+        <td><input name="food_new_amount" inputmode="decimal" size="6" aria-label="{{ t('tour.amount') }}"></td>
+        <td><input type="checkbox" name="food_new_carried" checked aria-label="{{ t('tour.carried') }}"></td>
+        <td><input type="checkbox" name="food_new_eaten" aria-label="{{ t('tour.eaten') }}"></td><td></td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+  <p class="meta">{{ t('tour.snapshot_hint') }}</p>
+
+  <div class="toolbar">
+    <button class="primary">{{ t('action.save') }}</button>
+    <button name="stay" value="1">{{ t('tour.save_and_stay') }}</button>
+    <a class="button" href="{{ url_for('protocols.tour_detail', tour_id=tour.id) }}">{{ t('action.cancel') }}</a>
+  </div>
+</form>
+{% endblock %}

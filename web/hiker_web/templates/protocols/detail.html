@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% from "macros.html" import csrf, delete_form, field %}
+{% import "protocols/_parts.html" as parts %}
+{% block title %}{{ tour.title }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>{{ tour.title }}</h1><span class="spacer"></span>
+  {% if can_edit %}<a class="button primary" href="{{ url_for('protocols.tour_edit', tour_id=tour.id) }}">{{ t('action.edit') }}</a>{% endif %}
+  <a class="button" href="{{ url_for('protocols.history', tour_id=tour.id) }}">{{ t('tour.history') }}</a>
+  {% if is_owner %}<a class="button" href="{{ url_for('protocols.sharing', tour_id=tour.id) }}">{{ t('tour.sharing') }}</a>{% endif %}
+  <a class="button" href="{{ url_for('protocols.tour_export', tour_id=tour.id) }}">{{ t('tour.export') }}</a>
+</div>
+{% if not is_owner %}
+<p class="meta">{{ t('tour.by', name=tour.owner.display_name or '?') }} · {{ t('tour.permission.' ~ tour.permission) }}</p>
+{% endif %}
+{% if tour.summary %}<p style="white-space:pre-line">{{ tour.summary }}</p>{% endif %}
+
+<section class="card">
+  <h2 style="margin-top:0">{{ t('tour.facts') }}</h2>
+  <dl class="facts">
+    {% if tour.start_time %}<dt>{{ t('tour.start_time') }}</dt><dd><time datetime="{{ tour.start_time }}" class="local-time">{{ tour.start_time|datetime }}</time></dd>{% endif %}
+    {% if tour.end_time %}<dt>{{ t('tour.end_time') }}</dt><dd><time datetime="{{ tour.end_time }}" class="local-time">{{ tour.end_time|datetime }}</time></dd>{% endif %}
+    {% set minutes = tour.duration_minutes if tour.duration_minutes is not none else tour.computed.duration_minutes %}
+    <dt>{{ t('tour.duration') }}</dt><dd>{{ minutes|duration }}</dd>
+    {{ parts.track_facts(tour.track_stats) }}
+    <dt>{{ t('tour.pack_weight') }}</dt>
+    <dd>{{ (tour.pack_weight_start_g if tour.pack_weight_start_g is not none else tour.computed.pack_weight_start_g)|weight }}</dd>
+    <dt>{{ t('tour.calories_eaten') }}</dt><dd>{{ t('tour.kcal', value=tour.computed.calories_eaten|number) }}</dd>
+    <dt>{{ t('tour.calories_burned') }}</dt>
+    <dd>{{ parts.burned(tour.calories_burned if tour.calories_burned is not none else tour.computed.calories_burned, tour.calories_burned_source) }}</dd>
+    {% if tour.track_stats and tour.track_stats.heart_rate %}
+    <dt>{{ t('tour.heart_rate') }}</dt>
+    <dd>{{ t('tour.heart_rate_value', avg=tour.track_stats.heart_rate.avg, max=tour.track_stats.heart_rate.max) }}
+      <span class="meta">{{ t('tour.health_note') }}</span></dd>
+    {% endif %}
+  </dl>
+  {% if tour.calories_estimate %}
+  <p class="meta">
+    {% if tour.calories_estimate.method %}{{ t('tour.estimate_method.' ~ tour.calories_estimate.method) }}
+    {% elif tour.calories_estimate.reason %}{{ t('tour.estimate_reason.' ~ tour.calories_estimate.reason) }}{% endif %}
+  </p>
+  {% if is_owner and tour.calories_burned_source == 'manual' and tour.calories_estimate.method %}
+  <form method="post" action="{{ url_for('protocols.calories_estimate', tour_id=tour.id) }}">{{ csrf() }}<button>{{ t('tour.use_estimate') }}</button></form>
+  {% endif %}
+  {% endif %}
+</section>
+
+<section id="track">
+  <h2>{{ t('tour.track') }}
+    {% if tour.track_source != 'none' %}<span class="chip">{{ t('tour.track_source.' ~ tour.track_source) }}</span>{% endif %}</h2>
+  {% if tour.track_source != 'none' or tour.start_point or photos or waypoints %}
+  {{ parts.map_block(tour, map_data) }}
+  {% else %}<p>{{ t('tour.no_track') }}</p>{% endif %}
+  {% if is_owner %}
+  <div class="toolbar">
+    <form method="post" action="{{ url_for('protocols.gpx_upload', tour_id=tour.id) }}" enctype="multipart/form-data" class="row">
+      {{ csrf() }}
+      <label class="field"><span>{{ t('tour.gpx_file') }}</span><input type="file" name="file" accept=".gpx,application/gpx+xml" required>
+        {% if tour.track_source != 'none' %}<small>{{ t('tour.gpx_replace_hint') }}</small>{% endif %}</label>
+      <button>{{ t('tour.gpx_upload') }}</button>
+    </form>
+    {% if tour.track_source == 'device' %}<a class="button" href="{{ url_for('protocols.gpx_download', tour_id=tour.id) }}">{{ t('tour.gpx_download') }}</a>{% endif %}
+    {% if tour.track_source != 'none' %}{{ delete_form(url_for('protocols.track_delete', tour_id=tour.id), t('tour.track_remove')) }}{% endif %}
+  </div>
+  {% endif %}
+</section>
+
+{% if overview.stations %}
+<section id="course">
+  <h2>{{ t('tour.course') }}</h2>
+  <table>
+    <thead><tr><th>{{ t('tour.place') }}</th><th class="num">{{ t('tour.elevation') }}</th><th class="num">{{ t('tour.at_distance') }}</th><th>{{ t('tour.time') }}</th></tr></thead>
+    <tbody>
+      {% for station in overview.stations %}
+      <tr><td><span class="chip">{{ t('tour.station.' ~ station.kind) }}</span> {{ station.name or '' }}</td>
+        <td class="num">{{ station.elevation_m|meters }}</td><td class="num">{{ station.track_distance_m|distance }}</td>
+        <td>{% if station.time %}<time datetime="{{ station.time }}" class="local-time">{{ station.time|time }}</time>{% endif %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if overview.attribution %}<p class="meta">{{ overview.attribution }}</p>{% endif %}
+  {% if is_owner and tour.track_source != 'none' %}
+  <form method="post" action="{{ url_for('protocols.track_places', tour_id=tour.id) }}">{{ csrf() }}<button>{{ t('tour.places_detect') }}</button></form>
+  {% endif %}
+</section>
+{% endif %}
+
+<section id="photos">
+  <h2>{{ t('tour.photos') }}</h2>
+  {% if photos %}
+  <div class="photo-grid">
+    {% for photo in photos %}
+    <figure>
+      <a href="{{ url_for('protocols.photo_image', tour_id=tour.id, photo_id=photo.id, size='full') }}" class="photo-link" data-caption="{{ photo.caption or '' }}">
+        <img src="{{ url_for('protocols.photo_image', tour_id=tour.id, photo_id=photo.id, size='thumb') }}" alt="{{ photo.caption or t('tour.photos') }}" loading="lazy"></a>
+      <figcaption class="meta">
+        {% if photo.is_cover %}<span class="chip">{{ t('tour.photo_is_cover') }}</span>{% endif %}
+        {{ t('tour.photo_position.' ~ photo.position_source) }}
+        {% if can_edit %}
+        <form method="post" action="{{ url_for('protocols.photo_update', tour_id=tour.id, photo_id=photo.id) }}" class="row">
+          {{ csrf() }}<input name="caption" value="{{ photo.caption or '' }}" maxlength="500" aria-label="{{ t('tour.photo_caption') }}" placeholder="{{ t('tour.photo_caption') }}">
+          <button>{{ t('action.save') }}</button>
+          {% if not photo.is_cover %}<button name="cover" value="1">{{ t('tour.photo_cover') }}</button>{% endif %}
+        </form>
+        {{ delete_form(url_for('protocols.photo_delete', tour_id=tour.id, photo_id=photo.id)) }}
+        {% elif photo.caption %}<br>{{ photo.caption }}{% endif %}
+      </figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if can_edit %}
+  <div class="toolbar">
+    <form method="post" action="{{ url_for('protocols.photo_upload', tour_id=tour.id) }}" enctype="multipart/form-data" class="row">
+      {{ csrf() }}
+      <label class="field"><span>{{ t('tour.photos') }}</span><input type="file" name="files" accept="image/jpeg,image/png,image/webp" multiple required></label>
+      <button>{{ t('tour.photos_upload') }}</button>
+    </form>
+    {% if photos %}
+    <form method="post" action="{{ url_for('protocols.photo_time_offset', tour_id=tour.id) }}" class="row">
+      {{ csrf() }}
+      {{ field('minutes', t('tour.photo_offset'), tour.photo_time_offset_seconds // 60, hint=t('tour.photo_offset_hint'), attrs='inputmode="numeric"') }}
+      <button>{{ t('tour.photo_offset_apply') }}</button>
+    </form>
+    <form method="post" action="{{ url_for('protocols.waypoints_from_photos', tour_id=tour.id) }}">{{ csrf() }}<button>{{ t('tour.waypoints_from_photos') }}</button></form>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+
+{% if tour.weather or is_owner %}
+<section id="weather">
+  <h2>{{ t('tour.weather') }}</h2>
+  {% if tour.weather %}{{ parts.weather_table(tour.weather) }}{% endif %}
+  {% if tour.weather_outdated %}<p class="meta">{{ t('tour.weather_outdated') }}</p>{% endif %}
+  {% if is_owner and (tour.start_point or tour.end_point) %}
+  <form method="post" action="{{ url_for('protocols.weather_fetch', tour_id=tour.id) }}">{{ csrf() }}<button>{{ t('tour.weather_fetch') }}</button></form>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if tour.peaks %}<section><h2>{{ t('tour.peaks') }}</h2>{{ parts.peak_list(tour.peaks) }}</section>{% endif %}
+{% if tour.partners %}
+<section><h2>{{ t('tour.partners') }}</h2>
+  <p>{% for partner in tour.partners %}<span class="chip">{{ partner.display_name }}</span> {% endfor %}</p></section>
+{% endif %}
+{% if tour.gear %}<section><h2>{{ t('tour.gear') }}</h2>{{ parts.gear_table(tour.gear) }}</section>{% endif %}
+{% if tour.food %}<section><h2>{{ t('tour.food') }}</h2>{{ parts.food_table(tour.food) }}</section>{% endif %}
+
+<div class="toolbar" style="margin-top:2rem">
+  {% if is_owner %}{{ delete_form(url_for('protocols.tour_delete', tour_id=tour.id)) }}
+  {% else %}
+  <form method="post" action="{{ url_for('protocols.share_leave', tour_id=tour.id) }}" class="inline" data-confirm="{{ t('common.confirm_delete') }}">{{ csrf() }}<button>{{ t('tour.leave') }}</button></form>
+  {% endif %}
+</div>
+{% endblock %}

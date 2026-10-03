@@ -81,3 +81,15 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 .dot-marker { width: 1.6rem; height: 1.6rem; border-radius: 50%; border: 2px solid #fff; color: #fff;
   display: grid; place-items: center; font-size: .8rem; box-shadow: 0 1px 3px #0006; }
 @media (max-width: 40rem) { .top nav { order: 3; flex-basis: 100%; } }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 1rem; }
+.photo-grid figure { margin: 0; }
+.photo-grid img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: .5rem; display: block; }
+#profile .area { fill: #2e7d3233; stroke: none; }
+#profile .line { fill: none; stroke: #2e7d32; stroke-width: 2; vector-effect: non-scaling-stroke; }
+#profile .cursor { stroke: #c62828; stroke-width: 1; vector-effect: non-scaling-stroke; visibility: hidden; }
+#profile .photo-tick { fill: #1565c0; }
+#photo-dialog { border: none; border-radius: .75rem; padding: .5rem; max-width: 95vw; }
+#photo-dialog img { max-width: 90vw; max-height: 80vh; display: block; }
+#photo-dialog::backdrop { background: #000a; }
+.conflict { border-color: #c62828; }
+del { color: #c62828; } ins { color: #2e7d32; text-decoration: none; }

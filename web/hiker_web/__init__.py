@@ -1,5 +1,7 @@
 """hiker web frontend: server-rendered pages on top of the hiker REST API."""
 
+from urllib.parse import urlsplit
+
 import httpx2
 from flask import Flask, flash, redirect, render_template, request, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -9,7 +11,7 @@ from hiker_web.api import ApiError, api
 from hiker_web.config import load_config
 from hiker_web.security import check_csrf, csrf_token, install_log_redaction
 from hiker_web.sessions import SessionStore
-from hiker_web.texts_de import TEXTS, t
+from hiker_web.texts_de import TEXTS, label, t
 
 __version__ = "0.1.0"
 
@@ -55,8 +57,24 @@ def create_app(config: dict | None = None) -> Flask:
     install_log_redaction()
     app.jinja_env.filters.update(formatting.FILTERS)
     # As globals, so that imported macros can use them too.
-    app.jinja_env.globals.update(t=t, csrf_token=csrf_token)
+    app.jinja_env.globals.update(t=t, label=label, csrf_token=csrf_token)
     app.before_request(check_csrf)
+
+    # Scripts and styles only from this server; map tiles from the configured source.
+    tiles = urlsplit(app.config["MAP_TILE_URL"])
+    tile_origin = f"{tiles.scheme}://{tiles.netloc}" if tiles.netloc else "'self'"
+    content_security_policy = "; ".join(
+        (
+            "default-src 'self'",
+            f"img-src 'self' data: blob: {tile_origin}",
+            f"connect-src 'self' {tile_origin}",
+            "worker-src 'self' blob:",
+            "style-src 'self' 'unsafe-inline'",
+            "frame-ancestors 'none'",
+            "form-action 'self'",
+            "base-uri 'self'",
+        )
+    )
 
     @app.context_processor
     def _globals():
@@ -110,17 +128,20 @@ def create_app(config: dict | None = None) -> Flask:
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "same-origin")
+        response.headers.setdefault("Content-Security-Policy", content_security_policy)
         return response
 
     @app.get("/healthz")
     def healthz():
         return {"status": "ok"}
 
-    from hiker_web.views import auth, gear, nutrition
+    from hiker_web.views import auth, gear, nutrition, protocols, public
 
     app.register_blueprint(auth.blueprint)
     app.register_blueprint(gear.blueprint)
     app.register_blueprint(nutrition.blueprint)
+    app.register_blueprint(protocols.blueprint)
+    app.register_blueprint(public.blueprint)
 
     @app.get("/")
     def home():

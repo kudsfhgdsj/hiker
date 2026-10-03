@@ -27,3 +27,8 @@ for (const input of document.querySelectorAll("input[data-utc-target]")) {
     target.value = input.value ? new Date(input.value).toISOString() : "";
   });
 }
+
+// A click into a link field selects the whole link, ready to copy.
+for (const input of document.querySelectorAll("input.select-on-focus")) {
+  input.addEventListener("focus", () => input.select());
+}

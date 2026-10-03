@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "macros.html" import field, csrf %}
+{% block title %}{{ t('tour.new') }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<section class="narrow">
+  <h1>{{ t('tour.new') }}</h1>
+  <form method="post" class="stack">
+    {{ csrf() }}
+    {{ field('title', t('tour.title'), tour.title, required=True, attrs='maxlength="200" autofocus') }}
+    <label class="field"><span>{{ t('tour.summary') }}</span><textarea name="summary" rows="5">{{ tour.summary or '' }}</textarea></label>
+    <p class="meta">{{ t('tour.create_hint') }}</p>
+    <button class="primary">{{ t('tour.create') }}</button>
+  </form>
+</section>
+{% endblock %}
