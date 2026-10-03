@@ -16,9 +16,11 @@ from app.modules.auth.models import User
 from app.modules.gear import service as gear_service
 from app.modules.nutrition import service as nutrition_service
 from app.modules.protocols.models import (
+    Contact,
     Tour,
     TourFoodEntry,
     TourGear,
+    TourPartner,
     TourPeak,
     TourRevision,
     TourWaypoint,
@@ -215,6 +217,16 @@ def restore(db: Session, access: TourAccess, revision: TourRevision) -> TourRevi
             TourWaypoint, tour.waypoints, state.waypoints, waypoint_columns
         ),
     }
+    current_partners = {partner.contact_id: partner for partner in tour.partners}
+    partners = []
+    for entry in state.partners:
+        partner = current_partners.get(entry.id)
+        # Contacts that no longer exist cannot be listed again.
+        if partner is None and db.get(Contact, entry.id) is not None:
+            partner = TourPartner(contact_id=entry.id, added_by=user.id)
+        if partner is not None:
+            partners.append(partner)
+    restored["partners"] = partners
     for row in (*restored["gear"], *restored["food"]):
         if row.added_by is None:
             row.added_by = user.id

@@ -10,12 +10,13 @@ from app.modules.auth import service as auth_service
 from app.modules.auth.models import User
 from app.modules.gear import service as gear_service
 from app.modules.nutrition import service as nutrition_service
-from app.modules.protocols import history, snapshots
+from app.modules.protocols import contacts, history, snapshots
 from app.modules.protocols.models import (
     CALORIES_MANUAL,
     Tour,
     TourFoodEntry,
     TourGear,
+    TourPartner,
     TourPeak,
     TourShare,
     TourWaypoint,
@@ -31,6 +32,7 @@ from app.modules.protocols.schemas import (
     TourListItem,
     TourOut,
     TourOwner,
+    TourPartnerIn,
     TourPeakIn,
     TourUpdate,
     WaypointIn,
@@ -144,6 +146,24 @@ def _sync_peaks(db: Session, tour: Tour, incoming: list[TourPeakIn]) -> None:
     tour.peaks = result
 
 
+def _sync_partners(db: Session, tour: Tour, user: User, incoming: list[TourPartnerIn]) -> None:
+    ids = [partner.contact_id for partner in incoming]
+    if len(set(ids)) != len(ids):
+        raise UnprocessableError("A partner appears more than once", code="duplicate_partner")
+    existing = {partner.contact_id: partner for partner in tour.partners}
+    result = []
+    for contact_id in ids:
+        partner = existing.get(contact_id)
+        if partner is None:
+            # New partners come from the caller's own contacts.
+            contact = contacts.get_usable_contact(db, user, contact_id)
+            if contact is None:
+                raise UnprocessableError("Unknown contact", code="unknown_contact")
+            partner = TourPartner(contact=contact, added_by=user.id)
+        result.append(partner)
+    tour.partners = result
+
+
 def _apply_document(db: Session, tour: Tour, user: User, data: TourIn, *, owner: bool) -> None:
     for field in TEXT_FIELDS:
         setattr(tour, field, getattr(data, field))
@@ -158,6 +178,7 @@ def _apply_document(db: Session, tour: Tour, user: User, data: TourIn, *, owner:
     _sync_gear(db, tour, user, data.gear)
     _sync_food(db, tour, user, data.food)
     _sync_peaks(db, tour, data.peaks)
+    _sync_partners(db, tour, user, data.partners)
 
 
 # --- Tours ---
@@ -295,6 +316,7 @@ def tour_out(db: Session, access: TourAccess) -> TourOut:
         gear=snapshots.gear_list(tour),
         food=snapshots.food_list(tour),
         peaks=snapshots.peak_list(tour),
+        partners=snapshots.partner_list(tour),
     )
 
 

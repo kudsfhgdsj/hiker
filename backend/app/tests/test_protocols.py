@@ -79,7 +79,7 @@ def shared_tour(client, db, anna, bea, cleo):
 
 def document(tour, **changes):
     """The tour as a client would send it back in a PUT."""
-    fields = ("title", "summary", *OWNER_ONLY, "gear", "food", "peaks", "version")
+    fields = ("title", "summary", *OWNER_ONLY, "gear", "food", "peaks", "partners", "version")
     return {field: tour[field] for field in fields} | changes
 
 
@@ -1019,3 +1019,120 @@ def test_users_may_give_up_their_own_share(client, anna, cleo, shared_tour):
     assert client.get(f"{TOURS}/{shared_tour['id']}", headers=cleo.headers).status_code == 404
     remaining = client.get(shares_url(shared_tour), headers=anna.headers).json()
     assert [share["user"]["display_name"] for share in remaining] == ["Bea"]
+
+
+# --- Contacts and partners ---
+
+CONTACTS = "/api/v1/contacts"
+
+
+def create_contact(client, person, display_name="Dani", **fields):
+    body = {"display_name": display_name, **fields}
+    response = client.post(CONTACTS, json=body, headers=person.headers)
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def test_contact_crud_and_privacy(client, anna, bea):
+    contact = create_contact(client, anna, "  Dani  ")
+    url = f"{CONTACTS}/{contact['id']}"
+
+    assert contact == {"id": contact["id"], "display_name": "Dani", "linked_user": None}
+    assert client.get(CONTACTS, headers=anna.headers).json() == [contact]
+    assert client.get(CONTACTS, headers=bea.headers).json() == []
+    assert client.get(CONTACTS).status_code == 401
+    assert client.patch(url, json={"display_name": "X"}, headers=bea.headers).status_code == 404
+    assert client.delete(url, headers=bea.headers).status_code == 404
+    renamed = client.patch(url, json={"display_name": "Daniela"}, headers=anna.headers)
+    assert renamed.json()["display_name"] == "Daniela"
+    assert client.patch(url, json={"display_name": None}, headers=anna.headers).status_code == 422
+    assert (
+        client.post(CONTACTS, json={"display_name": " "}, headers=anna.headers).status_code == 422
+    )
+    assert client.delete(url, headers=anna.headers).status_code == 204
+    assert client.get(CONTACTS, headers=anna.headers).json() == []
+
+
+def test_placeholder_can_be_linked_to_a_user_later(client, anna, bea):
+    contact = create_contact(client, anna, "Bea (Platzhalter)")
+    tour = create_tour(client, anna, partners=[{"contact_id": contact["id"]}])
+    url = f"{CONTACTS}/{contact['id']}"
+
+    assert tour["partners"] == [
+        {"contact_id": contact["id"], "display_name": "Bea (Platzhalter)", "linked_user_id": None}
+    ]
+
+    linked = client.patch(url, json={"linked_user_id": bea.id}, headers=anna.headers)
+
+    assert linked.json()["linked_user"] == {"id": bea.id, "display_name": "Bea"}
+    assert linked.json()["display_name"] == "Bea (Platzhalter)"
+    # The link applies at once to every tour that lists the contact.
+    current = client.get(f"{TOURS}/{tour['id']}", headers=anna.headers).json()
+    assert current["partners"][0]["linked_user_id"] == bea.id
+    # Being a partner does not give access to the tour.
+    assert client.get(f"{TOURS}/{tour['id']}", headers=bea.headers).status_code == 404
+    unknown = client.patch(url, json={"linked_user_id": str(uuid.uuid4())}, headers=anna.headers)
+    assert unknown.json()["error"]["code"] == "unknown_user"
+    unlinked = client.patch(url, json={"linked_user_id": None}, headers=anna.headers)
+    assert unlinked.json()["linked_user"] is None
+
+
+def test_partners_are_part_of_the_tour_document_and_history(client, anna):
+    dani = create_contact(client, anna, "Dani")
+    eva = create_contact(client, anna, "Eva")
+    tour = create_tour(client, anna, partners=[{"contact_id": dani["id"]}])
+
+    updated = put(client, anna, tour, partners=[{"contact_id": eva["id"]}]).json()
+
+    assert [partner["display_name"] for partner in updated["partners"]] == ["Eva"]
+    diff = revision(client, anna, tour, 2)["diff"]["partners"]
+    assert diff["added"] == [{"id": eva["id"], "name": "Eva"}]
+    assert diff["removed"] == [{"id": dani["id"], "name": "Dani"}]
+    restored = restore(client, anna, tour, 1).json()
+    assert [partner["display_name"] for partner in restored["partners"]] == ["Dani"]
+
+
+def test_partners_must_be_own_contacts_and_unique(client, anna, bea):
+    mine = create_contact(client, anna)
+    foreign = create_contact(client, bea)
+
+    def post(*ids):
+        partners = [{"contact_id": contact_id} for contact_id in ids]
+        return client.post(TOURS, json={"title": "T", "partners": partners}, headers=anna.headers)
+
+    assert post(foreign["id"]).json()["error"]["code"] == "unknown_contact"
+    assert post(str(uuid.uuid4())).json()["error"]["code"] == "unknown_contact"
+    assert post(mine["id"], mine["id"]).json()["error"]["code"] == "duplicate_partner"
+
+
+def test_edit_users_add_their_own_contacts_and_all_read_the_names(
+    client, anna, bea, cleo, shared_tour
+):
+    annas = create_contact(client, anna, "Annas Freund")
+    beas = create_contact(client, bea, "Beas Freundin")
+    with_anna = put(client, anna, shared_tour, partners=[{"contact_id": annas["id"]}]).json()
+
+    response = put(
+        client, bea, with_anna, partners=[*with_anna["partners"], {"contact_id": beas["id"]}]
+    )
+
+    assert response.status_code == 200
+    seen = client.get(f"{TOURS}/{shared_tour['id']}", headers=cleo.headers).json()
+    assert [p["display_name"] for p in seen["partners"]] == ["Annas Freund", "Beas Freundin"]
+    assert client.get(CONTACTS, headers=cleo.headers).json() == []
+
+
+def test_deleted_contact_stays_visible_in_old_tours(client, anna):
+    contact = create_contact(client, anna, "Dani")
+    tour = create_tour(client, anna, partners=[{"contact_id": contact["id"]}])
+
+    client.delete(f"{CONTACTS}/{contact['id']}", headers=anna.headers)
+
+    current = client.get(f"{TOURS}/{tour['id']}", headers=anna.headers).json()
+    assert [partner["display_name"] for partner in current["partners"]] == ["Dani"]
+    again = client.post(
+        TOURS,
+        json={"title": "Neu", "partners": [{"contact_id": contact["id"]}]},
+        headers=anna.headers,
+    )
+    assert again.json()["error"]["code"] == "unknown_contact"

@@ -108,6 +108,33 @@ class TourWaypoint(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
+class Contact(TimestampMixin, Base):
+    """A tour partner of a user: a placeholder name, optionally linked to a real user."""
+
+    __tablename__ = "contact"
+
+    id: Mapped[uuid.UUID] = _id_column()
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), index=True
+    )
+    display_name: Mapped[str] = mapped_column(String(100))
+    linked_user_id: Mapped[uuid.UUID | None] = _user_reference()
+
+
+class TourPartner(Base):
+    __tablename__ = "tour_partner"
+
+    tour_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("tour.id", ondelete="CASCADE"), primary_key=True
+    )
+    contact_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("contact.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    added_by: Mapped[uuid.UUID | None] = _user_reference()
+
+    contact: Mapped[Contact] = relationship(lazy="joined")
+
+
 class TourShare(Base):
     __tablename__ = "tour_share"
 
@@ -183,6 +210,7 @@ class Tour(TimestampMixin, Base):
     peaks: Mapped[list[TourPeak]] = relationship(
         cascade="all, delete-orphan", order_by=(TourPeak.sort_order, TourPeak.id)
     )
+    partners: Mapped[list[TourPartner]] = relationship(cascade="all, delete-orphan")
     waypoints: Mapped[list[TourWaypoint]] = relationship(
         cascade="all, delete-orphan", order_by=(TourWaypoint.created_at, TourWaypoint.id)
     )

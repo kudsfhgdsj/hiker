@@ -8,8 +8,11 @@ from app.core.deps import DbSession
 from app.core.errors import error_responses
 from app.core.pagination import Page, Paging
 from app.modules.auth.deps import CurrentUser
-from app.modules.protocols import history, service, sharing
+from app.modules.protocols import contacts, history, service, sharing
 from app.modules.protocols.schemas import (
+    ContactIn,
+    ContactOut,
+    ContactPatch,
     RevisionComparison,
     RevisionListItem,
     RevisionOut,
@@ -245,3 +248,45 @@ def delete_share(user_id: uuid.UUID, access: ReadableTour, db: DbSession):
     """Remove a share. The owner removes any, other users only their own."""
     sharing.require_owner_or_self(access, user_id)
     sharing.delete_share(db, access.tour, user_id)
+
+
+# --- Contacts ---
+
+
+@router.get("/contacts", response_model=list[ContactOut], tags=["contacts"])
+def list_contacts(user: CurrentUser, db: DbSession):
+    """The caller's tour partners."""
+    return contacts.contacts_out(db, contacts.list_contacts(db, user))
+
+
+@router.post(
+    "/contacts",
+    response_model=ContactOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["contacts"],
+    responses=error_responses(409),
+)
+def create_contact(body: ContactIn, user: CurrentUser, db: DbSession):
+    return contacts.contacts_out(db, [contacts.create_contact(db, user, body)])[0]
+
+
+@router.patch(
+    "/contacts/{contact_id}",
+    response_model=ContactOut,
+    tags=["contacts"],
+    responses=error_responses(404),
+)
+def update_contact(contact_id: uuid.UUID, body: ContactPatch, user: CurrentUser, db: DbSession):
+    """Rename a contact or link the placeholder to a real user (null unlinks)."""
+    contact = contacts.get_owned_contact(db, user, contact_id)
+    return contacts.contacts_out(db, [contacts.update_contact(db, contact, body)])[0]
+
+
+@router.delete(
+    "/contacts/{contact_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["contacts"],
+    responses=error_responses(404),
+)
+def delete_contact(contact_id: uuid.UUID, user: CurrentUser, db: DbSession):
+    contacts.delete_contact(db, contacts.get_owned_contact(db, user, contact_id))

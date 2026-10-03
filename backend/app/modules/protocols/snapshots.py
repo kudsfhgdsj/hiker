@@ -2,8 +2,10 @@
 
 from app.modules.protocols.models import Tour, TourFoodEntry, TourGear
 from app.modules.protocols.schemas import (
+    PartnerSnapshot,
     TourFoodOut,
     TourGearOut,
+    TourPartnerOut,
     TourPeakOut,
     TourSnapshot,
     WaypointOut,
@@ -19,7 +21,7 @@ SCALAR_FIELDS = (
     "calories_burned",
     "calories_burned_source",
 )
-LIST_FIELDS = ("gear", "food", "peaks", "waypoints")
+LIST_FIELDS = ("gear", "food", "peaks", "waypoints", "partners")
 
 
 def _gear_out(entry: TourGear) -> TourGearOut:
@@ -65,6 +67,21 @@ def waypoint_list(tour: Tour) -> list[WaypointOut]:
     return [WaypointOut.model_validate(waypoint) for waypoint in tour.waypoints]
 
 
+def _partners(tour: Tour) -> list:
+    return sorted(tour.partners, key=lambda p: (p.contact.display_name.lower(), str(p.contact_id)))
+
+
+def partner_list(tour: Tour) -> list[TourPartnerOut]:
+    return [
+        TourPartnerOut(
+            contact_id=partner.contact_id,
+            display_name=partner.contact.display_name,
+            linked_user_id=partner.contact.linked_user_id,
+        )
+        for partner in _partners(tour)
+    ]
+
+
 def build_snapshot(tour: Tour) -> dict:
     """The complete editable state of a tour as JSON-compatible data."""
     snapshot = TourSnapshot(
@@ -73,5 +90,9 @@ def build_snapshot(tour: Tour) -> dict:
         food=food_list(tour),
         peaks=peak_list(tour),
         waypoints=waypoint_list(tour),
+        partners=[
+            PartnerSnapshot(id=partner.contact_id, name=partner.contact.display_name)
+            for partner in _partners(tour)
+        ],
     )
     return snapshot.model_dump(mode="json")

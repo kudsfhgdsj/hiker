@@ -203,8 +203,8 @@ Open-Food-Facts-Einträge werden nach `OPENFOODFACTS_CACHE_DAYS` (Standard 30) b
 **tour_food_entry**: id, tour_id, food_item_id, added_by, name_snapshot, kcal_per_100g_snapshot, amount_g, kcal_snapshot (aus Menge und Momentaufnahme), carried, eaten, eaten_at (optional), sort_order
 
 Momentaufnahmen entstehen beim Hinzufügen und ändern sich nicht, wenn Gegenstand oder Lebensmittel später geändert oder gelöscht werden. Startgewicht (berechnet) = mitgeführte Ausrüstung × Stückzahl + mitgeführtes Essen; gegessene Kalorien = Summe der Einträge mit `eaten`.
-**contact**: id, owner_id, display_name, linked_user_id (leer = Platzhalter)
-**tour_partner**: tour_id, contact_id
+**contact**: id, owner_id, display_name, linked_user_id (leer = Platzhalter); Löschen ist ein Soft Delete, alte Touren zeigen den Namen weiter
+**tour_partner**: tour_id, contact_id, added_by. Partner gehören zum Tourdokument (`partners`); neue Partner stammen aus den Kontakten dessen, der sie einträgt. Partner zu sein gibt keinen Zugriff auf die Tour – dafür ist die Freigabe da.
 
 Platzhalter → echter User: `contact.linked_user_id` setzen; gilt sofort in allen Touren des Owners.
 
@@ -321,7 +321,8 @@ Versioniertes Schema (`schema_version`): Tour, Ausrüstung (Snapshots), Essen, P
 | POST | /tours/{id}/weather/fetch | Wetter abrufen |
 | POST | /tours/{id}/calories/estimate | Verbrauch schätzen |
 | GET | /tours/{id}/export | JSON-Export |
-| GET, POST, PATCH, DELETE | /contacts | Partner-Kontakte, Verknüpfung setzen |
+| GET, POST | /contacts | Partner-Kontakte listen / anlegen |
+| PATCH, DELETE | /contacts/{id} | Umbenennen, mit Nutzer verknüpfen (`linked_user_id`, `null` löst) / löschen |
 | GET | /sync/changes?since=, POST /sync/push | Offline-Sync |
 
 ### Ausrüstung
