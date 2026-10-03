@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, Query, Response, UploadFile, status
 
 from app.core import files
 from app.core.config import get_settings
@@ -10,7 +10,13 @@ from app.core.errors import NotFoundError, PayloadTooLargeError, error_responses
 from app.core.pagination import Page, Paging
 from app.modules.auth.deps import AdminUser, CurrentUser
 from app.modules.gear import catalog, service
-from app.modules.gear.deps import EditableType, OwnedItem, OwnedList, ReadableCatalogItem
+from app.modules.gear.deps import (
+    EditableType,
+    OwnedItem,
+    OwnedList,
+    OwnedTag,
+    ReadableCatalogItem,
+)
 from app.modules.gear.models import GearCatalogItem, GearType
 from app.modules.gear.schemas import (
     CatalogItemOut,
@@ -21,10 +27,15 @@ from app.modules.gear.schemas import (
     GearListCreate,
     GearListIn,
     GearListOut,
+    GearSummaryOut,
+    GearTagCreate,
+    GearTagIn,
+    GearTagOut,
     GearTypeCreate,
     GearTypeIn,
     GearTypeOut,
 )
+from app.modules.gear.summary import summarize
 
 router = APIRouter(responses=error_responses(401))
 
@@ -89,22 +100,73 @@ def delete_type(gear_type: EditableType, db: DbSession):
     service.delete_type(db, gear_type)
 
 
+# --- Tags ---
+
+
+@router.get("/tags", response_model=list[GearTagOut])
+def list_tags(user: CurrentUser, db: DbSession):
+    return service.list_tags(db, user)
+
+
+@router.post(
+    "/tags",
+    response_model=GearTagOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(409),
+)
+def create_tag(body: GearTagCreate, user: CurrentUser, db: DbSession):
+    return service.create_tag(db, user, body)
+
+
+@router.put("/tags/{tag_id}", response_model=GearTagOut, responses=error_responses(404, 409))
+def update_tag(body: GearTagIn, tag: OwnedTag, user: CurrentUser, db: DbSession):
+    return service.update_tag(db, user, tag, body)
+
+
+@router.delete(
+    "/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT, responses=error_responses(404)
+)
+def delete_tag(tag: OwnedTag, db: DbSession):
+    service.delete_tag(db, tag)
+
+
 # --- Items ---
 
 
-@router.get("/items", response_model=Page[GearItemOut])
-def list_items(
-    user: CurrentUser,
-    db: DbSession,
-    paging: Paging,
+def _item_filter(
     q: Annotated[str | None, Query(max_length=100, description="Search in name and brand")] = None,
     type_id: uuid.UUID | None = None,
     status: Literal["active", "retired"] | None = None,
-):
-    items, total = service.list_items(
-        db, user, q=q, type_id=type_id, status=status, limit=paging.limit, offset=paging.offset
-    )
+    tag_id: Annotated[
+        list[uuid.UUID] | None,
+        Query(max_length=20, description="Repeatable; items must carry all given tags"),
+    ] = None,
+) -> service.ItemFilter:
+    return service.ItemFilter(q=q, type_id=type_id, status=status, tag_ids=tuple(tag_id or ()))
+
+
+ItemFilters = Annotated[service.ItemFilter, Depends(_item_filter)]
+
+
+@router.get("/items", response_model=Page[GearItemOut])
+def list_items(user: CurrentUser, db: DbSession, paging: Paging, filters: ItemFilters):
+    items, total = service.list_items(db, user, filters, limit=paging.limit, offset=paging.offset)
     return Page(items=items, total=total, limit=paging.limit, offset=paging.offset)
+
+
+@router.get("/summary", response_model=GearSummaryOut)
+def summarize_items(
+    user: CurrentUser,
+    db: DbSession,
+    filters: ItemFilters,
+    group_by: Literal["type", "tag", "status", "brand"] | None = None,
+):
+    """Count, weight and purchase value of the gear, optionally per group.
+
+    Takes the same filters as the item list. With `group_by=tag` an item counts
+    in every one of its tags, so the groups can add up to more than the total.
+    """
+    return summarize(db, user, filters, group_by)
 
 
 @router.post(

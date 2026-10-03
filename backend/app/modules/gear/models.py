@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, Float, ForeignKey, Integer, String, Text, Uuid
+from sqlalchemy import Column, Date, Float, ForeignKey, Integer, String, Table, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base, TimestampMixin, UTCDateTime, utcnow
@@ -53,6 +53,31 @@ class GearCatalogItem(Base):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
 
 
+class GearTag(Base):
+    """Free label defined by a user to group gear in any way they like."""
+
+    __tablename__ = "gear_tag"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(50))
+    color: Mapped[str | None] = mapped_column(String(7))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+gear_item_tag = Table(
+    "gear_item_tag",
+    Base.metadata,
+    Column("gear_item_id", Uuid, ForeignKey("gear_item.id", ondelete="CASCADE"), primary_key=True),
+    Column(
+        "tag_id", Uuid, ForeignKey("gear_tag.id", ondelete="CASCADE"), primary_key=True, index=True
+    ),
+)
+
+
 class GearItem(TimestampMixin, Base):
     __tablename__ = "gear_item"
 
@@ -82,6 +107,14 @@ class GearItem(TimestampMixin, Base):
     serial_number: Mapped[str | None] = mapped_column(String(100))
     size: Mapped[str | None] = mapped_column(String(50))
     color: Mapped[str | None] = mapped_column(String(50))
+
+    tags: Mapped[list[GearTag]] = relationship(
+        secondary=gear_item_tag, lazy="selectin", order_by=GearTag.name
+    )
+
+    @property
+    def tag_ids(self) -> list[uuid.UUID]:
+        return [tag.id for tag in self.tags]
 
 
 class GearList(TimestampMixin, Base):

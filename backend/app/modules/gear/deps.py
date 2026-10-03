@@ -13,6 +13,7 @@ from app.modules.gear.models import (
     GearCatalogItem,
     GearItem,
     GearList,
+    GearTag,
     GearType,
 )
 
@@ -30,6 +31,13 @@ def get_owned_list(list_id: uuid.UUID, user: CurrentUser, db: DbSession) -> Gear
     if gear_list is None or gear_list.owner_id != user.id or gear_list.deleted_at is not None:
         raise NotFoundError("Packing list not found")
     return gear_list
+
+
+def get_owned_tag(tag_id: uuid.UUID, user: CurrentUser, db: DbSession) -> GearTag:
+    tag = db.get(GearTag, tag_id)
+    if tag is None or tag.owner_id != user.id:
+        raise NotFoundError("Tag not found")
+    return tag
 
 
 def get_editable_type(type_id: uuid.UUID, user: CurrentUser, db: DbSession) -> GearType:
@@ -55,5 +63,6 @@ def get_readable_catalog_item(
 
 OwnedItem = Annotated[GearItem, Depends(get_owned_item)]
 OwnedList = Annotated[GearList, Depends(get_owned_list)]
+OwnedTag = Annotated[GearTag, Depends(get_owned_tag)]
 EditableType = Annotated[GearType, Depends(get_editable_type)]
 ReadableCatalogItem = Annotated[GearCatalogItem, Depends(get_readable_catalog_item)]

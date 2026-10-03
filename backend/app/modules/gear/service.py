@@ -1,6 +1,7 @@
 """Personal gear: types, items and packing lists."""
 
 import uuid
+from dataclasses import dataclass
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -19,6 +20,7 @@ from app.modules.gear.models import (
     GearItem,
     GearList,
     GearListItem,
+    GearTag,
     GearType,
 )
 from app.modules.gear.schemas import (
@@ -28,6 +30,8 @@ from app.modules.gear.schemas import (
     GearListEntry,
     GearListIn,
     GearListOut,
+    GearTagCreate,
+    GearTagIn,
     GearTypeCreate,
     GearTypeIn,
 )
@@ -92,26 +96,88 @@ def _check_type_is_usable(db: Session, user: User, type_id: uuid.UUID | None) ->
         raise UnprocessableError("Unknown gear type", code="unknown_type")
 
 
+# --- Tags ---
+
+
+def list_tags(db: Session, user: User) -> list[GearTag]:
+    query = select(GearTag).where(GearTag.owner_id == user.id)
+    return list(db.scalars(query.order_by(func.lower(GearTag.name), GearTag.id)))
+
+
+def _check_tag_name_is_free(db: Session, user: User, name: str, *, except_id=None) -> None:
+    query = select(GearTag.id).where(
+        GearTag.owner_id == user.id, func.lower(GearTag.name) == name.lower()
+    )
+    if except_id is not None:
+        query = query.where(GearTag.id != except_id)
+    if db.scalar(query) is not None:
+        raise ConflictError("A tag with this name already exists", code="tag_name_taken")
+
+
+def create_tag(db: Session, user: User, data: GearTagCreate) -> GearTag:
+    if data.id is not None and db.get(GearTag, data.id) is not None:
+        raise ConflictError("A tag with this id already exists", code="id_taken")
+    _check_tag_name_is_free(db, user, data.name)
+    tag = GearTag(owner_id=user.id, **data.model_dump(exclude_none=True))
+    db.add(tag)
+    db.commit()
+    return tag
+
+
+def update_tag(db: Session, user: User, tag: GearTag, data: GearTagIn) -> GearTag:
+    _check_tag_name_is_free(db, user, data.name, except_id=tag.id)
+    tag.name = data.name
+    tag.color = data.color
+    db.commit()
+    return tag
+
+
+def delete_tag(db: Session, tag: GearTag) -> None:
+    """Delete the tag; the items that carried it stay."""
+    db.delete(tag)
+    db.commit()
+
+
+def _load_tags(db: Session, user: User, tag_ids: list[uuid.UUID]) -> list[GearTag]:
+    ids = set(tag_ids)
+    if not ids:
+        return []
+    tags = list(db.scalars(select(GearTag).where(GearTag.id.in_(ids), GearTag.owner_id == user.id)))
+    if len(tags) != len(ids):
+        raise UnprocessableError("Unknown tag", code="unknown_tag")
+    return tags
+
+
 # --- Items ---
 
 
-def list_items(
-    db: Session,
-    user: User,
-    *,
-    q: str | None,
-    type_id: uuid.UUID | None,
-    status: str | None,
-    limit: int,
-    offset: int,
-) -> tuple[list[GearItem], int]:
+@dataclass(frozen=True)
+class ItemFilter:
+    q: str | None = None
+    type_id: uuid.UUID | None = None
+    status: str | None = None
+    tag_ids: tuple[uuid.UUID, ...] = ()
+
+
+def item_conditions(user: User, filters: ItemFilter) -> list:
     conditions = [GearItem.owner_id == user.id, GearItem.deleted_at.is_(None)]
-    if q:
+    if filters.q:
+        q = filters.q
         conditions.append(or_(_contains(GearItem.name, q), _contains(GearItem.brand, q)))
-    if type_id is not None:
-        conditions.append(GearItem.type_id == type_id)
-    if status is not None:
-        conditions.append(GearItem.status == status)
+    if filters.type_id is not None:
+        conditions.append(GearItem.type_id == filters.type_id)
+    if filters.status is not None:
+        conditions.append(GearItem.status == filters.status)
+    # Several tags narrow the result: an item must carry all of them.
+    for tag_id in filters.tag_ids:
+        conditions.append(GearItem.tags.any(GearTag.id == tag_id))
+    return conditions
+
+
+def list_items(
+    db: Session, user: User, filters: ItemFilter, *, limit: int, offset: int
+) -> tuple[list[GearItem], int]:
+    conditions = item_conditions(user, filters)
     total = db.scalar(select(func.count()).select_from(GearItem).where(*conditions))
     query = select(GearItem).where(*conditions).order_by(func.lower(GearItem.name), GearItem.id)
     return list(db.scalars(query.limit(limit).offset(offset))), total
@@ -121,7 +187,11 @@ def create_item(db: Session, storage: Storage, user: User, data: GearItemCreate)
     if data.id is not None and db.get(GearItem, data.id) is not None:
         raise ConflictError("A gear item with this id already exists", code="id_taken")
     _check_type_is_usable(db, user, data.type_id)
-    item = GearItem(owner_id=user.id, **data.model_dump(exclude_none=True))
+    item = GearItem(
+        owner_id=user.id,
+        tags=_load_tags(db, user, data.tag_ids),
+        **data.model_dump(exclude_none=True, exclude={"tag_ids"}),
+    )
     if data.catalog_id is not None:
         template = db.get(GearCatalogItem, data.catalog_id)
         if template is None or template.status != CATALOG_APPROVED:
@@ -137,8 +207,10 @@ def create_item(db: Session, storage: Storage, user: User, data: GearItemCreate)
 def update_item(db: Session, user: User, item: GearItem, data: GearItemIn) -> GearItem:
     if data.type_id != item.type_id:
         _check_type_is_usable(db, user, data.type_id)
-    for field, value in data.model_dump().items():
+    for field, value in data.model_dump(exclude={"tag_ids"}).items():
         setattr(item, field, value)
+    item.tags = _load_tags(db, user, data.tag_ids)
+    item.updated_at = utcnow()
     db.commit()
     return item
 

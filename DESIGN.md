@@ -153,6 +153,7 @@ Alle IDs sind UUIDs und clientseitig erzeugbar. Hauptdaten haben `created_at`, `
 - description, notes, website_url, image_file_id
 - status (`active` | `retired`)
 - optional: serial_number, size, color
+- tags (beliebig viele, siehe `gear_tag`)
 
 **gear_catalog_item** (gemeinsamer Katalog, nutzerübergreifend)
 - id, created_by, name, brand, type_id (nur Standardkategorien), nominal_weight_g, website_url, image_file_id
@@ -161,11 +162,12 @@ Alle IDs sind UUIDs und clientseitig erzeugbar. Hauptdaten haben `created_at`, `
 Ablauf: Nutzer legt Gegenstand an → kann Katalogeintrag vorschlagen („Teilen im Katalog“, nur Produktdaten: Name, Marke, Kategorie, Gewicht, Website, Bild; keine persönlichen Felder wie Kaufpreis/-datum, Notizen, Beschreibung, Seriennummer) → Admin gibt frei oder lehnt ab und kann die Produktdaten dabei korrigieren. Ein Gegenstand kann erst nach einer Ablehnung erneut vorgeschlagen werden. Beim Anlegen eines eigenen Gegenstands lässt sich ein Katalogeintrag als Vorlage übernehmen (Kopie, spätere Katalogänderungen verändern persönliche Gegenstände nicht).
 
 **gear_type**: id, owner_id (leer = Standardliste), name, sort_order. Die Standardliste wird per Migration angelegt; wird eine Kategorie gelöscht, verlieren ihre Gegenstände nur die Zuordnung.
+**gear_tag** (frei definierbare Schlagworte je Nutzer, z. B. „Winter“, „Verleihbar“): id, owner_id, name (je Nutzer eindeutig), color (optional, `#RRGGBB`); Zuordnung über **gear_item_tag** (gear_item_id, tag_id). Wird ein Tag gelöscht, bleiben die Gegenstände erhalten.
 **gear_list** (Packlisten-Vorlage): id, owner_id, name, description + **gear_list_item**: gear_item_id, quantity
 
 Löschen eines Gegenstands oder einer Packliste ist ein Soft Delete (`deleted_at`); das Bild des Gegenstands wird dabei entfernt.
 
-Auswertungen (abgeleitet): Touren und Gesamtstrecke je Gegenstand, Gewicht je Kategorie.
+Auswertungen (abgeleitet): Touren und Gesamtstrecke je Gegenstand (mit Modul `protocols`); Summen über `/gear/summary`: Anzahl, Gesamtgewicht und Kaufwert (je Währung getrennt, keine Umrechnung), wahlweise gruppiert nach Kategorie, Tag, Status oder Marke und mit denselben Filtern wie die Liste. Bei Gruppierung nach Tag zählt ein Gegenstand in jedem seiner Tags.
 
 ### 6.3 Ernährung (Modul nutrition)
 **food_item**
@@ -305,7 +307,10 @@ Versioniertes Schema (`schema_version`): Tour, Ausrüstung (Snapshots), Essen, P
 ### Ausrüstung
 | Methode | Pfad | Zweck |
 |---|---|---|
-| GET, POST | /gear/items | Liste (`q`, `type_id`, `status`, `limit`, `offset`) / Anlegen (optional mit `catalog_id` als Vorlage) |
+| GET, POST | /gear/items | Liste (`q`, `type_id`, `status`, `tag_id` mehrfach, `limit`, `offset`) / Anlegen (optional mit `catalog_id` als Vorlage) |
+| GET | /gear/summary?group_by= | Summen (Anzahl, Gewicht, Kaufwert), optional gruppiert nach `type`, `tag`, `status`, `brand`; Filter wie Liste |
+| GET, POST | /gear/tags | Eigene Tags / anlegen |
+| PUT, DELETE | /gear/tags/{id} | Tag ändern / löschen |
 | GET, PUT, DELETE | /gear/items/{id} | CRUD |
 | POST, GET, DELETE | /gear/items/{id}/image | Bild hochladen (multipart, Feld `file`) / abrufen / entfernen |
 | GET | /gear/catalog?q= | Freigegebene Katalogeinträge durchsuchen |

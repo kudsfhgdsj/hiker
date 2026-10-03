@@ -644,3 +644,202 @@ def test_catalog_image_visibility(client, admin, anna, bea):
     approve(client, admin, entry["id"])
 
     assert client.get(url, headers=bea).status_code == 200
+
+
+# --- Tags ---
+
+TAGS = "/api/v1/gear/tags"
+SUMMARY = "/api/v1/gear/summary"
+
+
+def create_tag(client, headers, name, **fields):
+    response = client.post(TAGS, json={"name": name, **fields}, headers=headers)
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def test_tags_are_defined_freely_per_user(client, anna, bea):
+    winter = create_tag(client, anna, "Winter", color="#3366cc")
+    ultralight = create_tag(client, anna, "Ultraleicht")
+
+    assert client.get(TAGS, headers=anna).json() == [ultralight, winter]
+    assert winter["color"] == "#3366cc" and ultralight["color"] is None
+    assert client.get(TAGS, headers=bea).json() == []
+    assert client.post(TAGS, json={"name": "winter"}, headers=anna).status_code == 409
+    assert client.post(TAGS, json={"name": "Winter"}, headers=bea).status_code == 201
+    assert client.post(TAGS, json={"name": " "}, headers=anna).status_code == 422
+    assert client.post(TAGS, json={"name": "Rot", "color": "red"}, headers=anna).status_code == 422
+
+
+def test_tags_can_be_renamed_and_are_private(client, anna, bea):
+    tag = create_tag(client, anna, "Winter")
+    create_tag(client, anna, "Sommer")
+    url = f"{TAGS}/{tag['id']}"
+
+    renamed = client.put(url, json={"name": "Hochtour", "color": "#ff8800"}, headers=anna)
+
+    assert renamed.json() == {"id": tag["id"], "name": "Hochtour", "color": "#ff8800"}
+    assert client.put(url, json={"name": "sommer"}, headers=anna).status_code == 409
+    assert client.put(url, json={"name": "Meins"}, headers=bea).status_code == 404
+    assert client.delete(url, headers=bea).status_code == 404
+
+
+def test_items_carry_tags_and_can_be_filtered_by_them(client, anna):
+    winter = create_tag(client, anna, "Winter")
+    loan = create_tag(client, anna, "Verleihbar")
+    axe = create_item(client, anna, name="Pickel", tag_ids=[winter["id"], loan["id"]])
+    create_item(client, anna, name="Steigeisen", tag_ids=[winter["id"]])
+    create_item(client, anna, name="Sonnenhut")
+
+    def names(*tag_ids):
+        response = client.get(ITEMS, params={"tag_id": list(tag_ids)}, headers=anna)
+        assert response.status_code == 200
+        return [item["name"] for item in response.json()["items"]]
+
+    assert set(axe["tag_ids"]) == {winter["id"], loan["id"]}
+    assert names(winter["id"]) == ["Pickel", "Steigeisen"]
+    assert names(winter["id"], loan["id"]) == ["Pickel"]
+    assert names(str(uuid.uuid4())) == []
+
+    updated = client.put(
+        f"{ITEMS}/{axe['id']}", json={"name": "Pickel", "tag_ids": [loan["id"]]}, headers=anna
+    ).json()
+    assert updated["tag_ids"] == [loan["id"]]
+    assert names(winter["id"]) == ["Steigeisen"]
+
+
+def test_items_reject_unknown_and_foreign_tags(client, anna, bea):
+    foreign = create_tag(client, bea, "Winter")
+
+    for tag_id in (foreign["id"], str(uuid.uuid4())):
+        response = client.post(ITEMS, json={"name": "Pickel", "tag_ids": [tag_id]}, headers=anna)
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "unknown_tag"
+
+
+def test_deleting_a_tag_keeps_the_items(client, anna):
+    winter = create_tag(client, anna, "Winter")
+    item = create_item(client, anna, name="Pickel", tag_ids=[winter["id"]])
+
+    assert client.delete(f"{TAGS}/{winter['id']}", headers=anna).status_code == 204
+
+    assert client.get(f"{ITEMS}/{item['id']}", headers=anna).json()["tag_ids"] == []
+
+
+# --- Summary ---
+
+
+@pytest.fixture
+def gear_set(client, admin, anna):
+    """Four items of anna with types, tags, weights and prices in two currencies."""
+    tents = create_type(client, admin, "Zelt", standard=True)
+    winter = create_tag(client, anna, "Winter")
+    loan = create_tag(client, anna, "Verleihbar")
+    create_item(
+        client,
+        anna,
+        name="Zelt",
+        brand="MSR",
+        weight_g=1500,
+        purchase_price=399.9,
+        currency="CHF",
+        type_id=tents["id"],
+        tag_ids=[loan["id"]],
+    )
+    create_item(
+        client,
+        anna,
+        name="Pickel",
+        brand="Petzl",
+        weight_g=450,
+        purchase_price=120.1,
+        currency="CHF",
+        tag_ids=[winter["id"], loan["id"]],
+    )
+    create_item(
+        client,
+        anna,
+        name="Steigeisen",
+        brand="Petzl",
+        weight_g=800,
+        purchase_price=95.5,
+        currency="EUR",
+        status="retired",
+        tag_ids=[winter["id"]],
+    )
+    create_item(client, anna, name="Karte")
+    return {"tents": tents, "winter": winter, "loan": loan}
+
+
+def summary(client, headers, **params):
+    response = client.get(SUMMARY, params=params, headers=headers)
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def test_summary_totals_weight_and_value_per_currency(client, anna, gear_set):
+    result = summary(client, anna)
+
+    assert result == {
+        "group_by": None,
+        "total": {
+            "item_count": 4,
+            "weight_g": 2750,
+            "items_without_weight": 1,
+            "value": [{"currency": "CHF", "amount": 520.0}, {"currency": "EUR", "amount": 95.5}],
+            "items_without_price": 1,
+        },
+        "groups": [],
+    }
+
+
+def test_summary_respects_filters(client, anna, gear_set):
+    active = summary(client, anna, status="active")["total"]
+    winter = summary(client, anna, tag_id=gear_set["winter"]["id"])["total"]
+    petzl = summary(client, anna, q="petzl")["total"]
+
+    assert (active["item_count"], active["weight_g"]) == (3, 1950)
+    assert active["value"] == [{"currency": "CHF", "amount": 520.0}]
+    assert (winter["item_count"], winter["weight_g"]) == (2, 1250)
+    assert petzl["item_count"] == 2
+
+
+def test_summary_groups_by_tag(client, anna, gear_set):
+    groups = summary(client, anna, group_by="tag")["groups"]
+
+    assert [(g["label"], g["item_count"], g["weight_g"]) for g in groups] == [
+        ("Verleihbar", 2, 1950),
+        ("Winter", 2, 1250),
+        (None, 1, 0),
+    ]
+    assert groups[0]["key"] == gear_set["loan"]["id"]
+    assert groups[0]["value"] == [{"currency": "CHF", "amount": 520.0}]
+    assert groups[1]["value"] == [
+        {"currency": "CHF", "amount": 120.1},
+        {"currency": "EUR", "amount": 95.5},
+    ]
+    assert groups[2]["key"] is None
+
+
+@pytest.mark.parametrize(
+    ("group_by", "expected"),
+    [
+        ("type", [("Zelt", 1, 1500), (None, 3, 1250)]),
+        ("status", [("active", 3, 1950), ("retired", 1, 800)]),
+        ("brand", [("MSR", 1, 1500), ("Petzl", 2, 1250), (None, 1, 0)]),
+    ],
+)
+def test_summary_groups_by_type_status_and_brand(client, anna, gear_set, group_by, expected):
+    groups = summary(client, anna, group_by=group_by)["groups"]
+
+    assert [(g["label"], g["item_count"], g["weight_g"]) for g in groups] == expected
+
+
+def test_summary_is_private_and_ignores_deleted_items(client, anna, bea, gear_set):
+    items = client.get(ITEMS, params={"q": "zelt"}, headers=anna).json()["items"]
+    client.delete(f"{ITEMS}/{items[0]['id']}", headers=anna)
+
+    assert summary(client, bea)["total"]["item_count"] == 0
+    assert summary(client, anna)["total"]["item_count"] == 3
+    assert client.get(SUMMARY).status_code == 401
+    assert client.get(SUMMARY, params={"group_by": "color"}, headers=anna).status_code == 422
