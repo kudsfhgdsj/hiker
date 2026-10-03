@@ -204,7 +204,6 @@
   "foodProposed": "Vorschlag eingereicht.",
   "foodAlreadyInCatalog": "Dieses Lebensmittel ist schon mit einem Katalogeintrag verknüpft.",
   "foodCatalogTitle": "Katalog",
-  "foodScannerUnavailable": "Der Kamera-Scanner steht hier nicht zur Verfügung. Bitte den Barcode eintippen.",
   "foodScannerHint": "Barcode in den Rahmen halten",
   "errorBarcodeInCatalog": "Im Katalog gibt es schon ein Produkt mit diesem Barcode.",
   "toursTitle": "Touren",

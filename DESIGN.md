@@ -1,11 +1,11 @@
 # hiker – Designgrundlage
 
-Stand: 03.10.2026 (v3) · Zweck: Grundlage zur Umsetzung mit Claude Code
+Stand: 03.10.2026 (v4) · Zweck: Grundlage zur Umsetzung mit Claude Code
 Regeln für Claude Code stehen in der separaten Datei `CLAUDE.md`.
 
 ## 1. Ziele und Leitplanken
 
-- Android-App zuerst, später dieselbe Codebasis im Browser (auf dem eigenen Server gehostet).
+- Android-App (Flutter) und ein Web-Frontend im Browser (Python Flask, auf dem eigenen Server gehostet). Beide sind eigenständige Clients derselben REST-API; Flutter wird nur für Android gebaut.
 - Module: **Protokolle**, **Ausrüstung** und **Ernährung** (jetzt), **Planung** und **Berichte** (später).
 - **Strikt modular**: Jedes Modul ist in sich abgeschlossen und kann hinzugefügt/entfernt werden, ohne andere Module anzufassen.
 - **Keine Google-Dienste**: kein Firebase, kein Google Maps, kein FCM, kein Google Sign-In, kein Google ML Kit.
@@ -13,7 +13,7 @@ Regeln für Claude Code stehen in der separaten Datei `CLAUDE.md`.
 - Offline-fähig (in den Bergen oft kein Netz): lokal speichern, später synchronisieren.
 - Datenhoheit beim Nutzer: Export als JSON, alles selbst hostbar.
 
-Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen keine Google-Dienste. Falls das später stört, ist die Alternative Kotlin Multiplatform oder eine PWA; die Architektur (API-first) bleibt gleich.
+Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen keine Google-Dienste. Falls das später stört, ist die Alternative Kotlin Multiplatform; die Architektur (API-first) bleibt gleich.
 
 ## 2. Getroffene Entscheidungen
 
@@ -41,28 +41,31 @@ Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen k
 | `edit`-Grenze in Touren | `edit` ändert Titel, Fazit, Listen, Wegpunkte (und Fotos); Zeiten, Dauer, Startgewicht und Kalorienverbrauch ändert nur der Owner | Geänderte Owner-Felder von `edit` → 403 `owner_only_field` |
 | Einträge in geteilten Touren | Jeder trägt Ausrüstung aus der eigenen Datenbank ein (Essen: eigenes oder Katalog); die Tour speichert Name, Gewicht und Kalorien als Momentaufnahme | Alle mit Zugriff lesen die Einträge, ohne die Datenbank der anderen zu sehen |
 | Essen in Touren | `carried` (zählt ins Startgewicht) und `eaten` (zählt in die Kalorien) statt eines Felds `planned` | Auch Heimgetragenes und unterwegs Gekauftes erfassbar |
-| App: Server-Adresse | Wird beim Anmelden eingegeben und auf dem Gerät gespeichert; im Browser ist die eigene Herkunft vorbelegt | Keine feste Domain in der App; optionaler Vorgabewert per `--dart-define=API_BASE_URL` |
+| App: Server-Adresse | Wird beim Anmelden eingegeben und auf dem Gerät gespeichert | Keine feste Domain in der App; optionaler Vorgabewert per `--dart-define=API_BASE_URL` |
 | App: Tokens | Im Plattform-Keystore (`flutter_secure_storage`) | Abgelaufene Access-Tokens werden einmal automatisch erneuert; ein abgelehntes Refresh-Token meldet ab, fehlendes Netz nicht |
 | App: lokale Daten | Drift speichert die gesehenen Datensätze als JSON-Dokumente je Sammlung (`cached_documents`), nicht als Abbild aller Server-Tabellen | Weniger doppelte Schemapflege; die Typisierung liegt in den Dart-Modellen. Beim Abmelden wird die lokale Kopie gelöscht |
 | App: Lesen ohne Netz | Listen werden beim Laden lokal gespeichert; ist der Server nicht erreichbar, zeigt die App den gespeicherten Stand mit einem Hinweis und wendet Filter lokal an | Änderungen brauchen bis Schritt 12 (Offline-Sync) eine Verbindung |
 | App: Dateiauswahl | `file_picker` (MIT) für Bilder und GPX | Nutzt die Dateiauswahl des Systems, keine Google-Dienste |
 | App: Barcode-Ablauf | Scan oder Eingabe → Server (eigene Produkte, Katalog, Open Food Facts); ohne Netz wird in den schon gesehenen Produkten auf dem Gerät gesucht. Unbekannt oder nicht erreichbar → Formular mit vorbelegtem Barcode | Alles, was die App gesehen hat (Suche, Scans), bleibt lokal gespeichert |
 | App: Kennung | Android-Paketname `internal.lacasa.hiker` (vorläufig) | Vor einer Veröffentlichung auf die endgültige Domain umstellen |
+| Clients | Flutter nur für Android; das Web-Frontend ist ein eigenes Projekt mit Python Flask (`web/`), entschieden am 03.10.2026 | Keine Web-Plattform im Flutter-Projekt; zwei Oberflächen, die getrennt gepflegt werden |
+| Web-Frontend | Flask rendert die Seiten auf dem Server (Jinja2) und spricht ausschließlich mit der REST-API, nie direkt mit der Datenbank | API-first bleibt erhalten; Rechte, Historie und Konfliktschutz gelten wie in der App. Einzelheiten in Abschnitt 9a |
 | Fehlerformat | `{"error": {"code", "message"}}` für fachliche Fehler | Client übersetzt anhand von `code` |
 
 ## 3. Technologie-Stack
 
 | Bereich | Wahl | Begründung |
 |---|---|---|
-| App/Web-Client | Flutter (Android zuerst, `flutter build web` später) | Eine Codebasis |
+| Android-App | Flutter (nur Android) | Offline-fähig, Kamera-Scanner |
+| Web-Frontend | Python Flask mit Jinja2-Vorlagen, HTTP-Client `httpx2` | Gleiche Sprache und Werkzeuge wie das Backend; läuft als eigener Dienst neben der API |
 | State/DI | Riverpod | Testbar, modular |
-| Routing | go_router | Deep Links, Web-tauglich |
-| Lokale DB | Drift (SQLite) | Offline, typsicher, auch im Web |
+| Routing (App) | go_router | Deep Links |
+| Lokale DB (App) | Drift (SQLite) | Offline |
 | HTTP | dio | Interceptors (Auth, Retry) |
 | Karten | MapLibre (`maplibre_gl`) | Open Source; ab Phase 1 für Track, Fotos, Punktauswahl |
 | Kartenquellen | Konfigurierbare Tile-URL (Standard: OpenStreetMap) | Lizenzfragen später |
 | Diagramme | Eigenes Höhenprofil-Widget (Höhe, Herzfrequenz, Foto-Marker) | Foto-Marker und Kartenverknüpfung nötig |
-| Barcode-Scan | `flutter_zxing` (ZXing, lokal) | Kein ML Kit. Paketstatus geprüft am 03.10.2026: Version 3.1.0 vom 25.09.2026, MIT, aktiv gepflegt. Kein Web-Support: im Browser wird der Barcode eingetippt |
+| Barcode-Scan | `flutter_zxing` (ZXing, lokal) | Kein ML Kit. Paketstatus geprüft am 03.10.2026: Version 3.1.0 vom 25.09.2026, MIT, aktiv gepflegt. Im Web-Frontend wird der Barcode eingetippt |
 | Lebensmitteldaten | Open Food Facts | Kostenlos, Barcode-Abfrage, ODbL (Quelle nennen) |
 | Backend | FastAPI (Python) | OpenAPI-Doku automatisch |
 | Datenbank | PostgreSQL (Dev und Tests: SQLite) | Relational, Historie, Teilen |
@@ -77,17 +80,20 @@ Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen k
 
 ```
 ┌────────────────────────────┐        ┌───────────────────────────────┐
-│ Flutter Client (App / Web) │  HTTPS │ FastAPI Backend               │
+│ Android-App (Flutter)      │  HTTPS │ FastAPI Backend               │
 │  core/  features/*         │◄──────►│  core/  modules/*             │
 │  Drift (lokal, offline)    │  JSON  │  PostgreSQL + Dateispeicher   │
 └────────────────────────────┘        └───────────────────────────────┘
-                                              │
+┌────────────────────────────┐  HTTP          ▲            │
+│ Web-Frontend (Flask)       │────────────────┘            │
+│  Seiten für den Browser    │  JSON (gleiche REST-API)    │
+└────────────────────────────┘                             │
                           Open-Meteo, Open Food Facts, (später hikr.org)
 ```
 
 Prinzipien:
-1. **API-first**: Die App spricht nur mit der REST-API. Web = gleicher Client.
-2. **Local-first**: Änderungen landen zuerst in Drift, ein Sync-Dienst schickt sie an den Server.
+1. **API-first**: App und Web-Frontend sprechen nur mit der REST-API. Das Web-Frontend greift nie direkt auf Datenbank oder Dateispeicher zu.
+2. **Local-first** (Android-App): Änderungen landen zuerst in Drift, ein Sync-Dienst schickt sie an den Server. Das Web-Frontend arbeitet online.
 3. **Module sind Pakete**: eigene Ordner, Routen, Tabellen, Tests.
 4. **Abhängigkeiten explizit**: Core kennt keine Module. Ein Modul nutzt ein anderes nur über `MODULE_INFO.depends_on` und dessen öffentliche Service-Schnittstelle oder IDs. Keine Zyklen. `protocols` hängt von `gear` und `nutrition` ab, nie umgekehrt.
 5. **Externe Dienste hinter Adaptern** (Wetter, Höhe, Open Food Facts, Dateispeicher, später hikr.org).
@@ -101,8 +107,9 @@ hiker/
 ├── CLAUDE.md
 ├── docker-compose.yml
 ├── deploy/                   # Proxy-Beispiele, Backup-Skript, systemd-Timer
-├── backend/
-└── app/                      # Flutter
+├── backend/                  # FastAPI
+├── app/                      # Flutter, nur Android
+└── web/                      # Flask-Web-Frontend
 ```
 
 ### Backend
@@ -333,7 +340,7 @@ Umsetzung:
 - `hide_exact_start` rundet Start- und Endpunkt auf zwei Nachkommastellen (rund 1 km) und lässt deren Namen weg. Sobald es einen Track gibt (Schritt 7), muss er dort ebenfalls gekürzt werden.
 - Ungültige, abgelaufene und widerrufene Tokens sowie gelöschte Touren antworten gleich mit 404.
 - Antwort-Header: `X-Robots-Tag: noindex, nofollow`, `Cache-Control: no-store`, `Referrer-Policy: no-referrer`.
-- Das Token steht im Zugriffslog der API nur als `[redacted]` (Filter auf dem uvicorn-Access-Log für `/public/tours/` und `/p/`). Der vorgeschaltete Reverse Proxy braucht dieselbe Regel in seiner Log-Konfiguration (Beispiele in `deploy/`, Schritt 13).
+- Das Token steht im Zugriffslog der API nur als `[redacted]` (Filter auf dem uvicorn-Access-Log für `/public/tours/` und `/p/`). Das Web-Frontend und der vorgeschaltete Reverse Proxy brauchen dieselbe Regel in ihrer Log-Konfiguration (Schritte 13 und 14).
 
 **Export JSON**
 Versioniertes Schema (`schema_version`): Tour, Ausrüstung (Snapshots), Essen, Partner (Anzeigenamen), Wetter, Track-Statistik, Wegpunkte, Foto-Metadaten (inkl. Position) und Verweise auf Dateien oder ZIP mit den Dateien.
@@ -427,8 +434,9 @@ Berechtigungen werden zentral in einer Dependency geprüft, nicht in jedem Endpu
 
 - Material 3, helles und dunkles Theme, Design-Tokens zentral in `core/theme`.
 - Farbidee: Tannengrün, Fels-Grau, Schnee-Weiß, Akzent Orange.
-- Navigation: untere Leiste mit aktiven Modulen (Touren | Ausrüstung | Essen | später Planung, Berichte); auf großen Bildschirmen Navigation Rail.
+- Navigation: untere Leiste mit aktiven Modulen (Touren | Ausrüstung | Essen | später Planung, Berichte); auf großen Bildschirmen (Tablets) Navigation Rail.
 - Responsiv von Beginn an, Deutsch zuerst, Texte über ARB-Dateien.
+- Diese Grundlage gilt für die Android-App und, sinngemäß mit denselben Farben, Begriffen und Abläufen, für das Web-Frontend (Abschnitt 9a).
 
 ### Tourdetail (orientiert an wanderer)
 wanderer (open-wanderer/wanderer, AGPLv3) dient als **UX-Vorbild, nicht als Code- oder Asset-Quelle**. Aus der Dokumentation entnommen: Fotos hängen an der Tour und erscheinen in der Detailansicht, eines ist als Vorschaubild wählbar, Wegpunkte haben Name, Beschreibung, Icon und Fotos, und „Aus Fotos“ erzeugt Wegpunkte aus GPS-Daten der Bilder. Wie genau Karte und Höhenprofil die Fotos zeigen, steht dort nicht; das Verhalten bitte am Demo-System (demo.wanderer.to) ansehen und hier festhalten, bevor die Detailansicht gebaut wird.
@@ -447,6 +455,23 @@ Geplantes Verhalten (unsere Umsetzung):
 - Ausrüstung: Liste mit Bild, Filter und Suche, Katalogsuche beim Anlegen.
 - Essen: Scan-Button öffnet Kamera; Trefferkarte mit Nährwerten und Mengeneingabe.
 
+## 9a. Web-Frontend (Flask)
+
+Das Web-Frontend ist ein eigenes Projekt in `web/` und ersetzt die früher geplante Web-Version der Flutter-App.
+
+- **Aufbau**: Flask-Anwendung mit Jinja2-Vorlagen, je Modul ein Blueprint (`auth`, `gear`, `nutrition`, `protocols`). Angezeigt werden nur Module, die die API unter `/modules` meldet.
+- **Daten**: ausschließlich über die REST-API (`API_BASE_URL`, im Compose-Netz direkt zum `api`-Dienst). Kein eigener Datenbestand, keine eigene Fachlogik: Rechte, Historie, Konfliktschutz und Schätzungen kommen von der API.
+- **Anmeldung**: Das Frontend meldet den Nutzer an der API an und hält Access- und Refresh-Token serverseitig in der Sitzung; der Browser bekommt nur ein Sitzungs-Cookie (`HttpOnly`, `Secure`, `SameSite=Lax`). Formulare sind gegen CSRF geschützt. Abgelaufene Access-Tokens werden wie in der App einmal erneuert.
+- **Konflikte**: Formulare schicken die `version` mit; bei 409 zeigt die Seite den neuen Stand und die eigenen Eingaben nebeneinander.
+- **Karte und Höhenprofil**: MapLibre GL JS, als statische Datei vom eigenen Server ausgeliefert (kein CDN); Verhalten wie in Abschnitt 9 beschrieben.
+- **Öffentliche Links**: Die Seite `/p/<token>` gehört zum Web-Frontend. Sie braucht keine Anmeldung, liest `/public/tours/<token>` der API und setzt `noindex`.
+- **Bilder und Dateien**: Das Frontend reicht sie von der API durch (mit dem Token des Nutzers); Uploads gehen den umgekehrten Weg.
+- **Barcode**: Eingabe von Hand; der Kamera-Scanner bleibt der Android-App vorbehalten.
+- **Kein Offline-Betrieb**: Das Web-Frontend braucht eine Verbindung zum Server.
+- **Sprache**: Deutsch; die Texte liegen in einer Übersetzungsdatei, nicht in den Vorlagen verstreut.
+- **Betrieb**: eigener Dienst `web` im Compose-Stack, nur auf `127.0.0.1:<Port>`. Der Reverse Proxy leitet `/api/` an die API und alles andere an das Web-Frontend. Die Regel „Tokens öffentlicher Links nie in Logs“ gilt auch hier und im Proxy.
+- **Tests**: pytest mit dem Flask-Testclient; die API wird in den Tests durch eine Attrappe ersetzt.
+
 ## 10. Sicherheit und Datenschutz
 
 - Passwörter mit argon2 oder bcrypt, JWT kurzlebig + Refresh-Token.
@@ -464,7 +489,7 @@ Geplantes Verhalten (unsere Umsetzung):
 
 Ziel: Ubuntu 26.04, Domain `hiker.lacasa.internal`, läuft auf dem bereits genutzten Server neben anderen Diensten.
 
-- Docker über das offizielle Docker-Repository installieren; Stack per Docker Compose: `api`, `db` (PostgreSQL), optional `minio`.
+- Docker über das offizielle Docker-Repository installieren; Stack per Docker Compose: `api`, `db` (PostgreSQL), `web` (Flask-Web-Frontend, ab Schritt 13), optional `minio`.
 - **Keine festen Ports 80/443 im Stack.** Die API lauscht nur auf `127.0.0.1:<Port>`. Der bereits vorhandene Webserver bzw. Reverse Proxy (nginx, Apache oder Caddy) leitet `hiker.lacasa.internal` dorthin; TLS über Let's Encrypt (certbot oder Caddy). Beispielkonfigurationen für nginx und Caddy liegen in `deploy/`. Läuft auf dem Server noch kein Proxy, wird einer ergänzt.
 - DNS: A-/AAAA-Eintrag für `hiker.lacasa.internal` auf den Server.
 - Konfiguration in `.env` (nicht im Repository, Vorlage `.env.example`): Datenbankpasswort, `SECRET_KEY`, `PUBLIC_BASE_URL=https://hiker.lacasa.internal`, Speicherpfad, `ENABLED_MODULES`, `REGISTRATION_MODE`.
@@ -487,9 +512,10 @@ Ziel: Ubuntu 26.04, Domain `hiker.lacasa.internal`, läuft auf dem bereits genut
 8. Fotos: Upload, EXIF, Zuordnung zum Track, Wegpunkte aus Fotos, Titelbild
 9. Start-/Endpunkt und automatischer Wetterabruf
 10. Kalorienschätzung
-11. Flutter: Core inkl. `core/map` (Karte, Foto-Marker, Höhenprofil, Zeichnen), Auth, Ausrüstung, Essen mit Scanner, Protokolle (Liste, Detail, Editor, Historie, Teilen)
-12. Offline-Sync
-13. Tests, Docker Compose, Proxy-Beispiele, Backup-Skript, README
+11. Flutter (nur Android): Core inkl. `core/map` (Karte, Foto-Marker, Höhenprofil, Zeichnen), Auth, Ausrüstung, Essen mit Scanner, Protokolle (Liste, Detail, Editor, Historie, Teilen)
+12. Offline-Sync (Android-App)
+13. Web-Frontend mit Flask (Abschnitt 9a): Anmeldung, Ausrüstung, Essen, Protokolle, öffentliche Linkseite
+14. Tests, Docker Compose, Proxy-Beispiele, Backup-Skript, README
 
 **Phase 2 – Planung**: Layer-Provider-Schnittstelle, Stile (Sommer/Winter/Satellit), Ebenen (Hangneigung, Wetter, Schnee, Lawinenlage), Routen planen und als GPX speichern, Verknüpfung zu Protokollen; vorher Lizenzen der Kartenquellen klären. Optional FIT-Import.
 

@@ -16,15 +16,6 @@ class MapLibreMapView extends StatefulWidget {
 
   final MapContent content;
 
-  /// MapLibre GL JS is served by the app itself instead of a foreign CDN.
-  static void configureWeb() {
-    if (!kIsWeb) return;
-    MapLibreMap.webLibrarySource = const MapLibreJsSource.urls(
-      scriptUrl: 'maplibre/maplibre-gl.mjs',
-      styleUrl: 'maplibre/maplibre-gl.css',
-    );
-  }
-
   @override
   State<MapLibreMapView> createState() => _MapLibreMapViewState();
 }
@@ -142,8 +133,8 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
     }
     final screen = await controller.toScreenLocationBatch(points);
     if (!mounted) return;
-    // Android reports physical pixels, the browser logical ones.
-    final ratio = kIsWeb ? 1.0 : MediaQuery.devicePixelRatioOf(context);
+    // Android reports physical pixels; Flutter lays out in logical ones.
+    final ratio = MediaQuery.devicePixelRatioOf(context);
     setState(() {
       _positions = {
         for (var i = 0; i < ids.length; i++)

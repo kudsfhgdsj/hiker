@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -30,12 +29,7 @@ class _AuthFormScreenState extends ConsumerState<AuthFormScreen> {
   bool _busy = false;
   Object? _error;
 
-  String _initialServer() {
-    final stored = ref.read(sessionProvider).baseUrl;
-    if (stored.isNotEmpty) return stored;
-    // In the browser the app is normally served by the server it talks to.
-    return kIsWeb ? Uri.base.origin : '';
-  }
+  String _initialServer() => ref.read(sessionProvider).baseUrl;
 
   @override
   void dispose() {

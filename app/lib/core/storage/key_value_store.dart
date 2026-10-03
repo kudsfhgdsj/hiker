@@ -8,7 +8,7 @@ abstract class KeyValueStore {
   Future<void> delete(String key);
 }
 
-/// Backed by the platform keystore (Android Keystore, WebCrypto in the browser).
+/// Backed by the Android Keystore.
 class SecureKeyValueStore implements KeyValueStore {
   SecureKeyValueStore([FlutterSecureStorage? storage])
     : _storage = storage ?? const FlutterSecureStorage();

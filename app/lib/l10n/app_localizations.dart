@@ -1108,12 +1108,6 @@ abstract class AppLocalizations {
   /// **'Katalog'**
   String get foodCatalogTitle;
 
-  /// No description provided for @foodScannerUnavailable.
-  ///
-  /// In de, this message translates to:
-  /// **'Der Kamera-Scanner steht hier nicht zur Verfügung. Bitte den Barcode eintippen.'**
-  String get foodScannerUnavailable;
-
   /// No description provided for @foodScannerHint.
   ///
   /// In de, this message translates to:

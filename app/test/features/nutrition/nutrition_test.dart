@@ -86,17 +86,14 @@ FakeApi foodApi({List<Object?>? saved}) => FakeApi({
   },
 });
 
-/// Opens the app on the food screen; `scan` stands in for the camera.
+/// Opens the app on the food screen; `scan` is what the camera would read
+/// (null: the user leaves the scanner without a code).
 Future<void> openFood(WidgetTester tester, FakeApi api, {String? scan}) =>
     pumpApp(
       tester,
       api: api,
       store: MemoryKeyValueStore(signedInStore),
-      overrides: [
-        barcodeScannerProvider.overrideWithValue(
-          scan == null ? null : (_) async => scan,
-        ),
-      ],
+      overrides: [barcodeScannerProvider.overrideWithValue((_) async => scan)],
     );
 
 Future<void> tapSave(WidgetTester tester, [String label = 'Speichern']) async {
@@ -216,11 +213,11 @@ void main() {
       expect(find.text('Bergkraft · Eigenes'), findsOneWidget);
       expect(find.text('480 kcal'), findsOneWidget);
       expect(find.text('Marke · Katalog'), findsOneWidget);
-      // Without a camera the main action is typing the barcode.
       expect(
-        find.widgetWithText(FloatingActionButton, 'Barcode eingeben'),
+        find.widgetWithText(FloatingActionButton, 'Barcode scannen'),
         findsOneWidget,
       );
+      expect(find.byTooltip('Barcode eingeben'), findsOneWidget);
     });
 
     testWidgets('search narrows the list', (tester) async {
@@ -318,9 +315,7 @@ void main() {
       final api = foodApi();
       await openFood(tester, api);
 
-      await tester.tap(
-        find.widgetWithText(FloatingActionButton, 'Barcode eingeben'),
-      );
+      await tester.tap(find.byTooltip('Barcode eingeben'));
       await tester.pumpAndSettle();
       await tester.enterText(field('Barcode'), '12345');
       await tester.tap(find.widgetWithText(FilledButton, 'Suchen'));

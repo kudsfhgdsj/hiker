@@ -39,8 +39,7 @@ class _FoodListScreenState extends ConsumerState<FoodListScreen> {
   }
 
   Future<void> _scan() async {
-    final scan = ref.read(barcodeScannerProvider);
-    final barcode = scan == null ? await _typeBarcode() : await scan(context);
+    final barcode = await ref.read(barcodeScannerProvider)(context);
     if (barcode != null && mounted) await _lookup(barcode);
   }
 
@@ -98,21 +97,20 @@ class _FoodListScreenState extends ConsumerState<FoodListScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final hasCamera = ref.watch(barcodeScannerProvider) != null;
     final results = ref.watch(foodSearchProvider(_query));
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.foodTitle),
         actions: [
-          if (hasCamera)
-            IconButton(
-              tooltip: l10n.foodEnterBarcode,
-              icon: const Icon(Icons.dialpad),
-              onPressed: () async {
-                final barcode = await _typeBarcode();
-                if (barcode != null && mounted) await _lookup(barcode);
-              },
-            ),
+          // For damaged codes the camera cannot read.
+          IconButton(
+            tooltip: l10n.foodEnterBarcode,
+            icon: const Icon(Icons.dialpad),
+            onPressed: () async {
+              final barcode = await _typeBarcode();
+              if (barcode != null && mounted) await _lookup(barcode);
+            },
+          ),
           IconButton(
             tooltip: l10n.foodCatalogTitle,
             icon: const Icon(Icons.library_books_outlined),
@@ -128,7 +126,7 @@ class _FoodListScreenState extends ConsumerState<FoodListScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _scan,
         icon: const Icon(Icons.qr_code_scanner),
-        label: Text(hasCamera ? l10n.foodScan : l10n.foodEnterBarcode),
+        label: Text(l10n.foodScan),
       ),
       body: Column(
         children: [

@@ -1,6 +1,7 @@
 # hiker – App
 
-Flutter-App für Android und Browser. Grundlage: `../DESIGN.md`, Regeln: `../CLAUDE.md`.
+Flutter-App für Android. Das Web-Frontend ist ein eigenes Projekt (Python Flask, siehe
+`../DESIGN.md`). Grundlage: `../DESIGN.md`, Regeln: `../CLAUDE.md`.
 
 ## Einrichten
 
@@ -20,14 +21,13 @@ Die deutschen Texte liegen in `lib/l10n/app_de.arb`; `flutter gen-l10n` erzeugt 
 ## Starten
 
 ```sh
-flutter run -d chrome                       # Browser
 flutter run                                 # angeschlossenes Android-Gerät
-flutter build web                           # Web-Version nach build/web
+flutter build apk                           # braucht das Android-SDK
 ```
 
 Die Server-Adresse wird beim Anmelden eingegeben und auf dem Gerät gespeichert. Ein Vorgabewert
-lässt sich beim Bauen setzen: `--dart-define=API_BASE_URL=https://hiker.example.org`. Im Browser
-ist die eigene Herkunft vorbelegt. Für den Android-Emulator ist der Rechner unter
+lässt sich beim Bauen setzen: `--dart-define=API_BASE_URL=https://hiker.example.org`. Für den
+Android-Emulator ist der Rechner unter
 `http://10.0.2.2:<Port>` erreichbar.
 
 ## Aufbau

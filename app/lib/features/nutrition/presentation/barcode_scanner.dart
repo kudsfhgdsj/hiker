@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_zxing/flutter_zxing.dart';
@@ -10,13 +9,12 @@ import '../data/food_models.dart';
 typedef ScanBarcode = Future<String?> Function(BuildContext context);
 
 /// The scanner reads codes on the device with ZXing; no cloud service is involved.
-/// There is no camera scanner in the browser.
-final barcodeScannerProvider = Provider<ScanBarcode?>((ref) {
-  if (kIsWeb) return null;
-  return (context) => Navigator.of(context).push<String>(
-    MaterialPageRoute(builder: (context) => const _ScannerScreen()),
-  );
-});
+final barcodeScannerProvider = Provider<ScanBarcode>(
+  (ref) =>
+      (context) => Navigator.of(context).push<String>(
+        MaterialPageRoute(builder: (context) => const _ScannerScreen()),
+      ),
+);
 
 class _ScannerScreen extends StatefulWidget {
   const _ScannerScreen();

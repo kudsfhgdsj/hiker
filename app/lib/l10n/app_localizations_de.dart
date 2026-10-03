@@ -555,10 +555,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get foodCatalogTitle => 'Katalog';
 
   @override
-  String get foodScannerUnavailable =>
-      'Der Kamera-Scanner steht hier nicht zur Verfügung. Bitte den Barcode eintippen.';
-
-  @override
   String get foodScannerHint => 'Barcode in den Rahmen halten';
 
   @override
