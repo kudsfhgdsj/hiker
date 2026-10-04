@@ -840,3 +840,27 @@ def test_cloud_tiles_are_asked_for_by_area_and_time():
     assert params["layers"] == "mtg_fd:ir105_hrfi" and params["time"] == "2026-10-04T12:15:00Z"
     west, south, east, north = (float(part) for part in params["bbox"].split(","))
     assert west == 0 and south == 0 and round(east) == round(north) == 20037508
+
+
+def test_sun_for_a_place_needs_no_login_and_knows_the_summit(client):
+    place = {"lat": 47.2494, "lon": 9.3433, "date": "2026-06-21"}
+
+    valley = client.get("/api/v1/maps/sun", params=place)
+
+    assert valley.status_code == 200
+    body = valley.json()
+    assert body["date"] == "2026-06-21"
+    assert body["sunrise"].startswith("2026-06-21T03:26") and body["sunset"][11:16] == "19:22"
+    assert body["dawn"] < body["sunrise"] < body["noon"] < body["sunset"] < body["dusk"]
+
+    # From a summit the horizon lies lower: the sun is seen some minutes longer at both ends.
+    summit = client.get("/api/v1/maps/sun", params=place | {"elevation_m": 2500}).json()
+    early = datetime.fromisoformat(body["sunrise"]) - datetime.fromisoformat(summit["sunrise"])
+    assert timedelta(minutes=5) < early < timedelta(minutes=20)
+    assert summit["sunset"] > body["sunset"] and summit["dawn"] == body["dawn"]
+
+    # Without a date: today. In the polar summer there is no sunrise.
+    assert client.get("/api/v1/maps/sun", params={"lat": 47, "lon": 9}).status_code == 200
+    polar = client.get("/api/v1/maps/sun", params={"lat": 78.2, "lon": 15.6, "date": "2026-06-21"})
+    assert polar.json()["sunrise"] is None
+    assert client.get("/api/v1/maps/sun", params={"lat": 95, "lon": 9}).status_code == 422

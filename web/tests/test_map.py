@@ -144,7 +144,66 @@ def test_pages_carry_the_texts_of_the_layer_control(user, fake_api):
 
     texts = plan_data(page)["layerTexts"]
     assert texts["base"] == {"map": "Karte", "winter": "Winter", "satellite": "Luftbild"}
-    assert texts["overlay"]["slope"] == "Hangneigung" and texts["terrain"] == "3D-Gelände"
+    assert texts["overlay"]["slope"] == "Hangneigung" and "3D" in texts["terrain"]
+    # The drop-down fields of the map: layers, looks, slope angles, a past day, the radar.
+    assert texts["title"] == "Ebenen" and texts["looks"] == "Darstellung"
+    assert set(texts["slope"]) == {"from", "to", "low", "high", "open"}
+    assert set(texts["history"]) == {"label", "today", "note"}
+    assert set(texts["radar"]) == {"rain", "clouds", "play", "note"}
     assert texts["overlay"]["avalanche"] == "Lawinengefahr"
     assert "Bulletin" in texts["note"]["avalanche"]
     assert "map_layers.js" in page
+
+
+def test_map_mode_shows_the_map_and_links_into_the_planner(user, fake_api):
+    planning_api(fake_api, INFO)
+    vector_api(fake_api)
+
+    page = user.get("/map").get_data(as_text=True)
+
+    assert 'href="/map"' in page and ">Karte</a>" in page
+    data = json.loads(re.search(r'id="map-data">(.*?)</script>', page, re.S).group(1))
+    assert data["styleUrl"] == "/map/style.json" and data["sunUrl"] == "/map/sun"
+    assert data["planUrl"] == "/routes/new"
+    assert data["texts"]["sac"]["alpine_hiking"] == "T4 – Schwere Bergtour"
+    assert data["layerTexts"]["title"] == "Ebenen" and "map_view.js" in page
+
+    # The planner starts where the map was looked at.
+    planner = user.get("/routes/new?lat=46.5&lon=8.1&zoom=13").get_data(as_text=True)
+    assert plan_data(planner)["view"] == {"center": [8.1, 46.5], "zoom": 13.0}
+    assert plan_data(user.get("/routes/new?lat=x").get_data(as_text=True))["view"] is None
+
+
+def test_map_mode_needs_a_login_and_the_module(browser, fake_api):
+    assert browser.get("/map").status_code == 302
+    fake_api.modules.remove("maps")
+    browser.login()
+    assert browser.get("/map").status_code == 404
+
+
+def test_sun_radar_and_layer_choices_are_passed_on(browser, fake_api):
+    image = httpx2.Response(200, content=b"png", headers={"content-type": "image/png"})
+    sun = {"date": "2026-06-21", "sunrise": "2026-06-21T03:26:00Z", "sunset": None}
+    fake_api.route("GET", "/maps/sun", sun)
+    fake_api.route("GET", "/maps/radar/frames", {"rain": [1790000000], "clouds": []})
+    fake_api.route("GET", "/maps/radar/rain/1790000000/7/67/44.png", lambda r: image)
+    fake_api.route("GET", "/maps/slope/12/2153/1436.png", lambda r: image)
+    fake_api.route("GET", "/maps/raster/snow/7/67/44", lambda r: image)
+
+    answer = browser.get("/map/sun?lat=47.2&lon=9.3&elevation_m=2500&other=1")
+    assert answer.get_json() == sun
+    assert dict(fake_api.calls[-1].url.params) == {
+        "lat": "47.2",
+        "lon": "9.3",
+        "elevation_m": "2500",
+    }
+
+    assert browser.get("/map/radar/frames").get_json()["rain"] == [1790000000]
+    assert browser.get("/map/radar/rain/1790000000/7/67/44.png").data == b"png"
+    assert browser.get("/map/radar/other/1/7/67/44.png").status_code == 404
+
+    # The chosen angles of the slope layer and the day of a layer with a history.
+    browser.get("/map/slope/12/2153/1436.png?low=35&high=50")
+    assert dict(fake_api.calls[-1].url.params) == {"low": "35", "high": "50"}
+    browser.get("/map/raster/snow/7/67/44?date=2026-02-01")
+    assert dict(fake_api.calls[-1].url.params) == {"date": "2026-02-01"}

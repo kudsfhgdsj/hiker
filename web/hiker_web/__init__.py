@@ -10,7 +10,14 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from hiker_web import formatting
 from hiker_web.api import ApiError, api
 from hiker_web.config import load_config
-from hiker_web.security import check_csrf, csrf_token, install_log_redaction, pending_step
+from hiker_web.maps import map_config
+from hiker_web.security import (
+    check_csrf,
+    csrf_token,
+    install_log_redaction,
+    module_required,
+    pending_step,
+)
 from hiker_web.sessions import SessionStore
 from hiker_web.texts_de import TEXTS, label, t
 
@@ -20,8 +27,21 @@ __version__ = "0.1.0"
 NAVIGATION = (
     ("protocols", "protocols.tour_list", "nav.tours"),
     ("planning", "planning.route_list", "nav.planning"),
+    ("maps", "map_page", "nav.map"),
     ("gear", "gear.item_list", "nav.gear"),
     ("nutrition", "nutrition.food_list", "nav.food"),
+)
+
+
+OSM_ATTRIBUTION = "© OpenStreetMap-Mitwirkende"
+# The SAC hiking scale as OpenStreetMap names it, with its level T1 to T6.
+SAC_SCALE = (
+    (1, "hiking"),
+    (2, "mountain_hiking"),
+    (3, "demanding_mountain_hiking"),
+    (4, "alpine_hiking"),
+    (5, "demanding_alpine_hiking"),
+    (6, "difficult_alpine_hiking"),
 )
 
 
@@ -190,6 +210,10 @@ def create_app(config: dict | None = None) -> Flask:
                 source["tiles"] = [own(tile) for tile in source["tiles"]]
             if isinstance(source.get("data"), str):
                 source["data"] = own(source["data"])
+        radar = style.get("metadata", {}).get("hiker", {}).get("radar")
+        if radar:
+            for key in ("frames", "rain", "clouds"):
+                radar[key] = own(radar[key])
         response = app.json.response(style)
         response.headers["Cache-Control"] = "public, max-age=300"
         return response
@@ -199,16 +223,68 @@ def create_app(config: dict | None = None) -> Flask:
         upstream = api().request("GET", f"/maps/vector/{z}/{x}/{y}.pbf", auth=False)
         return _passed_on(upstream, "application/x-protobuf")
 
+    def _query(*names: str) -> dict:
+        """The query parameters a map layer takes, passed on as they are."""
+        return {name: request.args[name] for name in names if name in request.args}
+
     @app.get("/map/avalanche.geojson")
     def map_avalanche():
-        upstream = api().request("GET", "/maps/avalanche.geojson", auth=False)
+        upstream = api().request(
+            "GET", "/maps/avalanche.geojson", auth=False, params=_query("date")
+        )
         return _passed_on(upstream, "application/geo+json")
+
+    @app.get("/map/sun")
+    def map_sun():
+        """Sunrise and sunset at a place; computed by the API."""
+        upstream = api().request(
+            "GET", "/maps/sun", auth=False, params=_query("lat", "lon", "date", "elevation_m")
+        )
+        response = app.json.response(upstream.json())
+        response.headers["Cache-Control"] = "public, max-age=600"
+        return response
+
+    @app.get("/map")
+    @module_required("maps")
+    def map_page():
+        """Map mode: look at the map and look things up, without planning."""
+        modules = (api().data or {}).get("modules", [])
+        map_data = {
+            **map_config(OSM_ATTRIBUTION),
+            "sunUrl": url_for("map_sun"),
+            "planUrl": url_for("planning.route_new") if "planning" in modules else None,
+            "texts": {
+                "sunrise": t("plan.js.sunrise"),
+                "sunset": t("plan.js.sunset"),
+                "sun_loading": t("mapmode.sun_loading"),
+                "sun_none": t("mapmode.sun_none"),
+                "sun_summit": t("mapmode.sun_summit"),
+                "sun_light": t("mapmode.sun_light"),
+                "plan_here": t("mapmode.plan_here"),
+                "via_ferrata": t("mapmode.via_ferrata"),
+                "sac": {scale: t(f"plan.difficulty.{level}") for level, scale in SAC_SCALE},
+            },
+        }
+        return render_template("map.html", map_data=map_data)
+
+    @app.get("/map/radar/frames")
+    def map_radar_frames():
+        response = app.json.response(api().request("GET", "/maps/radar/frames", auth=False).json())
+        response.headers["Cache-Control"] = "public, max-age=120"
+        return response
+
+    @app.get("/map/radar/<any(rain, clouds):kind>/<int:frame>/<int:z>/<int:x>/<int:y>.png")
+    def map_radar_tile(kind, frame, z, x, y):
+        upstream = api().request("GET", f"/maps/radar/{kind}/{frame}/{z}/{x}/{y}.png", auth=False)
+        return _passed_on(upstream, "image/png")
 
     @app.get(
         "/map/raster/<any(terrain, satellite, snow, precipitation):layer>/<int:z>/<int:x>/<int:y>"
     )
     def map_layer_tile(layer, z, x, y):
-        upstream = api().request("GET", f"/maps/raster/{layer}/{z}/{x}/{y}", auth=False)
+        upstream = api().request(
+            "GET", f"/maps/raster/{layer}/{z}/{x}/{y}", auth=False, params=_query("date")
+        )
         return _passed_on(upstream, upstream.headers.get("content-type", "image/png"))
 
     @app.get("/map/contours/<int:z>/<int:x>/<int:y>.pbf")
@@ -218,12 +294,16 @@ def create_app(config: dict | None = None) -> Flask:
 
     @app.get("/map/weather/<int:z>/<int:x>/<int:y>.pbf")
     def map_weather_tile(z, x, y):
-        upstream = api().request("GET", f"/maps/weather/{z}/{x}/{y}.pbf", auth=False)
+        upstream = api().request(
+            "GET", f"/maps/weather/{z}/{x}/{y}.pbf", auth=False, params=_query("date")
+        )
         return _passed_on(upstream, "application/x-protobuf")
 
     @app.get("/map/slope/<int:z>/<int:x>/<int:y>.png")
     def map_slope_tile(z, x, y):
-        upstream = api().request("GET", f"/maps/slope/{z}/{x}/{y}.png", auth=False)
+        upstream = api().request(
+            "GET", f"/maps/slope/{z}/{x}/{y}.png", auth=False, params=_query("low", "high")
+        )
         return _passed_on(upstream, "image/png")
 
     @app.get("/map/fonts/<fontstack>/<glyphs>.pbf")

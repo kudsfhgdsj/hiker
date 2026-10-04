@@ -25,14 +25,31 @@ STATS = {
     "duration_s": 2000,
     "duration_estimated": True,
 }
+PACE = {
+    "preset": "sac",
+    "name": None,
+    "ascent_m_per_h": 400,
+    "descent_m_per_h": 800,
+    "distance_km_per_h": 4,
+}
+SAVED_PACE = {
+    "id": "66666666-6666-4666-8666-666666666666",
+    "name": "Mit Kindern",
+    "ascent_m_per_h": 250,
+    "descent_m_per_h": 400,
+    "distance_km_per_h": 3,
+}
 ROUTE = {
     "id": ROUTE_ID,
     "title": "Auf den Gipfel",
     "description": "Über die Hütte",
-    "planned_date": "2026-07-18",
+    "tags": ["Sommer", "Gipfel"],
+    "start_time": "2026-07-18T05:30:00Z",
     "profile": "hiking",
     "max_difficulty": 4,
     "via_ferrata": True,
+    "pace": PACE,
+    "sun": None,
     "engine": "brouter+direct",
     "version": 3,
     "waypoints": WAYPOINTS,
@@ -41,6 +58,11 @@ ROUTE = {
 }
 INFO = {
     "routing_available": True,
+    "paces": [
+        {"id": "dav", "ascent_m_per_h": 300, "descent_m_per_h": 500, "distance_km_per_h": 4},
+        {"id": "sac", "ascent_m_per_h": 400, "descent_m_per_h": 800, "distance_km_per_h": 4},
+        {"id": "pro", "ascent_m_per_h": 600, "descent_m_per_h": 1000, "distance_km_per_h": 6},
+    ],
     "profiles": [{"id": "hiking", "available": True}, {"id": "direct", "available": True}],
     "difficulties": [
         {"level": level, "code": f"T{level}", "sac_scale": "x"} for level in range(1, 7)
@@ -60,6 +82,7 @@ def planning_api(fake_api, info=INFO):
         "GET", "/planning/routes", {"items": [ROUTE], "total": 1, "limit": 200, "offset": 0}
     )
     fake_api.route("GET", "/planning/routes/*", ROUTE)
+    fake_api.route("GET", "/planning/paces", [SAVED_PACE])
 
 
 def plan_data(page: str) -> dict:
@@ -70,7 +93,13 @@ def form(**overrides) -> dict:
     return {
         "title": "Auf den Gipfel",
         "description": "",
-        "planned_date": "2026-07-18",
+        "tags": "Sommer, Gipfel, ",
+        "start_time": "2026-07-18T05:30:00.000Z",
+        "pace_preset": "sac",
+        "pace_ascent": "400",
+        "pace_descent": "800",
+        "pace_distance": "4",
+        "pace_name": "",
         "profile": "hiking",
         "max_difficulty": "4",
         "via_ferrata": "1",
@@ -85,7 +114,17 @@ def test_navigation_and_list_show_the_routes(user, fake_api):
 
     assert 'href="/routes/"' in page and "Planung" in page
     assert "Auf den Gipfel" in page and "18.07.2026" in page
+    assert 'href="/routes/?tag=Sommer"' in page
     assert "1,1 km" in page and "100 m" in page and "33 min" in page
+
+
+def test_list_can_be_narrowed_to_a_tag(user, fake_api):
+    planning_api(fake_api)
+
+    page = text(user.get("/routes/?tag=Gipfel"))
+
+    assert fake_api.last("GET", "/planning/routes").url.params["tag"] == "Gipfel"
+    assert "Routen mit dem Tag „Gipfel“" in page
 
 
 def test_pages_do_not_exist_without_the_module(browser, fake_api):
@@ -107,8 +146,14 @@ def test_new_route_opens_an_empty_planner(user, fake_api):
     # All levels of the SAC scale, T3 chosen, via ferratas off.
     assert "T1 – Wanderung" in page and "T6 – Äußerst schwierige Bergtour" in page
     assert re.search(r'<option value="3" selected>', page)
-    assert 'name="via_ferrata" id="plan-ferrata" value="1">' in page
+    assert 'id="plan-ferrata" value="1" form="plan-form">' in page
     assert "OpenStreetMap" in page
+    # The paces for the walking time: built in, own values, and the saved ones of the user.
+    assert re.search(r'<option value="dav"[^>]*selected>DAV', page)
+    assert "SAC: 400 Hm auf" in page and "Profi: 600 Hm auf" in page and "Individuell" in page
+    assert re.search(r'<option value="saved:6666[^>]*data-name="Mit Kindern"', page)
+    # No planned date any more; tags and the start instead.
+    assert "planned_date" not in page and 'name="tags"' in page and 'id="plan-start"' in page
 
 
 def test_planner_without_routing_offers_straight_lines_only(user, fake_api):
@@ -131,8 +176,12 @@ def test_stored_route_is_shown_with_its_line(user, fake_api):
     assert data["route"]["duration_s"] == 2000
     assert 'name="version" value="3"' in page
     assert re.search(r'<option value="4" selected>', page)
-    assert 'value="1" checked>' in page
+    assert 'id="plan-ferrata" value="1" form="plan-form" checked>' in page
     assert f'href="/routes/{ROUTE_ID}/gpx"' in page and "geschätzt" in page
+    assert 'value="Sommer, Gipfel"' in page
+    assert 'id="plan-start-utc" value="2026-07-18T05:30:00Z"' in page
+    assert re.search(r'<option value="sac"[^>]*selected>', page)
+    assert data["route"]["start_time"] == "2026-07-18T05:30:00Z"
 
 
 def test_preview_passes_the_waypoints_on_and_needs_the_csrf_token(user, fake_api):
@@ -172,12 +221,52 @@ def test_saving_a_new_route_sends_everything_to_the_api(user, fake_api):
     assert fake_api.body() == {
         "title": "Auf den Gipfel",
         "description": None,
-        "planned_date": "2026-07-18",
+        "tags": ["Sommer", "Gipfel"],
+        "start_time": "2026-07-18T05:30:00.000Z",
         "profile": "hiking",
         "max_difficulty": 4,
         "via_ferrata": True,
+        "pace": {"preset": "sac"},
         "waypoints": WAYPOINTS,
     }
+
+
+def test_own_and_saved_paces_are_sent_with_their_values(user, fake_api):
+    planning_api(fake_api)
+    fake_api.route("POST", "/planning/routes", lambda r: httpx2.Response(201, json=ROUTE))
+    values = {"pace_ascent": "250", "pace_descent": "400", "pace_distance": "3,5"}
+
+    user.post("/routes/new", form(pace_preset="custom", start_time="", tags="", **values))
+    sent = fake_api.body()
+    assert sent["pace"] == {
+        "preset": "custom",
+        "ascent_m_per_h": 250,
+        "descent_m_per_h": 400,
+        "distance_km_per_h": 3.5,
+    }
+    assert sent["start_time"] is None and sent["tags"] == []
+
+    saved = form(pace_preset=f"saved:{SAVED_PACE['id']}", pace_name="Mit Kindern", **values)
+    user.post("/routes/new", saved)
+    assert fake_api.body()["pace"]["preset"] == "custom"
+    assert fake_api.body()["pace"]["name"] == "Mit Kindern"
+
+
+def test_paces_are_saved_and_deleted_through_the_api(user, fake_api):
+    planning_api(fake_api)
+    fake_api.route("POST", "/planning/paces", lambda r: httpx2.Response(201, json=SAVED_PACE))
+    fake_api.route("DELETE", "/planning/paces/*", lambda r: httpx2.Response(204))
+    body = {k: SAVED_PACE[k] for k in SAVED_PACE if k != "id"}
+    token = {"X-CSRF-Token": user.csrf()}
+
+    assert user.client.post("/routes/paces", json=body).status_code == 400
+    response = user.client.post("/routes/paces", json=body, headers=token)
+    assert response.status_code == 201 and response.get_json()["id"] == SAVED_PACE["id"]
+    assert fake_api.body() == body
+
+    gone = user.client.post(f"/routes/paces/{SAVED_PACE['id']}/delete", json={}, headers=token)
+    assert gone.status_code == 204
+    assert f"DELETE /planning/paces/{SAVED_PACE['id']}" in fake_api.requested()
 
 
 def test_saving_a_change_sends_the_version(user, fake_api):
@@ -202,6 +291,9 @@ def test_rejected_route_keeps_what_was_entered(user, fake_api):
     page = text(response)
     assert response.status_code == 422 and "keinen Weg" in page
     assert 'value="Mein Plan"' in page and plan_data(page)["route"]["waypoints"] == WAYPOINTS
+    assert 'value="Sommer, Gipfel"' in page and re.search(
+        r'<option value="sac"[^>]*selected>', page
+    )
 
     fake_api.route("PUT", "/planning/routes/*", lambda r: error(409, "version_conflict"))
     response = user.post(f"/routes/{ROUTE_ID}", form(version="2"))

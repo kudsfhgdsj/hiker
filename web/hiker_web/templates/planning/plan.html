@@ -1,78 +1,117 @@
 {% extends "base.html" %}
 {% from "macros.html" import field, csrf, delete_form %}
 {% block title %}{{ route.title or t('plan.new') }} – {{ t('app.title') }}{% endblock %}
+{% block body_class %}full{% endblock %}
 {% block content %}
-<div class="toolbar">
-  <h1>{{ route.title or t('plan.new') }}</h1><span class="spacer"></span>
-  <a class="button" href="{{ url_for('planning.route_list') }}">{{ t('action.back') }}</a>
-  {% if not is_new %}<a class="button" href="{{ url_for('planning.route_gpx', route_id=route.id) }}">{{ t('plan.gpx') }}</a>{% endif %}
-</div>
-<p class="meta">{{ t('plan.intro') }}</p>
-{% if not info.routing_available %}<p class="flash">{{ t('plan.no_routing') }}</p>{% endif %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/maplibre-gl/maplibre-gl.css') }}">
 <noscript><p class="flash error">{{ t('plan.needs_script') }}</p></noscript>
+<div class="plan">
+  <div class="plan-map">
+    <div id="map"></div>
+    <div id="profile-box" hidden>
+      <svg id="profile" tabindex="0" role="img" aria-label="{{ t('tour.profile') }}"></svg>
+      <div id="profile-tip"></div>
+    </div>
+  </div>
 
-<form method="post" id="plan-form" class="stack">
-  {{ csrf() }}
-  <input type="hidden" name="waypoints" id="plan-waypoints" value="{{ route.waypoints|tojson|forceescape }}">
-  {% if not is_new %}<input type="hidden" name="version" value="{{ route.version }}">{% endif %}
+  <aside class="plan-side">
+    <div class="toolbar">
+      <h1>{{ route.title or t('plan.new') }}</h1><span class="spacer"></span>
+      <a class="button" href="{{ url_for('planning.route_list') }}">{{ t('action.back') }}</a>
+    </div>
+    {% if not info.routing_available %}<p class="flash">{{ t('plan.no_routing') }}</p>{% endif %}
+    <p id="plan-message" class="flash" hidden></p>
 
-  <div class="row card">
-    <label class="field"><span>{{ t('plan.connection') }}</span>
-      <select name="profile" id="plan-profile">
+    <dl class="facts card" id="plan-stats" hidden>
+      <dt>{{ t('plan.distance') }}</dt><dd data-stat="distance"></dd>
+      <dt>{{ t('plan.ascent') }}</dt><dd data-stat="ascent"></dd>
+      <dt>{{ t('plan.descent') }}</dt><dd data-stat="descent"></dd>
+      <dt>{{ t('plan.duration') }} <span class="chip estimate">{{ t('plan.estimated') }}</span></dt><dd data-stat="duration"></dd>
+    </dl>
+    <p class="meta" id="plan-duration-note" hidden></p>
+    <div class="card sun" id="plan-sun" hidden></div>
+
+    <form method="post" id="plan-form" class="stack">
+      {{ csrf() }}
+      <input type="hidden" name="waypoints" id="plan-waypoints" value="{{ route.waypoints|tojson|forceescape }}">
+      <input type="hidden" name="start_time" id="plan-start-utc" value="{{ route.start_time or '' }}">
+      {% if not is_new %}<input type="hidden" name="version" value="{{ route.version }}">{% endif %}
+
+      <section>
+        <div class="toolbar">
+          <h2>{{ t('plan.waypoints') }}</h2><span class="spacer"></span>
+          <button type="button" id="plan-undo" title="{{ t('plan.undo') }}">↶</button>
+          <button type="button" id="plan-reverse" title="{{ t('plan.reverse') }}">⇄</button>
+          <button type="button" id="plan-clear" class="danger" title="{{ t('plan.clear') }}">✕</button>
+        </div>
+        <ol class="list" id="plan-list"></ol>
+        <p class="meta" id="plan-empty">{{ t('plan.no_waypoints') }}</p>
+      </section>
+
+      <section class="stack card">
+        {{ field('title', t('plan.title'), route.title, required=True, attrs='maxlength="200"') }}
+        <label class="field"><span>{{ t('gear.description') }}</span>
+          <textarea name="description" rows="2" maxlength="5000">{{ route.description or '' }}</textarea></label>
+        {{ field('tags', t('plan.tags'), (route.tags or [])|join(', '), hint=t('plan.tags_hint'), attrs='maxlength="900"') }}
+        <label class="field"><span>{{ t('plan.start_time') }}</span>
+          <input type="datetime-local" id="plan-start">
+          <small>{{ t('plan.start_hint') }}</small></label>
+        <div class="row">
+          <button class="primary" id="plan-save">{{ t('action.save') }}</button>
+          {% if not is_new %}<a class="button" href="{{ url_for('planning.route_gpx', route_id=route.id) }}">{{ t('plan.gpx') }}</a>{% endif %}
+        </div>
+      </section>
+    </form>
+    {% if not is_new %}
+    <p>{{ delete_form(url_for('planning.route_delete', route_id=route.id)) }}</p>
+    {% endif %}
+    {% if info.attribution %}<p class="meta">{{ info.attribution }}</p>{% endif %}
+  </aside>
+</div>
+
+{# The fields of the drop-down "Schwierigkeit" on the map; they belong to the form above. #}
+<template id="plan-difficulty-fields">
+  <div class="map-fields">
+    <label><span>{{ t('plan.connection') }}</span>
+      <select name="profile" id="plan-profile" form="plan-form">
         <option value="hiking"{% if route.profile != 'direct' and info.routing_available %} selected{% endif %}{% if not info.routing_available %} disabled{% endif %}>{{ t('plan.profile.hiking') }}</option>
         <option value="direct"{% if route.profile == 'direct' or not info.routing_available %} selected{% endif %}>{{ t('plan.profile.direct') }}</option>
-      </select>
-      <small>{{ t('plan.connection_hint') }}</small></label>
-    <label class="field"><span>{{ t('plan.difficulty') }}</span>
-      <select name="max_difficulty" id="plan-difficulty">
+      </select></label>
+    <label><span>{{ t('plan.difficulty') }}</span>
+      <select name="max_difficulty" id="plan-difficulty" form="plan-form">
         {% for level in info.difficulties %}
         <option value="{{ level.level }}"{% if route.max_difficulty|int == level.level %} selected{% endif %}>{{ t('plan.difficulty.' ~ level.level) }}</option>
         {% endfor %}
-      </select>
-      <small>{{ t('plan.difficulty_hint') }}</small></label>
-    <label><input type="checkbox" name="via_ferrata" id="plan-ferrata" value="1"{% if route.via_ferrata %} checked{% endif %}> {{ t('plan.via_ferrata') }}</label>
-  </div>
-
-  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/maplibre-gl/maplibre-gl.css') }}">
-  <div id="map" class="tall plan"></div>
-  <p id="plan-message" class="flash" hidden></p>
-
-  <dl class="facts card" id="plan-stats" hidden>
-    <dt>{{ t('plan.distance') }}</dt><dd data-stat="distance"></dd>
-    <dt>{{ t('plan.ascent') }}</dt><dd data-stat="ascent"></dd>
-    <dt>{{ t('plan.descent') }}</dt><dd data-stat="descent"></dd>
-    <dt>{{ t('plan.duration') }} <span class="chip estimate">{{ t('plan.estimated') }}</span></dt><dd data-stat="duration"></dd>
-  </dl>
-  <p class="meta" id="plan-duration-note" hidden>{{ t('plan.duration_note') }}</p>
-
-  <div id="profile-box" hidden>
-    <svg id="profile" tabindex="0" role="img" aria-label="{{ t('tour.profile') }}"></svg>
-    <div id="profile-tip"></div>
-  </div>
-
-  <section>
-    <div class="toolbar">
-      <h2>{{ t('plan.waypoints') }}</h2><span class="spacer"></span>
-      <button type="button" id="plan-undo">{{ t('plan.undo') }}</button>
-      <button type="button" id="plan-reverse">{{ t('plan.reverse') }}</button>
-      <button type="button" id="plan-clear" class="danger">{{ t('plan.clear') }}</button>
+      </select></label>
+    <label class="inline"><input type="checkbox" name="via_ferrata" id="plan-ferrata" value="1" form="plan-form"{% if route.via_ferrata %} checked{% endif %}> {{ t('plan.via_ferrata') }}</label>
+    <hr>
+    <label><span>{{ t('plan.pace') }}</span>
+      <select name="pace_preset" id="plan-pace" form="plan-form">
+        {% for pace in info.paces %}
+        <option value="{{ pace.id }}" data-ascent="{{ pace.ascent_m_per_h|round|int }}" data-descent="{{ pace.descent_m_per_h|round|int }}" data-distance="{{ pace.distance_km_per_h }}"{% if route.pace.preset == pace.id %} selected{% endif %}>{{ t('plan.pace.' ~ pace.id) }}</option>
+        {% endfor %}
+        <option value="custom"{% if route.pace.preset == 'custom' %} selected{% endif %}>{{ t('plan.pace.custom') }}</option>
+        {% for pace in paces %}
+        <option value="saved:{{ pace.id }}" data-name="{{ pace.name }}" data-ascent="{{ pace.ascent_m_per_h|round|int }}" data-descent="{{ pace.descent_m_per_h|round|int }}" data-distance="{{ pace.distance_km_per_h }}">{{ pace.name }}</option>
+        {% endfor %}
+      </select></label>
+    <div class="pace-values">
+      <label><span>{{ t('plan.pace.ascent') }}</span>
+        <input type="number" name="pace_ascent" id="plan-pace-ascent" form="plan-form" min="50" max="3000" step="10" value="{{ route.pace.ascent_m_per_h|round|int }}"></label>
+      <label><span>{{ t('plan.pace.descent') }}</span>
+        <input type="number" name="pace_descent" id="plan-pace-descent" form="plan-form" min="50" max="5000" step="10" value="{{ route.pace.descent_m_per_h|round|int }}"></label>
+      <label><span>{{ t('plan.pace.distance') }}</span>
+        <input type="number" name="pace_distance" id="plan-pace-distance" form="plan-form" min="0.5" max="20" step="0.5" value="{{ route.pace.distance_km_per_h }}"></label>
     </div>
-    <ol class="list" id="plan-list"></ol>
-    <p class="meta" id="plan-empty">{{ t('plan.no_waypoints') }}</p>
-  </section>
-
-  <section class="stack card">
-    {{ field('title', t('plan.title'), route.title, required=True, attrs='maxlength="200"') }}
-    <label class="field"><span>{{ t('gear.description') }}</span>
-      <textarea name="description" rows="3" maxlength="5000">{{ route.description or '' }}</textarea></label>
-    {{ field('planned_date', t('plan.date'), route.planned_date, type='date') }}
-    <div><button class="primary" id="plan-save">{{ t('action.save') }}</button></div>
-  </section>
-</form>
-{% if not is_new %}
-<p>{{ delete_form(url_for('planning.route_delete', route_id=route.id)) }}</p>
-{% endif %}
-{% if info.attribution %}<p class="meta">{{ info.attribution }}</p>{% endif %}
+    <input type="hidden" name="pace_name" id="plan-pace-name" form="plan-form" value="{{ route.pace.name or '' }}">
+    <div class="pace-save" id="plan-pace-save">
+      <input type="text" id="plan-pace-new" maxlength="100" placeholder="{{ t('plan.pace.name') }}">
+      <button type="button" id="plan-pace-store">{{ t('plan.pace.save') }}</button>
+      <button type="button" id="plan-pace-delete" class="danger" hidden>{{ t('plan.pace.delete') }}</button>
+    </div>
+    <small>{{ t('plan.pace.note') }}</small>
+  </div>
+</template>
 
 <script type="application/json" id="plan-data">{{ plan_data|tojson }}</script>
 <script src="{{ url_for('static', filename='vendor/maplibre-gl/maplibre-gl-csp.js') }}" defer></script>

@@ -21,7 +21,17 @@ und Schätzungen kommen von der API (siehe `DESIGN.md`, Abschnitt 9a).
 - Packlisten, die sich in eine Tour übernehmen lassen
 - Planung: Routen auf der Karte planen (Punkte setzen und verschieben, den Wegen folgen oder
   Luftlinie – für alle oder einzelne Abschnitte –, Schwierigkeit T1–T6, Klettersteige),
-  Eckdaten mit geschätzter Gehzeit, Höhenprofil, GPX-Download. Der Planer braucht JavaScript.
+  Eckdaten mit geschätzter Gehzeit, Höhenprofil, GPX-Download. Die Karte füllt das Fenster;
+  Ebenen, Darstellung und Schwierigkeit liegen als Aufklappfelder an ihrem oberen Rand.
+  Gehzeit nach DAV, SAC, „Profi“ oder eigenen Werten, die sich unter einem Namen speichern
+  lassen (nur für den Ersteller). Tags statt Datum; mit einem Startzeitpunkt zeigt die Seite
+  Sonnenaufgang und -untergang, die Uhrzeit an jeder Stelle des Profils und warnt, wenn die
+  Tour ins Dunkle reicht. Der Planer braucht JavaScript.
+- Karte (`/map`): die Karte ansehen, ohne zu planen. Ein Klick nennt Gipfel, Hütte oder Weg
+  mit Schwierigkeit und die Sonnenzeiten des Tages dort (für Gipfel auch bei freiem Horizont)
+  und führt auf Wunsch in den Planer. Ebenen: Hangneigung mit einstellbaren Winkeln,
+  Lawinengefahr, Schnee und Wetter auch für einen Tag im letzten Jahr, Regenradar und Wolken
+  mit Zeitregler, Umschalter 2D/3D.
 
 Nicht im Web: Kamera-Scanner und Offline-Betrieb (das kann die Android-App).
 
@@ -63,7 +73,8 @@ hiker_web/
   texts_de.py     alle Texte der Oberfläche
   views/          je Modul ein Blueprint: auth, gear, nutrition, protocols, public
   templates/      Jinja2-Vorlagen
-  static/         style.css, site.js, tour.js, map_edit.js, vendor/maplibre-gl
+  static/         style.css, site.js, tour.js, map_edit.js, plan.js, map_view.js, map_layers.js,
+                  profile.js, vendor/maplibre-gl
 ```
 
 Seiten eines Moduls gibt es nur, wenn die API es unter `/modules` meldet.

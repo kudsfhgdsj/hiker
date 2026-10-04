@@ -23,15 +23,23 @@ route_page = module_required("planning")
 
 OSM_ATTRIBUTION = "© OpenStreetMap-Mitwirkende"
 DEFAULT_DIFFICULTY = 3
+PACE_PRESETS = ("dav", "sac", "pro")
+DEFAULT_PACE = {
+    "preset": "dav",
+    "name": None,
+    "ascent_m_per_h": 300,
+    "descent_m_per_h": 500,
+    "distance_km_per_h": 4,
+}
 
 
 @blueprint.get("/")
 @route_page
 def route_list():
     query = request.args.get("q", "").strip()
-    return render_template(
-        "planning/list.html", routes=api().pages("/planning/routes", q=query), query=query
-    )
+    tag = request.args.get("tag", "").strip()
+    routes = api().pages("/planning/routes", q=query, tag=tag)
+    return render_template("planning/list.html", routes=routes, query=query, tag=tag)
 
 
 def _waypoints_from_form() -> list[dict]:
@@ -53,30 +61,69 @@ def _waypoints_from_form() -> list[dict]:
     ]
 
 
+def _tags_from_form() -> list[str]:
+    return [tag.strip() for tag in (request.form.get("tags") or "").split(",") if tag.strip()]
+
+
+def _pace_from_form() -> dict:
+    """The pace for the walking time: a built-in one, own values, or a saved one."""
+    preset = request.form.get("pace_preset") or "dav"
+    if preset in PACE_PRESETS:
+        return {"preset": preset}
+    values = {
+        # A saved pace is sent with its values; the route keeps them and its name.
+        "name": forms.text("pace_name"),
+        "ascent_m_per_h": forms.number("pace_ascent"),
+        "descent_m_per_h": forms.number("pace_descent"),
+        "distance_km_per_h": forms.number("pace_distance"),
+    }
+    return {"preset": "custom"} | {key: value for key, value in values.items() if value is not None}
+
+
 def _route_from_form() -> dict:
     return {
         "title": forms.text("title") or "",
         "description": forms.text("description"),
-        "planned_date": forms.text("planned_date"),
+        "tags": _tags_from_form(),
+        # The page sends the moment in UTC; the browser knows the walker's time zone.
+        "start_time": forms.text("start_time"),
         "profile": "direct" if request.form.get("profile") == "direct" else "hiking",
         "max_difficulty": forms.whole("max_difficulty") or DEFAULT_DIFFICULTY,
         "via_ferrata": forms.checked("via_ferrata"),
+        "pace": _pace_from_form(),
         "waypoints": _waypoints_from_form(),
     }
 
 
+def _view_from_query() -> dict | None:
+    try:
+        lat, lon = float(request.args["lat"]), float(request.args["lon"])
+        zoom = float(request.args.get("zoom", 12))
+    except (KeyError, ValueError):
+        return None
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180 and 0 <= zoom <= 20):
+        return None
+    return {"center": [lon, lat], "zoom": zoom}
+
+
 def _planner(route: dict, is_new: bool, status: int = 200):
     info = api().get("/planning/info")
+    route.setdefault("pace", DEFAULT_PACE)
     plan_data = {
         **map_config(OSM_ATTRIBUTION),
         "previewUrl": url_for("planning.preview"),
+        "pacesUrl": url_for("planning.pace_create"),
         "routingAvailable": info["routing_available"],
         "maxWaypoints": info["max_waypoints"],
+        # Coming from the map mode: start where the map was looked at.
+        "view": _view_from_query(),
         "route": {
             key: route.get(key)
             for key in (
                 "waypoints",
                 "series",
+                "sun",
+                "start_time",
                 "distance_m",
                 "ascent_m",
                 "descent_m",
@@ -98,11 +145,31 @@ def _planner(route: dict, is_new: bool, status: int = 200):
                 "distance",
                 "elevation",
                 "slope",
+                "time",
+                "walked",
+                "difficulty",
+                "duration_note",
+                "sunrise",
+                "sunset",
+                "end",
+                "summit",
+                "sun_at_summit",
+                "daylight_left",
+                "after_sunset",
+                "starts_in_dark",
+                "ends_in_dark",
+                "pace_name_missing",
+                "pace_failed",
             )
         },
     }
     page = render_template(
-        "planning/plan.html", route=route, is_new=is_new, info=info, plan_data=plan_data
+        "planning/plan.html",
+        route=route,
+        is_new=is_new,
+        info=info,
+        paces=api().get("/planning/paces"),
+        plan_data=plan_data,
     )
     return page, status
 
@@ -112,10 +179,13 @@ def _save(method: str, path: str, route_id: str | None):
         **request.form.to_dict(),
         "id": route_id,
         "via_ferrata": forms.checked("via_ferrata"),
+        "tags": _tags_from_form(),
+        "start_time": forms.text("start_time"),
     }
     try:
         body = _route_from_form()
         submitted["waypoints"] = body["waypoints"]
+        submitted["pace"] = DEFAULT_PACE | body["pace"]
         if route_id is not None:
             body["version"] = forms.whole("version")
         route = api().send(method, path, body)
@@ -157,6 +227,31 @@ def preview():
         if error.status == 401:
             raise
         return jsonify({"error": error.code, "message": error_text(error)}), error.status
+
+
+@blueprint.post("/paces")
+@route_page
+def pace_create():
+    """Save the walker's own pace under a name; the planner sends it as JSON."""
+    try:
+        pace = api().send("POST", "/planning/paces", request.get_json(silent=True) or {})
+    except ApiError as error:
+        if error.status == 401:
+            raise
+        return jsonify({"error": error.code, "message": error_text(error)}), error.status
+    return jsonify(pace), 201
+
+
+@blueprint.post("/paces/<uuid:pace_id>/delete")
+@route_page
+def pace_delete(pace_id):
+    try:
+        api().send("DELETE", f"/planning/paces/{pace_id}")
+    except ApiError as error:
+        if error.status == 401:
+            raise
+        return jsonify({"error": error.code, "message": error_text(error)}), error.status
+    return "", 204
 
 
 @blueprint.post("/<uuid:route_id>/delete")

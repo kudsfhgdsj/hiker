@@ -27,7 +27,7 @@ h2 { font-size: 1.2rem; margin: calc(var(--gap) * 1.5) 0 calc(var(--gap) / 2); }
 .top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap); padding: .6rem var(--gap);
   background: var(--surface); border-bottom: 1px solid var(--border); }
 .brand { font-weight: 700; text-decoration: none; font-size: 1.2rem; }
-.top nav { display: flex; flex-wrap: wrap; gap: .25rem; flex: 1; }
+.top nav { display: flex; flex-wrap: wrap; gap: .25rem; flex: 1; justify-content: center; }
 .top nav a { padding: .4rem .7rem; border-radius: .5rem; text-decoration: none; }
 .top nav a[aria-current="page"] { background: var(--green-soft); font-weight: 600; }
 main { max-width: 60rem; margin: 0 auto; padding: var(--gap); }
@@ -111,17 +111,36 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 .conflict { border-color: #c62828; }
 del { color: #c62828; } ins { color: #2e7d32; text-decoration: none; }
 .checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .25rem 1rem; }
-.map-layers { display: grid; justify-items: start; gap: .25rem; }
-.map-layers-button { padding: .3rem .7rem; border-radius: .4rem; border: 0; background: #fff; color: #222;
-  box-shadow: 0 0 0 2px #0002; font: inherit; font-size: .85rem; cursor: pointer; }
-.map-layers-panel { display: grid; gap: .3rem; padding: .6rem .8rem; border-radius: .5rem; background: #fff;
-  color: #222; box-shadow: 0 0 0 2px #0002; font-size: .85rem; }
-.map-layers-panel[hidden] { display: none; }
-.map-layers-panel small { color: #666; max-width: 17rem; margin: -.15rem 0 .15rem 1.4rem; }
-.map-layers-panel hr { width: 100%; border: 0; border-top: 1px solid #0002; margin: .1rem 0; }
+/* Controls of the map: drop-down fields in a row at its top edge. */
+.map-bar { display: flex; flex-wrap: wrap; gap: .35rem; align-items: flex-start; max-width: calc(100vw - 5rem); }
+.map-drop { position: relative; }
+.map-drop-button { padding: .3rem .7rem; border-radius: .4rem; border: 0; background: #fff; color: #222;
+  box-shadow: 0 0 0 2px #0002; font: inherit; font-size: .85rem; cursor: pointer; white-space: nowrap; }
+.map-drop-button[aria-expanded="true"], .map-drop-button[aria-pressed="true"] { background: #d5e8d8; color: #123; }
+.map-drop-panel { position: absolute; top: calc(100% + .3rem); left: 0; z-index: 5; display: grid; gap: .3rem;
+  width: max-content; max-width: min(22rem, 86vw); max-height: min(70vh, 34rem); overflow: auto;
+  padding: .6rem .8rem; border-radius: .5rem; background: #fff; color: #222; box-shadow: 0 2px 10px #0004;
+  font-size: .85rem; }
+.map-drop-panel[hidden] { display: none; }
+.map-drop-panel hr { width: 100%; border: 0; border-top: 1px solid #0002; margin: .1rem 0; }
+.map-drop-panel small { color: #666; max-width: 19rem; margin: -.15rem 0 .15rem 1.4rem; }
+.map-drop-panel select, .map-drop-panel input[type="number"], .map-drop-panel input[type="text"],
+.map-drop-panel input[type="date"] { font: inherit; padding: .2rem .35rem; max-width: 100%; }
+.map-option { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; }
 .map-legend { display: inline-flex; align-items: center; gap: .2rem; margin-left: .5rem; color: #555; }
-.map-legend.paths { margin-left: 0; flex-wrap: wrap; max-width: 18rem; }
+.map-legend.paths { margin-left: 0; flex-wrap: wrap; }
 .map-legend i { width: .8rem; height: .8rem; border-radius: 2px; display: inline-block; margin-left: .2rem; }
+.map-range { display: grid; grid-template-columns: auto 1fr; gap: .15rem .5rem; align-items: center; margin-left: 1.4rem; }
+.map-range span:last-child { grid-column: 1 / -1; color: #555; }
+.map-radar { display: flex; align-items: center; gap: .5rem; margin-left: 1.4rem; }
+.map-radar[hidden] { display: none; }
+.map-radar input { flex: 1; min-width: 6rem; }
+.map-radar button { border: 0; background: var(--green-soft); border-radius: .3rem; padding: .15rem .5rem; cursor: pointer; }
+.map-fields { display: grid; gap: .45rem; min-width: 15rem; }
+.map-fields label { display: grid; gap: .15rem; }
+.map-fields label.inline { display: flex; align-items: center; gap: .35rem; }
+.map-fields .pace-values { display: grid; grid-template-columns: repeat(3, 1fr); gap: .35rem; }
+.map-fields .pace-values input { width: 100%; }
 #map.tall { height: 30rem; }
 dl.facts[hidden] { display: none; }
 #map.plan { height: min(36rem, 70vh); }
@@ -145,3 +164,39 @@ body::before {
   z-index: -1;
 }
 @media print { body::before { display: none; } }
+/* Pages where the map fills the window: planner and map mode. */
+body.full { height: 100vh; display: flex; flex-direction: column; }
+body.full main { flex: 1; min-height: 0; max-width: none; width: 100%; padding: 0; }
+.plan { display: grid; grid-template-columns: minmax(0, 1fr) 24rem; height: 100%; }
+.plan-map { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; min-width: 0; }
+.plan-map #map, .mapmode #map { height: 100%; min-height: 14rem; border-radius: 0; border: 0; }
+.plan-map #profile-box { background: var(--surface); border-top: 1px solid var(--border); padding: .25rem .5rem; }
+.plan-map #profile { height: 9rem; }
+.plan-side { overflow: auto; padding: var(--gap); display: grid; grid-template-columns: minmax(0, 1fr);
+  gap: var(--gap); align-content: start;
+  background: var(--snow); border-left: 1px solid var(--border); }
+.plan-side h1 { font-size: 1.25rem; margin: 0; }
+.plan-side h2 { margin: 0; }
+.plan-side #plan-list > li { flex-wrap: wrap; gap: .4rem; padding: .4rem 0; }
+.plan-side #plan-list button { padding: .3rem .6rem; font-size: .85rem; }
+.plan-side #plan-list label { font-size: .85rem; }
+.map-fields small { margin: 0; }
+.pace-values input[readonly] { background: #f1f1f1; color: #555; }
+.plan-side .toolbar { margin-bottom: 0; }
+.sun { font-size: .9rem; display: grid; gap: .25rem; }
+.sun[hidden] { display: none; }
+.sun .warn { color: var(--error); font-weight: 600; }
+.pace-save { display: flex; gap: .35rem; }
+.pace-save input { flex: 1; min-width: 0; }
+.mapmode { height: 100%; position: relative; }
+.map-info { font-size: .9rem; line-height: 1.5; }
+.map-info .name { font-weight: 600; font-size: 1rem; }
+.map-info .meta { color: #666; font-size: .82rem; }
+.maplibregl-popup-content { color: #222; }
+@media (max-width: 55rem) {
+  body.full { height: auto; }
+  .plan { grid-template-columns: 1fr; height: auto; }
+  .plan-map { height: 70vh; }
+  .plan-side { border-left: 0; border-top: 1px solid var(--border); }
+  .mapmode { height: calc(100vh - 6rem); }
+}

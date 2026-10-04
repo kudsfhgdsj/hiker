@@ -8,8 +8,8 @@ half).
 
 from datetime import datetime, timedelta
 
+from app.core.sun import sun_position, sun_times
 from app.modules.planning.estimate import Pace
-from app.modules.planning.sun import sun_position, sun_times
 
 
 def times_along(series: dict, duration_s: int, pace: Pace) -> list[int]:

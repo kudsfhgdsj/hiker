@@ -58,7 +58,9 @@ def _declination_and_equation(day: date) -> tuple[float, float]:
     return declination, equation
 
 
-def sun_times(lat: float, lon: float, day: date) -> SunTimes:
+def sun_times(lat: float, lon: float, day: date, elevation_m: float = 0) -> SunTimes:
+    """The day at a place. With an elevation the horizon lies lower, as seen from a summit
+    that stands above its surroundings: the sun rises earlier and sets later there."""
     declination, equation = _declination_and_equation(day)
     midnight = datetime(day.year, day.month, day.day, tzinfo=UTC)
     noon_minutes = 720 - 4 * lon - equation
@@ -78,7 +80,9 @@ def sun_times(lat: float, lon: float, day: date) -> SunTimes:
             return None, None
         return noon - timedelta(minutes=half), noon + timedelta(minutes=half)
 
-    sunrise, sunset = around(crossing(_SUNRISE_DEG))
+    # Dip of the horizon: about 1.76 arc minutes times the root of the height in metres.
+    dip = 1.76 / 60 * math.sqrt(max(0.0, elevation_m))
+    sunrise, sunset = around(crossing(_SUNRISE_DEG - dip))
     dawn, dusk = around(crossing(_CIVIL_DEG))
     return SunTimes(dawn=dawn, sunrise=sunrise, noon=noon, sunset=sunset, dusk=dusk)
 

@@ -144,6 +144,10 @@ window.hikerProfile = ({ box, series, texts, photos = [], onPhoto, onShow, onHid
       const time = new Date(series.time[index]).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
       rows.push(row(texts.time, time));
     }
+    if (series.time_s && series.time_s[index] != null && texts.walked) {
+      const minutes = Math.round(series.time_s[index] / 60);
+      rows.push(row(texts.walked, `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")} min`));
+    }
     if (series.heart_rate && series.heart_rate[index] != null) {
       rows.push(row(texts.heartRate, String(series.heart_rate[index])));
     }

@@ -10,14 +10,16 @@
     <input type="search" name="q" value="{{ query }}" placeholder="{{ t('plan.search_hint') }}"></label>
   <button>{{ t('action.search') }}</button>
 </form>
+{% if tag %}<p class="meta">{{ t('plan.tag_filter', tag=tag) }} <a href="{{ url_for('planning.route_list') }}">{{ t('plan.tag_all') }}</a></p>{% endif %}
 {% if routes %}
 <ul class="list">
   {% for route in routes %}
   <li>
     <a class="grow" href="{{ url_for('planning.route_plan', route_id=route.id) }}">
       <strong>{{ route.title }}</strong><br>
-      <span class="meta">{{ [route.planned_date|date if route.planned_date else none, t('plan.profile.' ~ route.profile)]|select|join(' · ') }}</span>
+      <span class="meta">{% if route.start_time %}<time class="local-time" datetime="{{ route.start_time }}">{{ route.start_time|datetime }}</time> · {% endif %}{{ t('plan.profile.' ~ route.profile) }}</span>
     </a>
+    {% for name in route.tags %}<a class="chip" href="{{ url_for('planning.route_list', tag=name) }}">{{ name }}</a>{% endfor %}
     <span class="meta">{{ route.distance_m|distance }} · ↑ {{ route.ascent_m|meters }} · {{ (route.duration_s / 60)|duration }}</span>
   </li>
   {% endfor %}

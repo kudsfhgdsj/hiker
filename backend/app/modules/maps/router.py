@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from app.core.config import get_settings
 from app.core.errors import NotFoundError, UnprocessableError, error_responses
 from app.core.ratelimit import rate_limit
+from app.core.sun import sun_times
 from app.modules.auth.deps import CurrentUser
 from app.modules.maps.avalanche import ATTRIBUTION as AVALANCHE_ATTRIBUTION
 from app.modules.maps.avalanche import AvalancheLayer
@@ -440,4 +441,44 @@ def download_region_layers(name: str, _user: CurrentUser, vectors: Vectors):
         region.layers_path,
         media_type="application/octet-stream",
         filename=f"{name}.layers.sqlite",
+    )
+
+
+class SunDay(BaseModel):
+    """Sunrise and sunset at a place, in UTC and for the mathematical horizon."""
+
+    date: date
+    dawn: datetime | None = Field(description="First light (civil twilight begins)")
+    sunrise: datetime | None = Field(description="Null where the sun does not rise or set")
+    noon: datetime
+    sunset: datetime | None
+    dusk: datetime | None = Field(description="Last light (civil twilight ends)")
+
+
+@router.get("/sun", response_model=SunDay, dependencies=[Depends(rate_limit("sun", limit=600))])
+def read_sun(
+    lat: Annotated[float, Query(ge=-90, le=90)],
+    lon: Annotated[float, Query(ge=-180, le=180)],
+    day: Annotated[date | None, Query(alias="date", description="Default: today (UTC)")] = None,
+    elevation_m: Annotated[
+        float,
+        Query(ge=0, le=9000, description="Height above the surroundings, for a free summit"),
+    ] = 0,
+):
+    """When the sun rises and sets at a place, e.g. on a summit. No login.
+
+    Computed, not looked up: mountains on the horizon are not taken into account, so in a
+    valley the sun appears later and leaves earlier. With `elevation_m` the horizon lies
+    lower, as on a summit that stands free above its surroundings; that is the earliest
+    sunrise and the latest sunset possible there.
+    """
+    day = day or datetime.now(UTC).date()
+    sun = sun_times(lat, lon, day, elevation_m)
+    return SunDay(
+        date=day,
+        dawn=sun.dawn,
+        sunrise=sun.sunrise,
+        noon=sun.noon,
+        sunset=sun.sunset,
+        dusk=sun.dusk,
     )

@@ -7,9 +7,9 @@ import pytest
 
 from app.core.config import get_settings
 from app.core.errors import UnprocessableError
+from app.core.sun import sun_position, sun_times
 from app.modules.planning.estimate import PRESETS, Pace, walking_time_s
 from app.modules.planning.routing import BRouterEngine, RouteOptions, RoutingUnavailableError
-from app.modules.planning.sun import sun_position, sun_times
 from app.modules.protocols.track import haversine_m
 from app.tests.conftest import auth_header, register
 
