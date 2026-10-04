@@ -16,6 +16,7 @@ providers are deliberately not part of this list.
 import io
 import math
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
@@ -88,12 +89,13 @@ SATELLITE = (
     ),
 )
 
-# From satellites, through NASA's open tile service GIBS; "default" is the newest image.
+# From satellites, through NASA's open tile service GIBS. Snow cover is asked for by day
+# ({date} = yesterday, the newest complete day): "default" delivers broken tiles there.
 _GIBS = "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best"
 SNOW = Provider(
     id="snow",
     url=_GIBS
-    + "/MODIS_Terra_NDSI_Snow_Cover/default/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png",
+    + "/MODIS_Terra_NDSI_Snow_Cover/default/{date}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png",
     attribution="Schneebedeckung: MODIS/Terra, NASA EOSDIS GIBS",
     licence="NASA Earth science data: free and open, acknowledgement requested",
     max_zoom=8,
@@ -138,6 +140,20 @@ def _covers(provider: Provider, z: int, x: int, y: int) -> bool:
     lat, lon = tile_center(z, x, y)
     west, south, east, north = provider.bounds
     return west <= lon <= east and south <= lat <= north
+
+
+class DatedTileSource(HttpTileSource):
+    """A source whose address names a day: `{date}` becomes yesterday (UTC)."""
+
+    def __init__(self, url_template: str, *args, **kwargs):
+        super().__init__(url_template, *args, **kwargs)
+        self._dated = url_template
+
+    def fetch(self, z: int, x: int, y: int, etag: str | None) -> FetchedTile | None:
+        day = (datetime.now(UTC) - timedelta(days=1)).date().isoformat()
+        self._template = self._dated.replace("{date}", day)
+        # Without the stored ETag: it belongs to the image of another day.
+        return super().fetch(z, x, y, None)
 
 
 class _Composite:
@@ -299,7 +315,8 @@ def _layers(
         )
     if weather:
         for provider in (SNOW, PRECIPITATION):
-            sources[provider.id] = HttpTileSource(provider.url, user_agent, public_base_url)
+            source = DatedTileSource if "{date}" in provider.url else HttpTileSource
+            sources[provider.id] = source(provider.url, user_agent, public_base_url)
     return Layers(cache_path, cache_days, max_mb * 1024 * 1024, sources)
 
 

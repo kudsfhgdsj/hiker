@@ -100,6 +100,8 @@ services:
       MAP_DATA_PATH: /data/maps
       SATELLITE_ENABLED: ${SATELLITE_ENABLED:-true}
       TERRAIN_ENABLED: ${TERRAIN_ENABLED:-true}
+      AVALANCHE_ENABLED: ${AVALANCHE_ENABLED:-true}
+      WEATHER_LAYERS_ENABLED: ${WEATHER_LAYERS_ENABLED:-true}
     volumes:
       - ${DATA_DIR:-./data}/files:/data/files
       - ${DATA_DIR:-./data}/tiles:/data/tiles

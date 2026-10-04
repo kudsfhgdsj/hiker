@@ -1,8 +1,9 @@
 import gzip
 import io
 import math
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 
+import httpx2
 import pytest
 from PIL import Image
 
@@ -11,6 +12,8 @@ from app.modules.maps.avalanche import Avalanche, AvalancheSourceError, _thin, g
 from app.modules.maps.contours import _grid, contour_tile, interval_for, trace
 from app.modules.maps.layers import (
     SATELLITE,
+    SNOW,
+    DatedTileSource,
     Layers,
     Provider,
     _Composite,
@@ -388,6 +391,23 @@ def test_snow_tiles_are_kept_only_for_hours(client, tmp_path):
     assert response.status_code == 200 and response.headers["content-type"] == "image/png"
     assert "max-age=1800" in response.headers["cache-control"]
     assert client.get("/api/v1/maps/raster/precipitation/5/16/11").status_code == 404
+
+
+def test_snow_cover_is_asked_for_by_day():
+    asked = []
+
+    def handler(request):
+        asked.append(str(request.url))
+        return httpx2.Response(200, content=b"png", headers={"content-type": "image/png"})
+
+    source = DatedTileSource(
+        SNOW.url, "hiker-test", "http://testserver", transport=httpx2.MockTransport(handler)
+    )
+
+    assert source.fetch(7, 67, 44, "old-etag").data == b"png"
+
+    yesterday = (datetime.now(UTC) - timedelta(days=1)).date().isoformat()
+    assert f"/default/{yesterday}/GoogleMapsCompatible_Level8/7/44/67.png" in asked[0]
 
 
 SQUARE = [[9.0, 47.0], [9.1, 47.0], [9.1, 47.1], [9.0, 47.1], [9.0, 47.0]]
