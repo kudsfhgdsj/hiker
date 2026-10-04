@@ -54,6 +54,7 @@ def _types(context: SyncContext, _since: datetime | None) -> SyncChanges:
             "name": t.name,
             "sort_order": t.sort_order,
             "standard": t.owner_id is None,
+            "kind": t.kind,
         }
         for t in types
     ]

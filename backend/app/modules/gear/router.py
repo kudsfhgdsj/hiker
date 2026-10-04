@@ -10,6 +10,7 @@ from app.core.errors import NotFoundError, PayloadTooLargeError, error_responses
 from app.core.pagination import Page, Paging
 from app.modules.auth.deps import AdminUser, CurrentUser
 from app.modules.gear import catalog, service
+from app.modules.gear.attributes import KINDS
 from app.modules.gear.deps import (
     EditableType,
     OwnedItem,
@@ -17,8 +18,9 @@ from app.modules.gear.deps import (
     OwnedTag,
     ReadableCatalogItem,
 )
-from app.modules.gear.models import GearCatalogItem, GearType
+from app.modules.gear.models import CURRENCY, GearCatalogItem, GearType
 from app.modules.gear.schemas import (
+    AttributeOut,
     CatalogItemOut,
     CatalogItemPatch,
     GearItemCreate,
@@ -27,6 +29,7 @@ from app.modules.gear.schemas import (
     GearListCreate,
     GearListIn,
     GearListOut,
+    GearMeta,
     GearSummaryOut,
     GearTagCreate,
     GearTagIn,
@@ -34,6 +37,7 @@ from app.modules.gear.schemas import (
     GearTypeCreate,
     GearTypeIn,
     GearTypeOut,
+    KindOut,
 )
 from app.modules.gear.summary import summarize
 
@@ -62,6 +66,7 @@ def _type_out(gear_type: GearType) -> GearTypeOut:
         name=gear_type.name,
         sort_order=gear_type.sort_order,
         standard=gear_type.owner_id is None,
+        kind=gear_type.kind,
     )
 
 
@@ -130,6 +135,36 @@ def delete_tag(tag: OwnedTag, db: DbSession):
     service.delete_tag(db, tag)
 
 
+# --- Meta ---
+
+
+@router.get("/meta", response_model=GearMeta)
+def read_meta(_user: CurrentUser):
+    """Currency, upload limits and the extra attributes per kind of gear type."""
+    return GearMeta(
+        currency=CURRENCY,
+        image_formats=["JPEG", "PNG", "WebP"],
+        max_upload_mb=get_settings().max_upload_mb,
+        kinds=[
+            KindOut(
+                kind=kind,
+                attributes=[
+                    AttributeOut(
+                        key=d.key,
+                        type=d.type,
+                        unit=d.unit,
+                        minimum=d.minimum,
+                        maximum=d.maximum,
+                        options=list(d.options),
+                    )
+                    for d in definitions
+                ],
+            )
+            for kind, definitions in KINDS.items()
+        ],
+    )
+
+
 # --- Items ---
 
 
@@ -141,8 +176,13 @@ def _item_filter(
         list[uuid.UUID] | None,
         Query(max_length=20, description="Repeatable; items must carry all given tags"),
     ] = None,
+    favorite: Annotated[
+        bool | None, Query(description="true: only favourites, false: only the others")
+    ] = None,
 ) -> service.ItemFilter:
-    return service.ItemFilter(q=q, type_id=type_id, status=status, tag_ids=tuple(tag_id or ()))
+    return service.ItemFilter(
+        q=q, type_id=type_id, status=status, tag_ids=tuple(tag_id or ()), favorite=favorite
+    )
 
 
 ItemFilters = Annotated[service.ItemFilter, Depends(_item_filter)]
@@ -194,6 +234,19 @@ def update_item(body: GearItemIn, item: OwnedItem, user: CurrentUser, db: DbSess
 )
 def delete_item(item: OwnedItem, db: DbSession, storage: FileStorage):
     service.delete_item(db, storage, item)
+
+
+@router.put("/items/{item_id}/favorite", response_model=GearItemOut, responses=error_responses(404))
+def mark_favorite(item: OwnedItem, user: CurrentUser, db: DbSession):
+    """Mark the item as a favourite (it gets the tag "favorite")."""
+    return service.set_favorite(db, user, item, True)
+
+
+@router.delete(
+    "/items/{item_id}/favorite", response_model=GearItemOut, responses=error_responses(404)
+)
+def unmark_favorite(item: OwnedItem, user: CurrentUser, db: DbSession):
+    return service.set_favorite(db, user, item, False)
 
 
 @router.post(

@@ -14,8 +14,11 @@ from app.core.images import reencode_image
 from app.core.storage import Storage
 from app.modules.auth.deps import is_admin
 from app.modules.auth.models import User
+from app.modules.gear import attributes
 from app.modules.gear.models import (
     CATALOG_APPROVED,
+    CURRENCY,
+    TAG_FAVORITE,
     GearCatalogItem,
     GearItem,
     GearList,
@@ -68,7 +71,10 @@ def create_type(db: Session, user: User, data: GearTypeCreate) -> GearType:
         raise ForbiddenError("Only an admin can change the standard list")
     _check_type_name_is_free(db, user, data.name)
     gear_type = GearType(
-        owner_id=None if data.standard else user.id, name=data.name, sort_order=data.sort_order
+        owner_id=None if data.standard else user.id,
+        name=data.name,
+        sort_order=data.sort_order,
+        kind=data.kind,
     )
     db.add(gear_type)
     db.commit()
@@ -79,6 +85,7 @@ def update_type(db: Session, user: User, gear_type: GearType, data: GearTypeIn) 
     _check_type_name_is_free(db, user, data.name, except_id=gear_type.id)
     gear_type.name = data.name
     gear_type.sort_order = data.sort_order
+    gear_type.kind = data.kind
     db.commit()
     return gear_type
 
@@ -89,11 +96,13 @@ def delete_type(db: Session, gear_type: GearType) -> None:
     db.commit()
 
 
-def _check_type_is_usable(db: Session, user: User, type_id: uuid.UUID | None) -> None:
+def _usable_type(db: Session, user: User, type_id: uuid.UUID | None) -> GearType | None:
     if type_id is None:
-        return
-    if db.scalar(select(GearType.id).where(GearType.id == type_id, _visible_types(user))) is None:
+        return None
+    gear_type = db.scalar(select(GearType).where(GearType.id == type_id, _visible_types(user)))
+    if gear_type is None:
         raise UnprocessableError("Unknown gear type", code="unknown_type")
+    return gear_type
 
 
 # --- Public interface for other modules ---
@@ -118,9 +127,31 @@ def existing_item_ids(db: Session, item_ids) -> set[uuid.UUID]:
 # --- Tags ---
 
 
+FAVORITE_NAME = "Favorit"
+FAVORITE_COLOR = "#f5b400"
+
+
+def favorite_tag(db: Session, user: User) -> GearTag:
+    """The tag "favorite" every user has. It is created when it is first needed; a tag
+    the user already named like it becomes the favourite tag."""
+    owned = select(GearTag).where(GearTag.owner_id == user.id)
+    tag = db.scalar(owned.where(GearTag.system == TAG_FAVORITE))
+    if tag is None:
+        tag = db.scalar(owned.where(func.lower(GearTag.name) == FAVORITE_NAME.lower()))
+        if tag is None:
+            tag = GearTag(owner_id=user.id, name=FAVORITE_NAME, color=FAVORITE_COLOR)
+            db.add(tag)
+        tag.system = TAG_FAVORITE
+        db.commit()
+    return tag
+
+
 def list_tags(db: Session, user: User) -> list[GearTag]:
+    favorite_tag(db, user)
     query = select(GearTag).where(GearTag.owner_id == user.id)
-    return list(db.scalars(query.order_by(func.lower(GearTag.name), GearTag.id)))
+    # The favourite tag first, then by name.
+    order = (GearTag.system.is_(None), func.lower(GearTag.name), GearTag.id)
+    return list(db.scalars(query.order_by(*order)))
 
 
 def _check_tag_name_is_free(db: Session, user: User, name: str, *, except_id=None) -> None:
@@ -143,7 +174,13 @@ def create_tag(db: Session, user: User, data: GearTagCreate) -> GearTag:
     return tag
 
 
+def _system_tag_error() -> ConflictError:
+    return ConflictError("This tag belongs to the app and stays as it is", code="system_tag")
+
+
 def update_tag(db: Session, user: User, tag: GearTag, data: GearTagIn) -> GearTag:
+    if tag.system is not None and data.name != tag.name:
+        raise _system_tag_error()
     _check_tag_name_is_free(db, user, data.name, except_id=tag.id)
     tag.name = data.name
     tag.color = data.color
@@ -153,6 +190,8 @@ def update_tag(db: Session, user: User, tag: GearTag, data: GearTagIn) -> GearTa
 
 def delete_tag(db: Session, tag: GearTag) -> None:
     """Delete the tag; the items that carried it stay."""
+    if tag.system is not None:
+        raise _system_tag_error()
     db.delete(tag)
     db.commit()
 
@@ -176,6 +215,7 @@ class ItemFilter:
     type_id: uuid.UUID | None = None
     status: str | None = None
     tag_ids: tuple[uuid.UUID, ...] = ()
+    favorite: bool | None = None
 
 
 def item_conditions(user: User, filters: ItemFilter) -> list:
@@ -190,6 +230,9 @@ def item_conditions(user: User, filters: ItemFilter) -> list:
     # Several tags narrow the result: an item must carry all of them.
     for tag_id in filters.tag_ids:
         conditions.append(GearItem.tags.any(GearTag.id == tag_id))
+    if filters.favorite is not None:
+        is_favorite = GearItem.tags.any(GearTag.system == TAG_FAVORITE)
+        conditions.append(is_favorite if filters.favorite else ~is_favorite)
     return conditions
 
 
@@ -205,11 +248,13 @@ def list_items(
 def create_item(db: Session, storage: Storage, user: User, data: GearItemCreate) -> GearItem:
     if data.id is not None and db.get(GearItem, data.id) is not None:
         raise ConflictError("A gear item with this id already exists", code="id_taken")
-    _check_type_is_usable(db, user, data.type_id)
+    gear_type = _usable_type(db, user, data.type_id)
     item = GearItem(
         owner_id=user.id,
         tags=_load_tags(db, user, data.tag_ids),
-        **data.model_dump(exclude_none=True, exclude={"tag_ids"}),
+        attributes=attributes.clean(gear_type.kind if gear_type else None, data.attributes),
+        currency=CURRENCY if data.purchase_price is not None else None,
+        **data.model_dump(exclude_none=True, exclude={"tag_ids", "attributes"}),
     )
     if data.catalog_id is not None:
         template = db.get(GearCatalogItem, data.catalog_id)
@@ -224,13 +269,30 @@ def create_item(db: Session, storage: Storage, user: User, data: GearItemCreate)
 
 
 def update_item(db: Session, user: User, item: GearItem, data: GearItemIn) -> GearItem:
-    if data.type_id != item.type_id:
-        _check_type_is_usable(db, user, data.type_id)
-    for field, value in data.model_dump(exclude={"tag_ids"}).items():
+    gear_type = (
+        _usable_type(db, user, data.type_id)
+        if data.type_id != item.type_id
+        else db.get(GearType, data.type_id)
+        if data.type_id
+        else None
+    )
+    for field, value in data.model_dump(exclude={"tag_ids", "attributes"}).items():
         setattr(item, field, value)
+    item.attributes = attributes.clean(gear_type.kind if gear_type else None, data.attributes)
+    item.currency = CURRENCY if data.purchase_price is not None else None
     item.tags = _load_tags(db, user, data.tag_ids)
     item.updated_at = utcnow()
     db.commit()
+    return item
+
+
+def set_favorite(db: Session, user: User, item: GearItem, favorite: bool) -> GearItem:
+    """Put the favourite tag on the item or take it off."""
+    tag = favorite_tag(db, user)
+    if favorite != item.favorite:
+        item.tags = [*item.tags, tag] if favorite else [t for t in item.tags if t.id != tag.id]
+        item.updated_at = utcnow()
+        db.commit()
     return item
 
 

@@ -1,13 +1,15 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Column, Date, Float, ForeignKey, Integer, String, Table, Text, Uuid
+from sqlalchemy import JSON, Column, Date, Float, ForeignKey, Integer, String, Table, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base, TimestampMixin, UTCDateTime, utcnow
 
 STATUS_ACTIVE = "active"
 STATUS_RETIRED = "retired"
+TAG_FAVORITE = "favorite"
+CURRENCY = "EUR"
 
 CATALOG_PENDING = "pending"
 CATALOG_APPROVED = "approved"
@@ -24,6 +26,8 @@ class GearType(Base):
         Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), index=True
     )
     name: Mapped[str] = mapped_column(String(80))
+    # Decides which extra attributes items of this type carry (see attributes.py).
+    kind: Mapped[str | None] = mapped_column(String(32))
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
@@ -64,6 +68,8 @@ class GearTag(Base):
     )
     name: Mapped[str] = mapped_column(String(50))
     color: Mapped[str | None] = mapped_column(String(7))
+    # Set for tags every user has and cannot delete, e.g. "favorite".
+    system: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
 
@@ -107,6 +113,7 @@ class GearItem(TimestampMixin, Base):
     serial_number: Mapped[str | None] = mapped_column(String(100))
     size: Mapped[str | None] = mapped_column(String(50))
     color: Mapped[str | None] = mapped_column(String(50))
+    attributes: Mapped[dict | None] = mapped_column(JSON, default=dict)
 
     tags: Mapped[list[GearTag]] = relationship(
         secondary=gear_item_tag, lazy="selectin", order_by=GearTag.name
@@ -115,6 +122,10 @@ class GearItem(TimestampMixin, Base):
     @property
     def tag_ids(self) -> list[uuid.UUID]:
         return [tag.id for tag in self.tags]
+
+    @property
+    def favorite(self) -> bool:
+        return any(tag.system == TAG_FAVORITE for tag in self.tags)
 
 
 class GearList(TimestampMixin, Base):

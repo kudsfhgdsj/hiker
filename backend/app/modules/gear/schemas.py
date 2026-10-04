@@ -8,7 +8,7 @@ from pydantic import (
     ConfigDict,
     Field,
     StringConstraints,
-    model_validator,
+    field_validator,
 )
 
 from app.core.fields import Name
@@ -40,9 +40,15 @@ Price = Annotated[
 # --- Types ---
 
 
+Kind = Literal["backpack", "shoes"]
+
+
 class GearTypeIn(BaseModel):
     name: TypeName
     sort_order: int = Field(default=0, ge=0, le=100_000)
+    kind: Kind | None = Field(
+        default=None, description="Gives the items of this type extra attributes, see /gear/meta"
+    )
 
 
 class GearTypeCreate(GearTypeIn):
@@ -58,6 +64,7 @@ class GearTypeOut(BaseModel):
     name: str
     sort_order: int
     standard: bool
+    kind: str | None = None
 
 
 # --- Tags ---
@@ -78,6 +85,9 @@ class GearTagOut(GearTagIn):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    system: str | None = Field(
+        default=None, description="favorite: the tag every user has; it cannot be deleted"
+    )
 
 
 # --- Items ---
@@ -89,10 +99,7 @@ class GearItemIn(BaseModel):
     type_id: uuid.UUID | None = None
     weight_g: WeightG = None
     purchase_date: date | None = None
-    purchase_price: Price = None
-    currency: str | None = Field(
-        default=None, pattern=r"^[A-Z]{3}$", description="ISO 4217; required with a price"
-    )
+    purchase_price: Price = Field(default=None, description="In EUR, at most two decimal places")
     description: LongText = None
     notes: LongText = None
     website_url: WebsiteUrl = None
@@ -101,12 +108,15 @@ class GearItemIn(BaseModel):
     size: _optional_text(50) = None
     color: _optional_text(50) = None
     tag_ids: list[uuid.UUID] = Field(default_factory=list, max_length=50)
+    attributes: dict[str, float | str | None] = Field(
+        default_factory=dict,
+        description="Extra fields that depend on the kind of the type, e.g. volume_l",
+    )
 
-    @model_validator(mode="after")
-    def _price_needs_currency(self):
-        if self.purchase_price is not None and self.currency is None:
-            raise ValueError("currency is required when purchase_price is set")
-        return self
+    @field_validator("attributes", mode="before")
+    @classmethod
+    def _no_attributes_is_empty(cls, value):
+        return {} if value is None else value
 
 
 class GearItemCreate(GearItemIn):
@@ -125,8 +135,33 @@ class GearItemOut(GearItemIn):
     image_file_id: uuid.UUID | None = Field(
         description="Changes with every new image; load it from /gear/items/{id}/image"
     )
+    currency: str | None = Field(description="Always EUR if there is a price")
+    favorite: bool = Field(description="Carries the tag 'favorite'; set with .../favorite")
     created_at: datetime
     updated_at: datetime
+
+
+class AttributeOut(BaseModel):
+    key: str
+    type: Literal["number", "choice"]
+    unit: str | None
+    minimum: float | None
+    maximum: float | None
+    options: list[str]
+
+
+class KindOut(BaseModel):
+    kind: str
+    attributes: list[AttributeOut]
+
+
+class GearMeta(BaseModel):
+    """What clients need to build the gear forms."""
+
+    currency: str
+    image_formats: list[str] = Field(description="Accepted for uploads; stored as JPEG")
+    max_upload_mb: int
+    kinds: list[KindOut]
 
 
 # --- Summary ---

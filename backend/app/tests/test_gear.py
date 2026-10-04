@@ -19,7 +19,6 @@ FULL_ITEM = {
     "weight_g": 890,
     "purchase_date": "2025-05-17",
     "purchase_price": 149.9,
-    "currency": "CHF",
     "description": "Tagesrucksack",
     "notes": "Hüftgurt links repariert",
     "website_url": "https://example.org/aeon-35",
@@ -101,6 +100,8 @@ def test_create_and_read_item_with_all_fields(client, anna):
     assert response.status_code == 200
     assert response.json() == created
     assert {key: created[key] for key in FULL_ITEM} == FULL_ITEM
+    assert created["currency"] == "EUR" and created["favorite"] is False
+    assert created["attributes"] == {}
     assert created["catalog_id"] is None and created["image_file_id"] is None
 
 
@@ -128,13 +129,11 @@ def test_blank_optional_fields_become_null(client, anna):
     [
         {"name": "  "},
         {"weight_g": -1},
-        {"purchase_price": -5, "currency": "CHF"},
-        {"purchase_price": 1.999, "currency": "CHF"},
-        {"purchase_price": 1_000_000.01, "currency": "CHF"},
-        {"purchase_price": "abc", "currency": "CHF"},
-        {"purchase_price": "NaN", "currency": "CHF"},
-        {"purchase_price": 20},
-        {"currency": "chf"},
+        {"purchase_price": -5},
+        {"purchase_price": 1.999},
+        {"purchase_price": 1_000_000.01},
+        {"purchase_price": "abc"},
+        {"purchase_price": "NaN"},
         {"status": "lost"},
         {"website_url": "javascript:alert(1)"},
         {"purchase_date": "17.05.2025"},
@@ -148,7 +147,7 @@ def test_item_validates_input(client, anna, fields):
 
 @pytest.mark.parametrize(("price", "stored"), [(0, 0.0), (19.99, 19.99), ("249.5", 249.5)])
 def test_price_is_stored_as_number(client, anna, price, stored):
-    created = create_item(client, anna, purchase_price=price, currency="EUR")
+    created = create_item(client, anna, purchase_price=price)
 
     assert created["purchase_price"] == stored
     assert isinstance(created["purchase_price"], float)
@@ -662,9 +661,11 @@ def test_tags_are_defined_freely_per_user(client, anna, bea):
     winter = create_tag(client, anna, "Winter", color="#3366cc")
     ultralight = create_tag(client, anna, "Ultraleicht")
 
-    assert client.get(TAGS, headers=anna).json() == [ultralight, winter]
+    favorite, *own = client.get(TAGS, headers=anna).json()
+    assert own == [ultralight, winter]
+    assert (favorite["name"], favorite["system"]) == ("Favorit", "favorite")
     assert winter["color"] == "#3366cc" and ultralight["color"] is None
-    assert client.get(TAGS, headers=bea).json() == []
+    assert [tag["system"] for tag in client.get(TAGS, headers=bea).json()] == ["favorite"]
     assert client.post(TAGS, json={"name": "winter"}, headers=anna).status_code == 409
     assert client.post(TAGS, json={"name": "Winter"}, headers=bea).status_code == 201
     assert client.post(TAGS, json={"name": " "}, headers=anna).status_code == 422
@@ -678,7 +679,12 @@ def test_tags_can_be_renamed_and_are_private(client, anna, bea):
 
     renamed = client.put(url, json={"name": "Hochtour", "color": "#ff8800"}, headers=anna)
 
-    assert renamed.json() == {"id": tag["id"], "name": "Hochtour", "color": "#ff8800"}
+    assert renamed.json() == {
+        "id": tag["id"],
+        "name": "Hochtour",
+        "color": "#ff8800",
+        "system": None,
+    }
     assert client.put(url, json={"name": "sommer"}, headers=anna).status_code == 409
     assert client.put(url, json={"name": "Meins"}, headers=bea).status_code == 404
     assert client.delete(url, headers=bea).status_code == 404
@@ -742,7 +748,6 @@ def gear_set(client, admin, anna):
         brand="MSR",
         weight_g=1500,
         purchase_price=399.9,
-        currency="CHF",
         type_id=tents["id"],
         tag_ids=[loan["id"]],
     )
@@ -753,7 +758,6 @@ def gear_set(client, admin, anna):
         brand="Petzl",
         weight_g=450,
         purchase_price=120.1,
-        currency="CHF",
         tag_ids=[winter["id"], loan["id"]],
     )
     create_item(
@@ -763,7 +767,6 @@ def gear_set(client, admin, anna):
         brand="Petzl",
         weight_g=800,
         purchase_price=95.5,
-        currency="EUR",
         status="retired",
         tag_ids=[winter["id"]],
     )
@@ -777,7 +780,7 @@ def summary(client, headers, **params):
     return response.json()
 
 
-def test_summary_totals_weight_and_value_per_currency(client, anna, gear_set):
+def test_summary_totals_weight_and_value(client, anna, gear_set):
     result = summary(client, anna)
 
     assert result == {
@@ -786,7 +789,7 @@ def test_summary_totals_weight_and_value_per_currency(client, anna, gear_set):
             "item_count": 4,
             "weight_g": 2750,
             "items_without_weight": 1,
-            "value": [{"currency": "CHF", "amount": 520.0}, {"currency": "EUR", "amount": 95.5}],
+            "value": [{"currency": "EUR", "amount": 615.5}],
             "items_without_price": 1,
         },
         "groups": [],
@@ -799,7 +802,7 @@ def test_summary_respects_filters(client, anna, gear_set):
     petzl = summary(client, anna, q="petzl")["total"]
 
     assert (active["item_count"], active["weight_g"]) == (3, 1950)
-    assert active["value"] == [{"currency": "CHF", "amount": 520.0}]
+    assert active["value"] == [{"currency": "EUR", "amount": 520.0}]
     assert (winter["item_count"], winter["weight_g"]) == (2, 1250)
     assert petzl["item_count"] == 2
 
@@ -813,11 +816,8 @@ def test_summary_groups_by_tag(client, anna, gear_set):
         (None, 1, 0),
     ]
     assert groups[0]["key"] == gear_set["loan"]["id"]
-    assert groups[0]["value"] == [{"currency": "CHF", "amount": 520.0}]
-    assert groups[1]["value"] == [
-        {"currency": "CHF", "amount": 120.1},
-        {"currency": "EUR", "amount": 95.5},
-    ]
+    assert groups[0]["value"] == [{"currency": "EUR", "amount": 520.0}]
+    assert groups[1]["value"] == [{"currency": "EUR", "amount": 215.6}]
     assert groups[2]["key"] is None
 
 
@@ -866,3 +866,135 @@ def test_users_see_the_status_of_their_own_proposals(client, admin, anna, bea):
     assert client.get(f"{CATALOG}/mine", headers=bea).json()["total"] == 1
     assert client.get(f"{CATALOG}/mine", headers=admin).json()["total"] == 0
     assert client.get(f"{CATALOG}/mine").status_code == 401
+
+
+# --- Favourites, currency and attributes by kind ---
+
+
+def test_every_price_is_in_eur_whatever_the_client_sends(client, anna):
+    priced = create_item(client, anna, purchase_price=20, currency="CHF")
+    free = create_item(client, anna, name="Karte", currency="CHF")
+
+    assert priced["currency"] == "EUR" and free["currency"] is None
+    changed = client.put(
+        f"{ITEMS}/{free['id']}", json={"name": "Karte", "purchase_price": 9.5}, headers=anna
+    ).json()
+    assert changed["currency"] == "EUR"
+
+
+def test_favorite_is_the_tag_every_user_has(client, anna, bea):
+    item = create_item(client, anna)
+    other = create_item(client, anna, name="Kocher")
+    url = f"{ITEMS}/{item['id']}/favorite"
+
+    marked = client.put(url, headers=anna).json()
+    favorite = next(t for t in client.get(TAGS, headers=anna).json() if t["system"])
+
+    assert marked["favorite"] is True and marked["tag_ids"] == [favorite["id"]]
+    assert client.put(url, headers=anna).json()["tag_ids"] == [favorite["id"]]
+
+    def names(**params):
+        listed = client.get(ITEMS, params=params, headers=anna).json()["items"]
+        return [entry["name"] for entry in listed]
+
+    assert names(favorite="true") == ["Stirnlampe"]
+    assert names(favorite="false") == ["Kocher"]
+    assert names(tag_id=favorite["id"]) == ["Stirnlampe"]
+    # Setting the tag through the normal item form marks the favourite too.
+    body = {"name": "Kocher", "tag_ids": [favorite["id"]]}
+    assert client.put(f"{ITEMS}/{other['id']}", json=body, headers=anna).json()["favorite"] is True
+    assert client.delete(url, headers=anna).json()["favorite"] is False
+    assert client.put(url, headers=bea).status_code == 404
+
+
+def test_favorite_tag_cannot_be_deleted_or_renamed(client, anna):
+    favorite = client.get(TAGS, headers=anna).json()[0]
+    url = f"{TAGS}/{favorite['id']}"
+
+    assert client.delete(url, headers=anna).status_code == 409
+    renamed = client.put(url, json={"name": "Lieblinge"}, headers=anna)
+    assert renamed.status_code == 409 and renamed.json()["error"]["code"] == "system_tag"
+    recolored = client.put(url, json={"name": "Favorit", "color": "#00aa00"}, headers=anna)
+    assert recolored.status_code == 200 and recolored.json()["color"] == "#00aa00"
+    assert len(client.get(TAGS, headers=anna).json()) == 1
+
+
+def test_own_tag_named_like_the_favorite_becomes_it(client, anna):
+    # Created before the favourite tag was needed for the first time.
+    own = client.post(TAGS, json={"name": "favorit"}, headers=anna).json()
+
+    tags = client.get(TAGS, headers=anna).json()
+
+    assert [(tag["id"], tag["system"]) for tag in tags] == [(own["id"], "favorite")]
+
+
+def test_meta_describes_the_extra_fields_per_kind(client, anna):
+    meta = client.get("/api/v1/gear/meta", headers=anna).json()
+
+    assert meta["currency"] == "EUR" and meta["image_formats"] == ["JPEG", "PNG", "WebP"]
+    assert meta["max_upload_mb"] > 0
+    kinds = {kind["kind"]: kind["attributes"] for kind in meta["kinds"]}
+    assert kinds["backpack"][0] == {
+        "key": "volume_l",
+        "type": "number",
+        "unit": "l",
+        "minimum": 1,
+        "maximum": 200,
+        "options": [],
+    }
+    assert kinds["shoes"][0]["options"] == ["A", "B", "B/C", "C", "D"]
+
+
+def test_attributes_follow_the_kind_of_the_type(client, anna, admin):
+    packs = create_type(client, admin, "Rucksack", standard=True, kind="backpack")
+    shoes = create_type(client, anna, "Bergschuhe", kind="shoes")
+    plain = create_type(client, anna, "Sonstiges")
+    assert packs["kind"] == "backpack" and plain["kind"] is None
+
+    pack = create_item(client, anna, name="Aeon", type_id=packs["id"], attributes={"volume_l": 35})
+    boot = create_item(
+        client,
+        anna,
+        name="Nepal",
+        type_id=shoes["id"],
+        # A value that belongs to another kind is dropped.
+        attributes={"shoe_category": "B/C", "volume_l": 35},
+    )
+
+    assert pack["attributes"] == {"volume_l": 35}
+    assert boot["attributes"] == {"shoe_category": "B/C"}
+    # Changing the type removes what no longer applies.
+    moved = client.put(
+        f"{ITEMS}/{pack['id']}",
+        json={"name": "Aeon", "type_id": plain["id"], "attributes": {"volume_l": 35}},
+        headers=anna,
+    ).json()
+    assert moved["attributes"] == {}
+
+
+@pytest.mark.parametrize(
+    ("kind", "attributes"),
+    [
+        ("backpack", {"volume_l": 0}),
+        ("backpack", {"volume_l": 500}),
+        ("backpack", {"volume_l": "viel"}),
+        ("shoes", {"shoe_category": "E"}),
+    ],
+)
+def test_invalid_attribute_values_are_rejected(client, anna, kind, attributes):
+    gear_type = create_type(client, anna, "Typ", kind=kind)
+
+    response = client.post(
+        ITEMS,
+        json={"name": "X", "type_id": gear_type["id"], "attributes": attributes},
+        headers=anna,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "invalid_attribute"
+
+
+def test_unknown_kind_is_rejected(client, anna):
+    response = client.post(TYPES, json={"name": "Typ", "kind": "boat"}, headers=anna)
+
+    assert response.status_code == 422
