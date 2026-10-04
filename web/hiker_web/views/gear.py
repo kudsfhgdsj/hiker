@@ -203,3 +203,91 @@ def catalog():
 def catalog_decide(catalog_id, decision):
     api().send("PATCH", f"/gear/catalog/{catalog_id}", {"status": decision})
     return redirect(url_for("gear.catalog"))
+
+
+# --- Packing lists ---
+
+
+def _list_from_form() -> dict:
+    removed = set(request.form.getlist("entry_remove"))
+    ids = request.form.getlist("entry_item")
+    quantities = request.form.getlist("entry_quantity")
+    if len(ids) != len(quantities):
+        raise forms.FormError("entries")
+    entries = [
+        {"gear_item_id": item_id, "quantity": forms.to_number(quantity, "quantity", int) or 1}
+        for item_id, quantity in zip(ids, quantities, strict=True)
+        if item_id not in removed
+    ]
+    present = {entry["gear_item_id"] for entry in entries}
+    for item_id in request.form.getlist("entry_new"):
+        if item_id and item_id not in present:
+            entries.append(
+                {"gear_item_id": item_id, "quantity": forms.number("entry_new_quantity", int) or 1}
+            )
+            present.add(item_id)
+    return {
+        "name": forms.text("name") or "",
+        "description": forms.text("description"),
+        "entries": entries,
+    }
+
+
+@blueprint.get("/lists")
+@gear_page
+def packing_lists():
+    return render_template("gear/lists.html", lists=api().get("/gear/lists"))
+
+
+def _list_page(gear_list: dict, is_new: bool, status: int = 200):
+    items = api().pages("/gear/items")
+    page = render_template(
+        "gear/list_form.html",
+        gear_list=gear_list,
+        is_new=is_new,
+        items=items,
+        by_id={item["id"]: item for item in items},
+    )
+    return page, status
+
+
+def _save_list(method: str, path: str, list_id: str | None):
+    try:
+        body = _list_from_form()
+        saved = api().send(method, path, body)
+    except forms.FormError:
+        flash(t("error.validation"), "error")
+        return redirect(request.url)
+    except ApiError as error:
+        if error.status in (401, 404):
+            raise
+        flash(error_text(error), "error")
+        return _list_page({**body, "id": list_id}, list_id is None, 422)
+    flash(t("common.saved"), "success")
+    if "stay" in request.form:
+        return redirect(url_for("gear.packing_list_edit", list_id=saved["id"]))
+    return redirect(url_for("gear.packing_lists"))
+
+
+@blueprint.route("/lists/new", methods=["GET", "POST"])
+@gear_page
+def packing_list_new():
+    if request.method == "POST":
+        return _save_list("POST", "/gear/lists", None)
+    return _list_page({"entries": []}, True)
+
+
+@blueprint.route("/lists/<uuid:list_id>", methods=["GET", "POST"])
+@gear_page
+def packing_list_edit(list_id):
+    if request.method == "POST":
+        return _save_list("PUT", f"/gear/lists/{list_id}", str(list_id))
+    return _list_page(api().get(f"/gear/lists/{list_id}"), False)
+
+
+@blueprint.post("/lists/<uuid:list_id>/delete")
+@gear_page
+def packing_list_delete(list_id):
+    api().send("DELETE", f"/gear/lists/{list_id}")
+    flash(t("common.deleted"), "success")
+    return redirect(url_for("gear.packing_lists"))

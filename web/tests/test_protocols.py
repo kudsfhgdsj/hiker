@@ -173,6 +173,19 @@ def text(response) -> str:
     return response.get_data(as_text=True)
 
 
+PACKING_LIST = {
+    "id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    "name": "Hochtour",
+    "description": None,
+    "total_weight_g": 2400,
+    "entries": [
+        {"gear_item_id": "item-1", "quantity": 1},
+        {"gear_item_id": "item-2", "quantity": 2},
+        {"gear_item_id": "item-3", "quantity": 1},
+    ],
+}
+
+
 def tour_api(fake_api, **changes):
     tour = {**TOUR, **changes}
     fake_api.route("GET", "/tours/*", tour)
@@ -186,6 +199,8 @@ def tour_api(fake_api, **changes):
     fake_api.route(
         "GET", "/nutrition/search", page([{"id": "food-2", "name": "Nüsse", "brand": None}])
     )
+    fake_api.route("GET", "/gear/lists", [PACKING_LIST])
+    fake_api.route("GET", "/gear/lists/*", PACKING_LIST)
     return tour
 
 
@@ -439,6 +454,27 @@ def test_saving_sends_the_whole_document_with_the_version(user, fake_api):
         {"name": "Lisengrat", "elevation_m": 2100},
     ]
     assert body["partners"] == [{"contact_id": "c1"}]
+
+
+def test_packing_list_adds_only_items_the_tour_does_not_have_yet(user, fake_api):
+    tour_api(fake_api)
+    fake_api.route("PUT", "/tours/*", lambda r: httpx2.Response(200, json=TOUR))
+
+    form = text(user.get(f"/tours/{TOUR_ID}/edit"))
+    user.post(
+        f"/tours/{TOUR_ID}/edit",
+        edit_form(gear_item="item-1", gear_new="item-2", gear_list=PACKING_LIST["id"]),
+    )
+
+    assert "Packliste übernehmen" in form and "Hochtour (2,4 kg)" in form
+    assert 'name="gear_item" value="item-1"' in form
+    body = json.loads(fake_api.last("PUT", f"/tours/{TOUR_ID}").content)
+    # item-1 is in the tour, item-2 was just chosen by hand: only item-3 comes from the list.
+    assert body["gear"] == [
+        {"id": "g1", "quantity": 1, "carried": True},
+        {"gear_item_id": "item-2", "quantity": 1, "carried": True},
+        {"gear_item_id": "item-3", "quantity": 1, "carried": True},
+    ]
 
 
 def test_removing_rows_and_staying_on_the_form(user, fake_api):

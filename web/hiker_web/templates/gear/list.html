@@ -4,6 +4,7 @@
 <div class="toolbar">
   <h1>{{ t('nav.gear') }}</h1><span class="spacer"></span>
   <a class="button" href="{{ url_for('gear.summary', **filters) }}">{{ t('gear.summary') }}</a>
+  <a class="button" href="{{ url_for('gear.packing_lists') }}">{{ t('gear.lists') }}</a>
   <a class="button" href="{{ url_for('gear.manage') }}">{{ t('gear.manage') }}</a>
   <a class="button" href="{{ url_for('gear.catalog') }}">{{ t('gear.catalog') }}</a>
   <a class="button primary" href="{{ url_for('gear.item_new') }}">{{ t('gear.new') }}</a>

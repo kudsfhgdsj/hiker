@@ -283,3 +283,70 @@ def test_catalog_proposals_and_moderation(browser, fake_api):
         "status": "approved"
     }
     assert browser.post(f"/gear/catalog/{proposal['id']}/deleted").status_code == 404
+
+
+LIST = {
+    "id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    "name": "Wochenende",
+    "description": "Zwei Tage",
+    "total_weight_g": 1800,
+    "entries": [{"gear_item_id": TENT["id"], "quantity": 1}],
+}
+
+
+def test_packing_lists_are_listed_with_their_weight(user, fake_api):
+    fake_api.route("GET", "/gear/lists", [LIST])
+
+    page_text = text(user.get("/gear/lists"))
+
+    assert "Wochenende" in page_text and "1,8 kg" in page_text and "Zwei Tage" in page_text
+    assert f"/gear/lists/{LIST['id']}" in page_text
+
+
+def test_packing_list_form_and_saving(user, fake_api):
+    gear_api(fake_api)
+    fake_api.route("GET", "/gear/lists/*", LIST)
+    fake_api.route("PUT", "/gear/lists/*", LIST)
+    fake_api.route("POST", "/gear/lists", lambda r: httpx2.Response(201, json=LIST))
+    fake_api.route("DELETE", "/gear/lists/*", lambda r: httpx2.Response(204))
+
+    form = text(user.get(f"/gear/lists/{LIST['id']}"))
+    saved = user.post(
+        f"/gear/lists/{LIST['id']}",
+        {
+            "name": "Wochenende",
+            "description": "",
+            "entry_item": TENT["id"],
+            "entry_quantity": "2",
+            "entry_new": STOVE["id"],
+            "entry_new_quantity": "1",
+        },
+    )
+    changed = json.loads(fake_api.last("PUT", f"/gear/lists/{LIST['id']}").content)
+    user.post(
+        "/gear/lists/new",
+        {
+            "name": "Leer",
+            "entry_item": TENT["id"],
+            "entry_quantity": "1",
+            "entry_remove": TENT["id"],
+        },
+    )
+    created = json.loads(fake_api.last("POST", "/gear/lists").content)
+    deleted = user.post(f"/gear/lists/{LIST['id']}/delete")
+
+    # The tent is in the list, the stove can be added.
+    assert "Zelt Hubba" in form and 'name="entry_quantity" value="1"' in form
+    assert f'name="entry_new" value="{STOVE["id"]}"' in form
+    assert f'name="entry_new" value="{TENT["id"]}"' not in form
+    assert saved.headers["location"] == "/gear/lists"
+    assert changed == {
+        "name": "Wochenende",
+        "description": None,
+        "entries": [
+            {"gear_item_id": TENT["id"], "quantity": 2},
+            {"gear_item_id": STOVE["id"], "quantity": 1},
+        ],
+    }
+    assert created == {"name": "Leer", "description": None, "entries": []}
+    assert deleted.headers["location"] == "/gear/lists"

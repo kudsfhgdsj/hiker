@@ -91,7 +91,7 @@
     <thead><tr><th>{{ t('common.name') }}</th><th>{{ t('tour.quantity') }}</th><th>{{ t('tour.carried') }}</th><th>{{ t('tour.remove') }}</th></tr></thead>
     <tbody>
       {% for row in tour.gear %}
-      <tr><td><input type="hidden" name="gear_id" value="{{ row.id }}">{{ row.name }} <span class="meta">{{ row.weight_g|weight }}</span></td>
+      <tr><td><input type="hidden" name="gear_id" value="{{ row.id }}"><input type="hidden" name="gear_item" value="{{ row.gear_item_id or '' }}">{{ row.name }} <span class="meta">{{ row.weight_g|weight }}</span></td>
         <td><input name="gear_quantity" value="{{ row.quantity }}" inputmode="numeric" size="4" aria-label="{{ t('tour.quantity') }}"></td>
         <td><input type="checkbox" name="gear_carried" value="{{ row.id }}"{% if row.carried %} checked{% endif %} aria-label="{{ t('tour.carried') }}"></td>
         <td><input type="checkbox" name="gear_remove" value="{{ row.id }}" aria-label="{{ t('tour.remove') }}"></td></tr>
@@ -104,6 +104,13 @@
       {% endif %}
     </tbody>
   </table>
+
+  {% if gear_lists %}
+  <label class="field"><span>{{ t('tour.add_list') }}</span>
+    <select name="gear_list"><option value="">{{ t('tour.choose') }}</option>
+      {% for gear_list in gear_lists %}<option value="{{ gear_list.id }}">{{ gear_list.name }} ({{ gear_list.total_weight_g|weight }})</option>{% endfor %}</select>
+    <small>{{ t('tour.add_list_hint') }}</small></label>
+  {% endif %}
 
   <h2>{{ t('tour.food') }}</h2>
   <table>

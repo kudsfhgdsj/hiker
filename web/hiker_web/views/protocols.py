@@ -180,6 +180,12 @@ def _document() -> dict:
         for row in _rows("gear", "id", "quantity")
         if row["id"] not in removed["gear"]
     ]
+    # Items that are in the tour already are not added a second time.
+    present = {
+        item
+        for row_id, item in zip(form.getlist("gear_id"), form.getlist("gear_item"), strict=False)
+        if item and row_id not in removed["gear"]
+    }
     if forms.text("gear_new"):
         gear.append(
             {
@@ -187,6 +193,14 @@ def _document() -> dict:
                 "quantity": forms.number("gear_new_quantity", int) or 1,
                 "carried": forms.checked("gear_new_carried"),
             }
+        )
+        present.add(forms.text("gear_new"))
+    if forms.text("gear_list"):
+        packing_list = api().get(f"/gear/lists/{forms.text('gear_list')}")
+        gear.extend(
+            {"gear_item_id": entry["gear_item_id"], "quantity": entry["quantity"], "carried": True}
+            for entry in packing_list["entries"]
+            if entry["gear_item_id"] not in present
         )
 
     food = [
@@ -321,6 +335,7 @@ def _edit_page(
         base=base if base is not None else _scalars(tour),
         is_owner=tour["permission"] == "owner",
         gear_items=client.pages("/gear/items", status="active") if "gear" in modules else [],
+        gear_lists=client.get("/gear/lists") if "gear" in modules else [],
         foods=client.pages("/nutrition/search") if "nutrition" in modules else [],
         contacts=contacts,
         other_partners=others,

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% from "macros.html" import field, csrf, delete_form %}
+{% block title %}{{ t('gear.list_new' if is_new else 'gear.list_edit') }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('gear.list_new' if is_new else 'gear.list_edit') }}</h1>
+<form method="post" class="stack">
+  {{ csrf() }}
+  {{ field('name', t('common.name'), gear_list.name, required=True, attrs='maxlength="200"') }}
+  <label class="field"><span>{{ t('gear.description') }}</span><textarea name="description" rows="2">{{ gear_list.description or '' }}</textarea></label>
+  <table>
+    <thead><tr><th>{{ t('common.name') }}</th><th>{{ t('tour.quantity') }}</th><th class="num">{{ t('gear.weight') }}</th><th>{{ t('tour.remove') }}</th></tr></thead>
+    <tbody>
+      {% for entry in gear_list.entries %}
+      {% set item = by_id.get(entry.gear_item_id) %}
+      <tr><td><input type="hidden" name="entry_item" value="{{ entry.gear_item_id }}">{{ item.name if item else '?' }}{% if item and item.brand %} <span class="meta">{{ item.brand }}</span>{% endif %}</td>
+        <td><input name="entry_quantity" value="{{ entry.quantity }}" inputmode="numeric" size="4" aria-label="{{ t('tour.quantity') }}"></td>
+        <td class="num">{{ (item.weight_g * entry.quantity)|weight if item and item.weight_g is not none else '–' }}</td>
+        <td><input type="checkbox" name="entry_remove" value="{{ entry.gear_item_id }}" aria-label="{{ t('tour.remove') }}"></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not is_new and gear_list.total_weight_g is defined %}<p><strong>{{ t('gear.total_weight') }}: {{ gear_list.total_weight_g|weight }}</strong></p>{% endif %}
+  {% set present = gear_list.entries|map(attribute='gear_item_id')|list %}
+  {% set candidates = items|rejectattr('id', 'in', present)|list %}
+  {% if candidates %}
+  <fieldset class="field"><legend>{{ t('tour.add_gear') }}</legend>
+    <div class="checks">
+      {% for item in candidates %}
+      <label><input type="checkbox" name="entry_new" value="{{ item.id }}"> {{ item.name }}{% if item.weight_g is not none %} <span class="meta">{{ item.weight_g|weight }}</span>{% endif %}{% if item.status == 'retired' %} <span class="meta">({{ t('gear.status.retired') }})</span>{% endif %}</label>
+      {% endfor %}
+    </div>
+    <input type="hidden" name="entry_new_quantity" value="1">
+  </fieldset>
+  {% elif not items %}<p class="meta">{{ t('gear.empty') }}</p>{% endif %}
+  <div class="toolbar">
+    <button class="primary">{{ t('action.save') }}</button>
+    <button name="stay" value="1">{{ t('tour.save_and_stay') }}</button>
+    <a class="button" href="{{ url_for('gear.packing_lists') }}">{{ t('action.cancel') }}</a>
+  </div>
+</form>
+{% if not is_new %}<div class="toolbar" style="margin-top:1rem">{{ delete_form(url_for('gear.packing_list_delete', list_id=gear_list.id)) }}</div>{% endif %}
+{% endblock %}

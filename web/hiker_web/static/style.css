@@ -93,3 +93,4 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 #photo-dialog::backdrop { background: #000a; }
 .conflict { border-color: #c62828; }
 del { color: #c62828; } ins { color: #2e7d32; text-decoration: none; }
+.checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .25rem 1rem; }
