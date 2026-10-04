@@ -129,7 +129,9 @@ def create_app(config: dict | None = None) -> Flask:
     def _security_headers(response):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
-        response.headers.setdefault("Referrer-Policy", "same-origin")
+        # Other servers only learn the origin, never the path: the tile server of the map
+        # requires a referrer, and the path of a public link contains its token.
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         response.headers.setdefault("Content-Security-Policy", content_security_policy)
         return response
 

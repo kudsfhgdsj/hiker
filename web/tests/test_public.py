@@ -79,7 +79,7 @@ def test_public_page_needs_no_login_and_is_not_indexed(browser, fake_api):
     assert "Rotsteinpass" in page and "Zelt" in page and "Riegel" in page and "Ben" in page
     assert "ungefähr" in page and "© OpenStreetMap-Mitwirkende (ODbL)" in page
     assert response.headers["X-Robots-Tag"] == "noindex, nofollow"
-    assert response.headers["Referrer-Policy"] == "no-referrer"
+    assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
     assert response.headers["Cache-Control"] == "no-store"
     assert '<meta name="robots" content="noindex, nofollow">' in page
     # Nothing of the signed-in area and no health data.

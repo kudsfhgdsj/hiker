@@ -48,7 +48,7 @@
   <ul class="list">
     {% for point in tour.waypoints %}
     <li><span class="chip">{{ t('tour.station.' ~ point.kind) }}</span><span class="grow">{{ point.name }}{% if point.description %}<br><span class="meta">{{ point.description }}</span>{% endif %}</span>
-      {% if point.reached_at %}<time datetime="{{ point.reached_at }}" class="local-time meta">{{ point.reached_at|time }}</time>{% endif %}
+      {% if point.reached_at %}<time datetime="{{ point.reached_at }}" class="local-time meta" data-format="time">{{ point.reached_at|time }}</time>{% endif %}
       <span>{{ point.elevation_m|meters }}</span></li>
     {% endfor %}
   </ul>

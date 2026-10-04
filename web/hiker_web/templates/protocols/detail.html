@@ -74,7 +74,7 @@
       {% for station in overview.stations %}
       <tr><td><span class="chip">{{ t('tour.station.' ~ station.kind) }}</span> {{ station.name or '' }}</td>
         <td class="num">{{ station.elevation_m|meters }}</td><td class="num">{{ station.track_distance_m|distance }}</td>
-        <td>{% if station.time %}<time datetime="{{ station.time }}" class="local-time">{{ station.time|time }}</time>{% endif %}</td></tr>
+        <td>{% if station.time %}<time datetime="{{ station.time }}" class="local-time" data-format="time">{{ station.time|time }}</time>{% endif %}</td></tr>
       {% endfor %}
     </tbody>
   </table>

@@ -67,8 +67,10 @@ Seiten eines Moduls gibt es nur, wenn die API es unter `/modules` meldet.
 - `Content-Security-Policy`: Skripte und Stile nur vom eigenen Server, Kartenkacheln nur von
   `MAP_TILE_URL`. Keine Inline-Skripte.
 - Bilder, GPX und Export werden mit dem Token des Nutzers von der API durchgereicht.
-- Öffentliche Links: `X-Robots-Tag: noindex, nofollow`, `Referrer-Policy: no-referrer`,
-  `Cache-Control: no-store`. Die Tokens erscheinen nicht im Log (Filter in `security.py`; gunicorn
+- `Referrer-Policy: strict-origin-when-cross-origin`: fremde Server erfahren nur die Herkunft,
+  nie den Pfad. Ganz ohne Referer geht es nicht – der Kachelserver von OpenStreetMap lehnt
+  solche Anfragen ab („Access blocked“).
+- Öffentliche Links: `X-Robots-Tag: noindex, nofollow`, `Cache-Control: no-store`. Die Tokens erscheinen nicht im Log (Filter in `security.py`; gunicorn
   läuft ohne Zugriffs-Log). **Der Reverse Proxy muss `/p/…` ebenfalls aus seinem Log halten.**
 - Die Client-Adresse wird an die API weitergegeben, damit deren Rate-Limit je Besucher zählt.
 
@@ -91,7 +93,9 @@ für mehr als gelegentliche Nutzung eine eigene Quelle in `MAP_TILE_URL` eintrag
 ```
 
 Die Tests laufen mit dem Flask-Testclient; die API ist durch eine Attrappe ersetzt
-(`tests/conftest.py`, `FakeApi`). Das JavaScript (Karte, Höhenprofil) hat keine automatischen Tests.
+(`tests/conftest.py`, `FakeApi`). Das JavaScript (Karte, Höhenprofil) hat keine automatischen
+Tests; es wurde am 04.10.2026 von Hand mit Firefox (headless, Playwright) gegen ein laufendes
+Backend geprüft.
 
 ## Betrieb
 

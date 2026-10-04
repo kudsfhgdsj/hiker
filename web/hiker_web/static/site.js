@@ -4,7 +4,10 @@
 for (const element of document.querySelectorAll("time.local-time")) {
   const date = new Date(element.dateTime);
   if (!Number.isNaN(date.getTime())) {
-    element.textContent = date.toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
+    element.textContent =
+      element.dataset.format === "time"
+        ? date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
+        : date.toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
   }
 }
 

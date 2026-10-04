@@ -27,7 +27,9 @@ def _get(token: str, suffix: str = ""):
 @blueprint.after_request
 def _private(response):
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
-    response.headers["Referrer-Policy"] = "no-referrer"
+    # Not "no-referrer": the tile server of the map rejects requests without one.
+    # Other servers get the origin only, so the token in the path stays private.
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers.setdefault("Cache-Control", "no-store")
     return response
 
