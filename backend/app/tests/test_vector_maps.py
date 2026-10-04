@@ -131,6 +131,8 @@ def test_style_is_a_hiking_map_from_own_layers():
     # Paths, peaks and huts are what the map is for.
     assert layers["path"]["filter"] == ["==", ["get", "class"], "path"]
     assert {"peak", "peak-name", "hut", "hut-name", "rock", "ice", "wood"} <= set(layers)
+    # Ridges and cliffs live in the same layer as lines; they are not summits.
+    assert layers["peak"]["filter"] == ["==", ["geometry-type"], "Point"]
     # Paths are drawn above the roads, labels above all lines.
     order = [layer["id"] for layer in style["layers"]]
     assert order.index("path") > order.index("road-motorway")

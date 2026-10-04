@@ -306,6 +306,8 @@ def build_style(
             "source": "hiker",
             "source-layer": "mountain_peak",
             "minzoom": 9,
+            # The layer also holds ridges and cliffs as lines: only points are summits.
+            "filter": ["==", ["geometry-type"], "Point"],
             "paint": {
                 "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 2, 14, 3.5],
                 "circle-color": "#6b4a2b",
@@ -316,7 +318,7 @@ def build_style(
         _label(
             "peak-name",
             "mountain_peak",
-            ["has", "name"],
+            ["all", ["has", "name"], ["==", ["geometry-type"], "Point"]],
             {
                 # "Säntis\n2502 m"
                 "text-field": [
