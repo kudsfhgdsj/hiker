@@ -12,7 +12,7 @@ USER = {
     "display_name": "Anna",
     "role": "user",
 }
-ALL_MODULES = ["auth", "gear", "nutrition", "protocols", "sync"]
+ALL_MODULES = ["auth", "gear", "nutrition", "protocols", "sync", "planning"]
 
 
 def error(status: int, code: str) -> httpx2.Response:

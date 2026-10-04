@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% from "macros.html" import field, csrf, delete_form %}
+{% block title %}{{ route.title or t('plan.new') }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>{{ route.title or t('plan.new') }}</h1><span class="spacer"></span>
+  <a class="button" href="{{ url_for('planning.route_list') }}">{{ t('action.back') }}</a>
+  {% if not is_new %}<a class="button" href="{{ url_for('planning.route_gpx', route_id=route.id) }}">{{ t('plan.gpx') }}</a>{% endif %}
+</div>
+<p class="meta">{{ t('plan.intro') }}</p>
+{% if not info.routing_available %}<p class="flash">{{ t('plan.no_routing') }}</p>{% endif %}
+<noscript><p class="flash error">{{ t('plan.needs_script') }}</p></noscript>
+
+<form method="post" id="plan-form" class="stack">
+  {{ csrf() }}
+  <input type="hidden" name="waypoints" id="plan-waypoints" value="{{ route.waypoints|tojson|forceescape }}">
+  {% if not is_new %}<input type="hidden" name="version" value="{{ route.version }}">{% endif %}
+
+  <div class="row card">
+    <label class="field"><span>{{ t('plan.connection') }}</span>
+      <select name="profile" id="plan-profile">
+        <option value="hiking"{% if route.profile != 'direct' and info.routing_available %} selected{% endif %}{% if not info.routing_available %} disabled{% endif %}>{{ t('plan.profile.hiking') }}</option>
+        <option value="direct"{% if route.profile == 'direct' or not info.routing_available %} selected{% endif %}>{{ t('plan.profile.direct') }}</option>
+      </select>
+      <small>{{ t('plan.connection_hint') }}</small></label>
+    <label class="field"><span>{{ t('plan.difficulty') }}</span>
+      <select name="max_difficulty" id="plan-difficulty">
+        {% for level in info.difficulties %}
+        <option value="{{ level.level }}"{% if route.max_difficulty|int == level.level %} selected{% endif %}>{{ t('plan.difficulty.' ~ level.level) }}</option>
+        {% endfor %}
+      </select>
+      <small>{{ t('plan.difficulty_hint') }}</small></label>
+    <label><input type="checkbox" name="via_ferrata" id="plan-ferrata" value="1"{% if route.via_ferrata %} checked{% endif %}> {{ t('plan.via_ferrata') }}</label>
+  </div>
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/maplibre-gl/maplibre-gl.css') }}">
+  <div id="map" class="tall plan"></div>
+  <p id="plan-message" class="flash" hidden></p>
+
+  <dl class="facts card" id="plan-stats" hidden>
+    <dt>{{ t('plan.distance') }}</dt><dd data-stat="distance"></dd>
+    <dt>{{ t('plan.ascent') }}</dt><dd data-stat="ascent"></dd>
+    <dt>{{ t('plan.descent') }}</dt><dd data-stat="descent"></dd>
+    <dt>{{ t('plan.duration') }} <span class="chip estimate">{{ t('plan.estimated') }}</span></dt><dd data-stat="duration"></dd>
+  </dl>
+  <p class="meta" id="plan-duration-note" hidden>{{ t('plan.duration_note') }}</p>
+
+  <div id="profile-box" hidden>
+    <svg id="profile" tabindex="0" role="img" aria-label="{{ t('tour.profile') }}"></svg>
+    <div id="profile-tip"></div>
+  </div>
+
+  <section>
+    <div class="toolbar">
+      <h2>{{ t('plan.waypoints') }}</h2><span class="spacer"></span>
+      <button type="button" id="plan-undo">{{ t('plan.undo') }}</button>
+      <button type="button" id="plan-reverse">{{ t('plan.reverse') }}</button>
+      <button type="button" id="plan-clear" class="danger">{{ t('plan.clear') }}</button>
+    </div>
+    <ol class="list" id="plan-list"></ol>
+    <p class="meta" id="plan-empty">{{ t('plan.no_waypoints') }}</p>
+  </section>
+
+  <section class="stack card">
+    {{ field('title', t('plan.title'), route.title, required=True, attrs='maxlength="200"') }}
+    <label class="field"><span>{{ t('gear.description') }}</span>
+      <textarea name="description" rows="3" maxlength="5000">{{ route.description or '' }}</textarea></label>
+    {{ field('planned_date', t('plan.date'), route.planned_date, type='date') }}
+    <div><button class="primary" id="plan-save">{{ t('action.save') }}</button></div>
+  </section>
+</form>
+{% if not is_new %}
+<p>{{ delete_form(url_for('planning.route_delete', route_id=route.id)) }}</p>
+{% endif %}
+{% if info.attribution %}<p class="meta">{{ info.attribution }}</p>{% endif %}
+
+<script type="application/json" id="plan-data">{{ plan_data|tojson }}</script>
+<script src="{{ url_for('static', filename='vendor/maplibre-gl/maplibre-gl-csp.js') }}" defer></script>
+<script src="{{ url_for('static', filename='profile.js') }}" defer></script>
+<script src="{{ url_for('static', filename='plan.js') }}" defer></script>
+{% endblock %}

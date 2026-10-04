@@ -18,6 +18,7 @@ __version__ = "0.1.0"
 # Blueprint, and the API module that must be enabled for its pages.
 NAVIGATION = (
     ("protocols", "protocols.tour_list", "nav.tours"),
+    ("planning", "planning.route_list", "nav.planning"),
     ("gear", "gear.item_list", "nav.gear"),
     ("nutrition", "nutrition.food_list", "nav.food"),
 )
@@ -158,13 +159,14 @@ def create_app(config: dict | None = None) -> Flask:
         )
         return response
 
-    from hiker_web.views import admin, auth, gear, nutrition, protocols, public
+    from hiker_web.views import admin, auth, gear, nutrition, planning, protocols, public
 
     app.register_blueprint(auth.blueprint)
     app.register_blueprint(admin.blueprint)
     app.register_blueprint(gear.blueprint)
     app.register_blueprint(nutrition.blueprint)
     app.register_blueprint(protocols.blueprint)
+    app.register_blueprint(planning.blueprint)
     app.register_blueprint(public.blueprint)
 
     @app.get("/")

@@ -19,6 +19,9 @@ und Schätzungen kommen von der API (siehe `DESIGN.md`, Abschnitt 9a).
 - Auf der Karte bearbeiten: Wegpunkte, Fotoposition, Start und Ende, Track zeichnen, Wetter für
   einen eigenen Punkt
 - Packlisten, die sich in eine Tour übernehmen lassen
+- Planung: Routen auf der Karte planen (Punkte setzen und verschieben, den Wegen folgen oder
+  Luftlinie – für alle oder einzelne Abschnitte –, Schwierigkeit T1–T6, Klettersteige),
+  Eckdaten mit geschätzter Gehzeit, Höhenprofil, GPX-Download. Der Planer braucht JavaScript.
 
 Nicht im Web: Kamera-Scanner und Offline-Betrieb (das kann die Android-App).
 

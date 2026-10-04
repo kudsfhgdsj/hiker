@@ -575,6 +575,8 @@ Entschieden am 04.10.2026: Phase 2 beginnt mit der Routenplanung; Kartenstile un
 - `GET /planning/routes`, `POST /planning/routes`, `GET|PUT|DELETE /planning/routes/{id}`
 - `GET /planning/routes/{id}/gpx` – Route als GPX-Datei (Track und Wegpunkte)
 
+**Planer im Web-Frontend** (`/routes`, Blueprint `planning`, `static/plan.js`): Ein Klick auf die Karte setzt den nächsten Wegpunkt, Punkte lassen sich verschieben, benennen, entfernen; die Richtung lässt sich umkehren. Über der Karte stehen die Verbindung (den Wegen folgen oder Luftlinie, für alle Abschnitte), die Schwierigkeit (T1–T6) und „Klettersteige benutzen“; in der Liste der Wegpunkte lässt sich je Abschnitt „Luftlinie hierher“ ankreuzen. Nach jeder Änderung fragt die Seite `POST /routes/preview` (reicht an `/planning/preview` weiter, mit CSRF-Token) und zeigt Linie, Strecke, Auf- und Abstieg, geschätzte Gehzeit und das Höhenprofil, das wie bei Touren mit der Karte verknüpft ist (`static/profile.js`, von beiden Seiten genutzt). Gespeichert wird über ein normales Formular; die Wegpunkte stehen als JSON in einem versteckten Feld. Der Planer braucht JavaScript; Liste, Löschen und GPX-Download nicht.
+
 **Karte beim Planen** (Vorgaben vom 04.10.2026):
 - Grundlage ist OpenStreetMap.
 - **Darstellung wählbar**: Stile Sommer, Winter, Satellit und eine topografische Karte; Ebenen Hangneigung, Wetter, Schnee, Lawinenlage (Schritte 6 und 7).

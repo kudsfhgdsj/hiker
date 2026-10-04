@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ t('nav.planning') }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>{{ t('nav.planning') }}</h1><span class="spacer"></span>
+  <a class="button primary" href="{{ url_for('planning.route_new') }}">{{ t('plan.new') }}</a>
+</div>
+<form method="get" class="row" role="search">
+  <label class="field"><span>{{ t('action.search') }}</span>
+    <input type="search" name="q" value="{{ query }}" placeholder="{{ t('plan.search_hint') }}"></label>
+  <button>{{ t('action.search') }}</button>
+</form>
+{% if routes %}
+<ul class="list">
+  {% for route in routes %}
+  <li>
+    <a class="grow" href="{{ url_for('planning.route_plan', route_id=route.id) }}">
+      <strong>{{ route.title }}</strong><br>
+      <span class="meta">{{ [route.planned_date|date if route.planned_date else none, t('plan.profile.' ~ route.profile)]|select|join(' · ') }}</span>
+    </a>
+    <span class="meta">{{ route.distance_m|distance }} · ↑ {{ route.ascent_m|meters }} · {{ (route.duration_s / 60)|duration }}</span>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p>{{ t('plan.empty') }}</p>
+{% endif %}
+{% endblock %}

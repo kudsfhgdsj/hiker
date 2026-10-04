@@ -3,6 +3,7 @@
 TEXTS = {
     "app.title": "hiker",
     "nav.tours": "Touren",
+    "nav.planning": "Planung",
     "nav.gear": "Ausrüstung",
     "nav.food": "Essen",
     "nav.profile": "Profil",
@@ -283,6 +284,66 @@ TEXTS = {
     "tour.gpx_uploaded": "Track ausgewertet.",
     "tour.gpx_download": "GPX herunterladen",
     "tour.track_remove": "Track entfernen",
+    "plan.new": "Neue Route",
+    "plan.empty": "Noch keine geplanten Routen.",
+    "plan.search_hint": "Titel",
+    "plan.intro": (
+        "Punkte nacheinander auf der Karte anklicken; sie werden zu einer Route verbunden. "
+        "Punkte lassen sich verschieben."
+    ),
+    "plan.needs_script": "Der Planer braucht JavaScript.",
+    "plan.no_routing": (
+        "Auf diesem Server ist keine Wegführung eingerichtet: Die Punkte werden als Luftlinie "
+        "verbunden."
+    ),
+    "plan.connection": "Verbindung der Punkte",
+    "plan.connection_hint": (
+        "Gilt für alle Abschnitte; einzelne lassen sich unten als Luftlinie festlegen."
+    ),
+    "plan.profile.hiking": "Den Wegen folgen",
+    "plan.profile.direct": "Luftlinie",
+    "plan.difficulty": "Schwierigkeit bis",
+    "plan.difficulty_hint": "Leichtere Wege sind eingeschlossen, schwerere werden nicht benutzt.",
+    "plan.difficulty.1": "T1 – Wanderung",
+    "plan.difficulty.2": "T2 – Anspruchsvolle Bergwanderung",
+    "plan.difficulty.3": "T3 – Bergtour",
+    "plan.difficulty.4": "T4 – Schwere Bergtour",
+    "plan.difficulty.5": "T5 – Sehr schwere Bergtour",
+    "plan.difficulty.6": "T6 – Äußerst schwierige Bergtour",
+    "plan.via_ferrata": "Klettersteige benutzen",
+    "plan.distance": "Strecke",
+    "plan.ascent": "Aufstieg",
+    "plan.descent": "Abstieg",
+    "plan.duration": "Gehzeit",
+    "plan.estimated": "geschätzt",
+    "plan.duration_note": (
+        "Gehzeit nach DIN 33466 (4 km/h, 300 Hm/h im Aufstieg, 500 Hm/h im Abstieg), ohne Pausen."
+    ),
+    "plan.waypoints": "Wegpunkte",
+    "plan.no_waypoints": "Noch keine Punkte. Der erste Klick auf die Karte setzt den Start.",
+    "plan.undo": "Letzten Punkt entfernen",
+    "plan.reverse": "Richtung umkehren",
+    "plan.clear": "Alle entfernen",
+    "plan.title": "Titel",
+    "plan.date": "Geplant für",
+    "plan.gpx": "GPX herunterladen",
+    "plan.js.remove": "Entfernen",
+    "plan.js.name": "Name",
+    "plan.js.direct": "Luftlinie hierher",
+    "plan.js.start": "Start",
+    "plan.js.computing": "Route wird berechnet …",
+    "plan.js.no_route": (
+        "Zwischen diesen Punkten gibt es keinen Weg bis zur gewählten Schwierigkeit. "
+        "Höhere Stufe wählen, einen Punkt verschieben oder den Abschnitt als Luftlinie planen."
+    ),
+    "plan.js.routing_unavailable": (
+        "Die Wegführung ist gerade nicht erreichbar. Luftlinien lassen sich trotzdem planen."
+    ),
+    "plan.js.failed": "Die Route konnte nicht berechnet werden.",
+    "plan.js.too_many": "Mehr Wegpunkte sind nicht möglich.",
+    "plan.js.distance": "Strecke",
+    "plan.js.elevation": "Höhe",
+    "plan.js.slope": "Steigung",
     "tour.profile": "Höhenprofil",
     "tour.profile.hint": (
         "Mit Maus, Finger oder Pfeiltasten über das Höhenprofil fahren: "
@@ -555,7 +616,15 @@ TEXTS = {
     "error.unknown_user": "Kein Nutzer mit dieser E-Mail-Adresse.",
     "error.already_shared": "Die Tour ist mit diesem Nutzer schon geteilt.",
     "error.share_with_owner": "Die Tour gehört diesem Nutzer bereits.",
-    "error.version_conflict": "Die Tour wurde inzwischen geändert. Bitte die Seite neu laden.",
+    "error.version_conflict": "Der Eintrag wurde inzwischen geändert. Bitte die Seite neu laden.",
+    "error.no_route": (
+        "Zwischen diesen Punkten gibt es keinen Weg bis zur gewählten Schwierigkeit. "
+        "Höhere Stufe wählen, einen Punkt verschieben oder den Abschnitt als Luftlinie planen."
+    ),
+    "error.routing_unavailable": (
+        "Die Wegführung ist gerade nicht erreichbar. Luftlinien lassen sich trotzdem planen."
+    ),
+    "error.id_taken": "Das gibt es schon.",
     "error.page_404": "Diese Seite gibt es nicht.",
 }
 
