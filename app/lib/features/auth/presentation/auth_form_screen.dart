@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_exception.dart';
-import '../../../core/network/trusted_certificates.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/session/session.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/certificate_dialog.dart';
 import '../../../core/widgets/error_text.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/auth_repository.dart';
@@ -58,52 +58,8 @@ class _AuthFormScreenState extends ConsumerState<AuthFormScreen> {
       return false;
     }
     final server = Uri.tryParse(normalizeBaseUrl(_server.text) ?? '');
-    if (server == null) return false;
-    final found = await ref.read(certificateProbeProvider)(server);
-    final trusted = ref.read(trustedCertificatesProvider.notifier);
-    if (found == null || !mounted) return false;
-    final known = ref.read(trustedCertificatesProvider);
-    if (known['${found.host}:${found.port}'] == found.fingerprint) return false;
-    final l10n = AppLocalizations.of(context);
-    final changed = known.containsKey('${found.host}:${found.port}');
-    final accepted = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.certificateTitle),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(changed ? l10n.certificateChanged : l10n.certificateUnknown),
-              const SizedBox(height: AppSpacing.m),
-              Text(l10n.certificateFingerprint),
-              SelectableText(
-                found.fingerprint,
-                style: const TextStyle(fontFamily: 'monospace'),
-              ),
-              const SizedBox(height: AppSpacing.m),
-              Text(found.subject),
-              const SizedBox(height: AppSpacing.m),
-              Text(l10n.certificateAdvice),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(l10n.certificateTrust),
-          ),
-        ],
-      ),
-    );
-    if (accepted != true) return false;
-    await trusted.trust(found.host, found.port, found.fingerprint);
-    return true;
+    if (server == null || !mounted) return false;
+    return offerToTrustCertificate(context, ref, server);
   }
 
   Future<void> _submit() async {

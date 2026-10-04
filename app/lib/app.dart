@@ -12,6 +12,7 @@ import 'core/router/app_router.dart';
 import 'core/session/session.dart';
 import 'core/sync/sync_service.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/certificate_dialog.dart';
 import 'features/auth/presentation/account_security_screens.dart';
 import 'features/auth/presentation/auth_form_screen.dart';
 import 'features/auth/presentation/profile_screen.dart';
@@ -117,6 +118,8 @@ class _HikerAppState extends ConsumerState<HikerApp>
       trustedCertificatesProvider,
       (_, _) => _startTileProxyIfNeeded(),
     );
+    // A renewed certificate was accepted: the server is reachable again.
+    ref.listen(certificateChangedProvider, (_, _) => _sync());
     return MaterialApp.router(
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       theme: AppTheme.light(),

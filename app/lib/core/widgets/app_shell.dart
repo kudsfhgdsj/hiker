@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../l10n/app_localizations.dart';
 import '../modules/feature_module.dart';
 import '../theme/app_theme.dart';
+import 'certificate_dialog.dart';
 import 'mountain_background.dart';
 
 /// Frame around the feature screens: bottom navigation on phones, a navigation
@@ -34,7 +35,9 @@ class AppShell extends ConsumerWidget {
     void open(int i) => context.go(destinations[i].path);
 
     // A navigation with a single entry would only take up space.
-    if (destinations.length < 2) return MountainBackground(child: child);
+    if (destinations.length < 2) {
+      return MountainBackground(child: CertificateWatcher(child: child));
+    }
 
     final wide = MediaQuery.sizeOf(context).width >= AppSpacing.wideLayout;
     if (wide) {
@@ -54,14 +57,18 @@ class AppShell extends ConsumerWidget {
               ],
             ),
             const VerticalDivider(width: 1),
-            Expanded(child: MountainBackground(child: child)),
+            Expanded(
+              child: MountainBackground(
+                child: CertificateWatcher(child: child),
+              ),
+            ),
           ],
         ),
       );
     }
     return Scaffold(
       // The mountain stands on the navigation bar, not behind it.
-      body: MountainBackground(child: child),
+      body: MountainBackground(child: CertificateWatcher(child: child)),
       bottomNavigationBar: NavigationBar(
         selectedIndex: selected,
         onDestinationSelected: open,

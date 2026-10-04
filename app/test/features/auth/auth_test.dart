@@ -281,7 +281,9 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, 'Vertrauen'));
       await tester.pumpAndSettle();
 
-      expect(asked.single.host, 'hiker.test');
+      // Once for the login; once more after it, where nothing has changed.
+      expect(asked.map((server) => server.host).toSet(), {'hiker.test'});
+      expect(find.text('Unbekanntes Zertifikat'), findsNothing);
       expect(container.read(trustedCertificatesProvider), {
         'hiker.test:443': fingerprint,
       });
@@ -317,6 +319,49 @@ void main() {
         find.textContaining('Der Server ist nicht erreichbar'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('a changed certificate is offered while signed in', (
+      tester,
+    ) async {
+      final api = FakeApi({
+        'GET /modules': (_, _) => ok([]),
+        'GET /me/profile': (_, _) => ok(<String, dynamic>{}),
+      });
+      final asked = <Uri>[];
+      final container = await pumpApp(
+        tester,
+        api: api,
+        store: MemoryKeyValueStore({
+          ...signedInStore,
+          'trusted_certificates': '{"hiker.test:443":"OLD:01"}',
+        }),
+        certificateProbe: (server) async {
+          asked.add(server);
+          return (
+            host: server.host,
+            port: 443,
+            fingerprint: 'NEW:02',
+            subject: 'CN=hiker.test',
+            validUntil: DateTime(2030),
+          );
+        },
+      );
+      await tester.pumpAndSettle();
+
+      expect(asked.single.host, 'hiker.test');
+      expect(find.text('Unbekanntes Zertifikat'), findsOneWidget);
+      expect(find.textContaining('ein anderes Zertifikat'), findsOneWidget);
+      expect(find.text('NEW:02'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Vertrauen'));
+      await tester.pumpAndSettle();
+
+      expect(container.read(trustedCertificatesProvider), {
+        'hiker.test:443': 'NEW:02',
+      });
+      // Asked once per start of the app.
+      expect(asked, hasLength(1));
     });
 
     testWidgets('trust can be taken back in the profile', (tester) async {
