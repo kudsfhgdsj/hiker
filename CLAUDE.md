@@ -16,7 +16,7 @@ Android-App (Flutter, nur Android), Web-Frontend (Python Flask) und eigenes Back
 - Local-first in der Android-App (Drift), Sync über `/sync/*`.
 - Flutter wird nur für Android gebaut; keine Web-Plattform und kein web-spezifischer Code im Flutter-Projekt.
 - Das Web-Frontend (Flask, `web/`) spricht ausschließlich mit der REST-API, nie direkt mit Datenbank oder Dateispeicher, und enthält keine eigene Fachlogik. Tokens bleiben serverseitig in der Sitzung; Formulare sind gegen CSRF geschützt. JavaScript-Bibliotheken werden vom eigenen Server ausgeliefert, nicht von einem CDN.
-- Wegführung beim Planen nur über den Adapter `RoutingEngine`; Wegpunkte gehen ausschließlich an den eigenen BRouter, nie an fremde Dienste.
+- Wegführung beim Planen nur über den Adapter `RoutingEngine`; Wegpunkte gehen ausschließlich an den eigenen BRouter, nie an fremde Dienste. Die App plant ohne Netz mit dem eingebetteten BRouter (`DeviceRouter`) und Wegdaten vom eigenen Server; das Profil `hiker-hiking.brf` muss in `deploy/brouter/profiles/` und `app/assets/brouter/` gleich sein.
 - Externe Dienste (Open-Meteo, Open-Meteo-Elevation, Open Food Facts, OpenStreetMap/Overpass, Kartenkacheln, Dateispeicher, später hikr.org) nur über Adapter-Interfaces ansprechen.
 - Datenbankänderungen nur über Alembic-Migrationen.
 - Konfiguration über Umgebungsvariablen; keine Geheimnisse oder feste Domains im Code (`PUBLIC_BASE_URL`).

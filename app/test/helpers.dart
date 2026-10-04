@@ -134,6 +134,9 @@ ProviderContainer createContainer({
       httpClientAdapterProvider.overrideWithValue(api),
       // No platform in tests: no router on the device, files in a temporary folder.
       deviceRouterProvider.overrideWithValue(deviceRouter),
+      tileCacheDirectoryProvider.overrideWith(
+        (ref) => Directory.systemTemp.createTemp('hiker-tiles'),
+      ),
       routingDirectoryProvider.overrideWith(
         (ref) => Directory.systemTemp.createTemp('hiker-routing'),
       ),

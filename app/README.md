@@ -116,6 +116,20 @@ Die Kartenkacheln kommen vom eigenen Server (`/api/v1/maps/tiles/…`, Modul `ma
 zwischenspeichert. Hat der Server das Modul nicht, lädt die App direkt von OpenStreetMap. Eine
 feste Quelle lässt sich beim Bauen setzen: `--dart-define=MAP_TILE_URL=https://…/{z}/{x}/{y}.png`.
 
+## Planung
+
+Unter „Planung“ liegen die Routenliste und der Planer: Punkte auf der Karte setzen und
+versetzen, den Wegen folgen oder Luftlinie (für alle oder einzelne Abschnitte), Schwierigkeit
+T1–T6, Klettersteige, Höhenprofil, als GPX speichern. Linie und Eckdaten kommen vom Server.
+
+**Ohne Netz** rechnet die App selbst: Der Routing-Kern von BRouter ist eingebunden
+(`android/app/libs/`, Herkunft und Prüfsumme in der README dort; Aufruf in `MainActivity.kt`,
+Dart-Seite in `features/planning/data/offline_routing.dart`). Die Wegdaten eines Gebiets lädt
+man unter Planung → „Offline-Wegdaten“ vom eigenen Server (je Kachel 100–300 MB). Das Profil
+`assets/brouter/hiker-hiking.brf` ist eine Kopie von `deploy/brouter/profiles/`; ein Test
+prüft, dass beide gleich sind. Luftlinien haben ohne Netz keine Höhen, und die Karte zeigt
+nur schon angesehene Ausschnitte (der `TileProxy` hebt ausgelieferte Kacheln als Dateien auf). Beim Abgleich berechnet der Server die Linie neu.
+
 ## Anmeldung und Sicherheit
 
 - Registrierung mit doppelter Passworteingabe; die Regeln (BSI) werden schon in der App geprüft.

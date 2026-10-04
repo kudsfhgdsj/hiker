@@ -127,6 +127,17 @@ void main() {
       await other.drain<void>();
       expect(other.statusCode, 404);
       expect(asked.length, 2);
+
+      // A tile seen before comes from the device: at once, and without network.
+      await upstream.close(force: true);
+      final again = await get('/5/1/2.png');
+      expect(again.statusCode, 200);
+      expect(await again.expand((chunk) => chunk).toList(), [137, 80, 78, 71]);
+      expect(asked.length, 2);
+      // A tile never seen cannot be shown without network.
+      final unseen = await get('/5/1/3.png');
+      await unseen.drain<void>();
+      expect(unseen.statusCode, 502);
     });
   });
 }

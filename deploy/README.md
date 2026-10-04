@@ -159,6 +159,10 @@ ihn lassen sich nur Luftlinien planen.
 
 3. `docker compose up -d --build`
 
+Die App lädt dieselben Wegdaten über die API (`/api/v1/planning/segments`) auf das Gerät, um
+ohne Netz zu planen; der Proxy muss dafür Downloads von einigen hundert MB durchlassen
+(nginx: `proxy_buffering off` oder genug Platz für Zwischendateien).
+
 BRouter hat keinen Port nach außen; nur die API spricht mit ihm. Die Wegdaten stammen aus
 OpenStreetMap (ODbL) und lassen sich jederzeit neu holen, gehören also nicht in die Sicherung.
 Punkte außerhalb der geladenen Kacheln ergeben beim Planen „kein Weg gefunden“.
