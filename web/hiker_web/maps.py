@@ -40,7 +40,17 @@ def map_config(attribution: str) -> dict:
                 "winter": t("map.base.winter"),
                 "satellite": t("map.base.satellite"),
             },
-            "overlay": {"slope": t("map.overlay.slope")},
+            "overlay": {
+                "slope": t("map.overlay.slope"),
+                "avalanche": t("map.overlay.avalanche"),
+                "snow": t("map.overlay.snow"),
+                "precipitation": t("map.overlay.precipitation"),
+            },
+            "note": {
+                "avalanche": t("map.note.avalanche"),
+                "snow": t("map.note.snow"),
+                "precipitation": t("map.note.precipitation"),
+            },
             "terrain": t("map.terrain"),
             "from": t("map.from"),
         },

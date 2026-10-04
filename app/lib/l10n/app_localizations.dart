@@ -2883,6 +2883,42 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Gelb ab 30°, orange ab 35°, rot ab 40°, violett ab 45°'**
   String get mapSlopeLegend;
+
+  /// No description provided for @mapOverlayAvalanche.
+  ///
+  /// In de, this message translates to:
+  /// **'Lawinengefahr'**
+  String get mapOverlayAvalanche;
+
+  /// No description provided for @mapOverlaySnow.
+  ///
+  /// In de, this message translates to:
+  /// **'Schneebedeckung'**
+  String get mapOverlaySnow;
+
+  /// No description provided for @mapOverlayPrecipitation.
+  ///
+  /// In de, this message translates to:
+  /// **'Niederschlag'**
+  String get mapOverlayPrecipitation;
+
+  /// No description provided for @mapAvalancheNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Höchste Gefahrenstufe des Tages je Region: 1 grün, 2 gelb, 3 orange, 4 rot, 5 schwarz. Maßgeblich ist das Bulletin des Lawinenwarndienstes.'**
+  String get mapAvalancheNote;
+
+  /// No description provided for @mapSnowNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Satellitenbild des letzten Tages; Wolken verdecken den Boden.'**
+  String get mapSnowNote;
+
+  /// No description provided for @mapPrecipitationNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Aus Satellitendaten, einige Stunden alt und grob.'**
+  String get mapPrecipitationNote;
 }
 
 class _AppLocalizationsDelegate

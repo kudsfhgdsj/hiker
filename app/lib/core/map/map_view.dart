@@ -116,6 +116,9 @@ final mapStyleProvider = FutureProvider<String?>((ref) async {
     // the map server of the app instead.
     final local = 'http://127.0.0.1:$port';
     const marker = '/api/v1/maps/';
+    String own(String address) => address.contains(marker)
+        ? '$local/${address.substring(address.indexOf(marker) + marker.length)}'
+        : address;
     style = {
       ...style,
       'glyphs': '$local/fonts/{fontstack}/{range}.pbf',
@@ -125,12 +128,10 @@ final mapStyleProvider = FutureProvider<String?>((ref) async {
             ...entry.value as Map<String, dynamic>,
             if ((entry.value as Map<String, dynamic>)['tiles']
                 case final List<dynamic> tiles)
-              'tiles': [
-                for (final tile in tiles.cast<String>())
-                  tile.contains(marker)
-                      ? '$local/${tile.substring(tile.indexOf(marker) + marker.length)}'
-                      : tile,
-              ],
+              'tiles': [for (final tile in tiles.cast<String>()) own(tile)],
+            if ((entry.value as Map<String, dynamic>)['data']
+                case final String data)
+              'data': own(data),
           },
       },
     };
@@ -206,7 +207,20 @@ class MapLayerSheet extends ConsumerWidget {
       'satellite' => l10n.mapBaseSatellite,
       _ => id,
     };
-    String overlayLabel(String id) => id == 'slope' ? l10n.mapOverlaySlope : id;
+    String overlayLabel(String id) => switch (id) {
+      'slope' => l10n.mapOverlaySlope,
+      'avalanche' => l10n.mapOverlayAvalanche,
+      'snow' => l10n.mapOverlaySnow,
+      'precipitation' => l10n.mapOverlayPrecipitation,
+      _ => id,
+    };
+    String? overlayNote(String id) => switch (id) {
+      'slope' => l10n.mapSlopeLegend,
+      'avalanche' => l10n.mapAvalancheNote,
+      'snow' => l10n.mapSnowNote,
+      'precipitation' => l10n.mapPrecipitationNote,
+      _ => null,
+    };
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -237,9 +251,10 @@ class MapLayerSheet extends ConsumerWidget {
             SwitchListTile(
               value: choice.overlays.contains(overlay['id']),
               title: Text(overlayLabel(overlay['id'] as String)),
-              subtitle: overlay['id'] == 'slope'
-                  ? Text(l10n.mapSlopeLegend)
-                  : null,
+              subtitle: switch (overlayNote(overlay['id'] as String)) {
+                final note? => Text(note),
+                null => null,
+              },
               onChanged: (on) =>
                   notifier.setOverlay(overlay['id'] as String, on: on),
             ),

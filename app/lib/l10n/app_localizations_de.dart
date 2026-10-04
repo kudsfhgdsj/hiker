@@ -1540,4 +1540,25 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get mapSlopeLegend =>
       'Gelb ab 30°, orange ab 35°, rot ab 40°, violett ab 45°';
+
+  @override
+  String get mapOverlayAvalanche => 'Lawinengefahr';
+
+  @override
+  String get mapOverlaySnow => 'Schneebedeckung';
+
+  @override
+  String get mapOverlayPrecipitation => 'Niederschlag';
+
+  @override
+  String get mapAvalancheNote =>
+      'Höchste Gefahrenstufe des Tages je Region: 1 grün, 2 gelb, 3 orange, 4 rot, 5 schwarz. Maßgeblich ist das Bulletin des Lawinenwarndienstes.';
+
+  @override
+  String get mapSnowNote =>
+      'Satellitenbild des letzten Tages; Wolken verdecken den Boden.';
+
+  @override
+  String get mapPrecipitationNote =>
+      'Aus Satellitendaten, einige Stunden alt und grob.';
 }

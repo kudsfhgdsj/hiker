@@ -75,10 +75,17 @@ window.hikerMapLayers = (map, texts) => {
         for (const entry of overlay.legend) {
           const swatch = document.createElement("i");
           swatch.style.background = entry.color;
-          swatch.title = `${texts.from} ${entry.from}°`;
-          legend.append(swatch, `${entry.from}°`);
+          // Slope classes name their angle, danger levels their number.
+          if (entry.from != null) swatch.title = `${texts.from} ${entry.from}°`;
+          legend.append(swatch, entry.from != null ? `${entry.from}°` : String(entry.level));
         }
         row.append(legend);
+      }
+      const note = (texts.note || {})[overlay.id];
+      if (note) {
+        const hint = document.createElement("small");
+        hint.textContent = note;
+        panel.append(hint);
       }
       apply(on);
     }

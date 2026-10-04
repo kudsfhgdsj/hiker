@@ -569,5 +569,11 @@
   "mapBaseWinter": "Winter",
   "mapBaseSatellite": "Luftbild",
   "mapOverlaySlope": "Hangneigung",
-  "mapSlopeLegend": "Gelb ab 30°, orange ab 35°, rot ab 40°, violett ab 45°"
+  "mapSlopeLegend": "Gelb ab 30°, orange ab 35°, rot ab 40°, violett ab 45°",
+  "mapOverlayAvalanche": "Lawinengefahr",
+  "mapOverlaySnow": "Schneebedeckung",
+  "mapOverlayPrecipitation": "Niederschlag",
+  "mapAvalancheNote": "Höchste Gefahrenstufe des Tages je Region: 1 grün, 2 gelb, 3 orange, 4 rot, 5 schwarz. Maßgeblich ist das Bulletin des Lawinenwarndienstes.",
+  "mapSnowNote": "Satellitenbild des letzten Tages; Wolken verdecken den Boden.",
+  "mapPrecipitationNote": "Aus Satellitendaten, einige Stunden alt und grob."
 }

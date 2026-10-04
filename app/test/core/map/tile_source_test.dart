@@ -189,6 +189,10 @@ void main() {
                 'https://hiker.example.org/api/v1/maps/raster/terrain/{z}/{x}/{y}',
               ],
             },
+            'avalanche': {
+              'type': 'geojson',
+              'data': 'https://hiker.example.org/api/v1/maps/avalanche.geojson',
+            },
             'slope': {
               'type': 'raster',
               'tiles': [
@@ -245,6 +249,10 @@ void main() {
       expect((sources['slope'] as Map)['tiles'], [
         'http://127.0.0.1:$port/slope/{z}/{x}/{y}.png',
       ]);
+      expect(
+        (sources['avalanche'] as Map)['data'],
+        'http://127.0.0.1:$port/avalanche.geojson',
+      );
       // What can be switched travels with the style.
       final options = mapLayerOptions(jsonEncode(style))!;
       expect((options['bases'] as List).length, 2);

@@ -18,6 +18,10 @@ STYLE = {
             "type": "raster-dem",
             "tiles": ["https://api.example/api/v1/maps/raster/terrain/{z}/{x}/{y}"],
         },
+        "avalanche": {
+            "type": "geojson",
+            "data": "https://api.example/api/v1/maps/avalanche.geojson",
+        },
         "slope": {
             "type": "raster",
             "tiles": ["https://api.example/api/v1/maps/slope/{z}/{x}/{y}.png"],
@@ -81,6 +85,7 @@ def test_style_points_to_the_web_frontend_without_login(browser, fake_api):
         "http://localhost/map/raster/terrain/{z}/{x}/{y}"
     ]
     assert style["sources"]["slope"]["tiles"] == ["http://localhost/map/slope/{z}/{x}/{y}.png"]
+    assert style["sources"]["avalanche"]["data"] == "http://localhost/map/avalanche.geojson"
     assert style["layers"] == STYLE["layers"]
 
 
@@ -114,6 +119,12 @@ def test_raster_layers_and_slope_are_passed_on(browser, fake_api):
     assert browser.get("/map/slope/12/2153/1436.png").mimetype == "image/png"
     assert browser.get("/map/raster/other/12/2153/1436").status_code == 404
 
+    fake_api.route("GET", "/maps/raster/snow/7/67/44", lambda r: image)
+    fake_api.route("GET", "/maps/avalanche.geojson", {"type": "FeatureCollection", "features": []})
+    assert browser.get("/map/raster/snow/7/67/44").data == b"png"
+    danger = browser.get("/map/avalanche.geojson")
+    assert danger.get_json()["features"] == [] and danger.mimetype == "application/geo+json"
+
     fake_api.route(
         "GET", "/maps/contours/12/2153/1436.pbf", lambda r: httpx2.Response(200, content=b"lines")
     )
@@ -130,4 +141,6 @@ def test_pages_carry_the_texts_of_the_layer_control(user, fake_api):
     texts = plan_data(page)["layerTexts"]
     assert texts["base"] == {"map": "Karte", "winter": "Winter", "satellite": "Luftbild"}
     assert texts["overlay"]["slope"] == "Hangneigung" and texts["terrain"] == "3D-Gelände"
+    assert texts["overlay"]["avalanche"] == "Lawinengefahr"
+    assert "Bulletin" in texts["note"]["avalanche"]
     assert "map_layers.js" in page

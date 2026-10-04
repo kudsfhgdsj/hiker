@@ -19,7 +19,8 @@ import 'map_regions.dart';
 ///   file on the device (see [MapRegionStore]), else from the user's server,
 /// - `/fonts/{font}/{range}.pbf`: the glyphs for the labels,
 /// - `/raster/{layer}/{z}/{x}/{y}` and `/slope/{z}/{x}/{y}.png`: elevation,
-///   aerial images and the slope layer of the user's server.
+///   aerial images, snow, precipitation and the slope layer of the user's
+///   server, and `/avalanche.geojson`, the avalanche danger of today.
 ///
 /// What comes from the server goes over the connection the app trusts (also
 /// with a certificate the user confirmed by hand) and is kept as a file. A
@@ -38,7 +39,7 @@ class TileProxy extends Notifier<int?> {
     r'^/fonts/([\w ,%-]{1,200})/(\d{1,5}-\d{1,5})\.pbf$',
   );
   static final _layer = RegExp(
-    r'^/raster/(terrain|satellite)/(\d{1,2})/(\d{1,7})/(\d{1,7})$',
+    r'^/raster/(terrain|satellite|snow|precipitation)/(\d{1,2})/(\d{1,7})/(\d{1,7})$',
   );
   static final _slope = RegExp(r'^/slope/(\d{1,2})/(\d{1,7})/(\d{1,7})\.png$');
   static const _freshFor = Duration(days: 7);
@@ -118,6 +119,7 @@ class TileProxy extends Notifier<int?> {
     required String cacheName,
     required ContentType type,
     bool gzipped = false,
+    Duration freshFor = _freshFor,
   }) async {
     final baseUrl = ref.read(sessionProvider).baseUrl;
     final cached = await _cacheFile(cacheName);
@@ -134,7 +136,7 @@ class TileProxy extends Notifier<int?> {
     }
 
     if (known &&
-        DateTime.now().difference(cached.lastModifiedSync()) < _freshFor) {
+        DateTime.now().difference(cached.lastModifiedSync()) < freshFor) {
       send(cached.readAsBytesSync());
       return;
     }
@@ -249,7 +251,22 @@ class TileProxy extends Notifier<int?> {
           response,
           apiPath: '/api/v1/maps/raster/${layer[1]}/$tile',
           cacheName: 'raster/${layer[1]}/$tile',
-          type: layer[1] == 'terrain' ? _png : ContentType('image', 'jpeg'),
+          type: layer[1] == 'satellite' ? ContentType('image', 'jpeg') : _png,
+          // Snow and precipitation change within hours.
+          freshFor: switch (layer[1]) {
+            'snow' => const Duration(hours: 6),
+            'precipitation' => const Duration(minutes: 30),
+            _ => _freshFor,
+          },
+        );
+      } else if (path == '/avalanche.geojson') {
+        await _fromServer(
+          response,
+          apiPath: '/api/v1/maps/avalanche.geojson',
+          cacheName: 'avalanche.geojson',
+          type: ContentType('application', 'geo+json'),
+          // The bulletins change during the day; an old one is still shown offline.
+          freshFor: const Duration(minutes: 30),
         );
       } else if (_contours.firstMatch(path) case final lines?) {
         final tile = '${lines[1]}/${lines[2]}/${lines[3]}.pbf';

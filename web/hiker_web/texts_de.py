@@ -289,6 +289,15 @@ TEXTS = {
     "map.base.winter": "Winter",
     "map.base.satellite": "Luftbild",
     "map.overlay.slope": "Hangneigung",
+    "map.overlay.avalanche": "Lawinengefahr",
+    "map.overlay.snow": "Schneebedeckung",
+    "map.overlay.precipitation": "Niederschlag",
+    "map.note.avalanche": (
+        "Höchste Gefahrenstufe des Tages je Region (1–5). Maßgeblich ist das Bulletin "
+        "des Lawinenwarndienstes."
+    ),
+    "map.note.snow": "Satellitenbild des letzten Tages; Wolken verdecken den Boden.",
+    "map.note.precipitation": "Aus Satellitendaten, einige Stunden alt und grob.",
     "map.terrain": "3D-Gelände",
     "map.from": "ab",
     "plan.new": "Neue Route",

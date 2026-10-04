@@ -178,14 +178,18 @@ def create_app(config: dict | None = None) -> Flask:
         style = api().request("GET", "/maps/style.json", auth=False).json()
         root = request.url_root.rstrip("/")
         style["glyphs"] = f"{root}/map/fonts/{{fontstack}}/{{range}}.pbf"
+
         # Everything the style loads from the API's maps module comes from here instead.
+        def own(address: str) -> str:
+            if "/api/v1/maps/" not in address:
+                return address
+            return f"{root}/map/{address.split('/api/v1/maps/', 1)[1]}"
+
         for source in style.get("sources", {}).values():
-            source["tiles"] = [
-                f"{root}/map/{tile.split('/api/v1/maps/', 1)[1]}"
-                if "/api/v1/maps/" in tile
-                else tile
-                for tile in source.get("tiles", [])
-            ]
+            if "tiles" in source:
+                source["tiles"] = [own(tile) for tile in source["tiles"]]
+            if isinstance(source.get("data"), str):
+                source["data"] = own(source["data"])
         response = app.json.response(style)
         response.headers["Cache-Control"] = "public, max-age=300"
         return response
@@ -195,7 +199,14 @@ def create_app(config: dict | None = None) -> Flask:
         upstream = api().request("GET", f"/maps/vector/{z}/{x}/{y}.pbf", auth=False)
         return _passed_on(upstream, "application/x-protobuf")
 
-    @app.get("/map/raster/<any(terrain, satellite):layer>/<int:z>/<int:x>/<int:y>")
+    @app.get("/map/avalanche.geojson")
+    def map_avalanche():
+        upstream = api().request("GET", "/maps/avalanche.geojson", auth=False)
+        return _passed_on(upstream, "application/geo+json")
+
+    @app.get(
+        "/map/raster/<any(terrain, satellite, snow, precipitation):layer>/<int:z>/<int:x>/<int:y>"
+    )
     def map_layer_tile(layer, z, x, y):
         upstream = api().request("GET", f"/maps/raster/{layer}/{z}/{x}/{y}", auth=False)
         return _passed_on(upstream, upstream.headers.get("content-type", "image/png"))
