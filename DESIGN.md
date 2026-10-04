@@ -24,7 +24,8 @@ Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen k
 | Historie | Jede Änderung wird als Revision gespeichert | Abschnitt 6.5 |
 | Partner | Per Nutzerkonto verknüpfbar, sonst Platzhalter, später austauschbar | Kontakte (6.4) |
 | Teilen per Link | Zufälliges UUID-Token, nur lesend, widerrufbar | Abschnitt 7 |
-| Kartenlayer-Lizenzen | Zurückgestellt bis Phase 2 | Tile-URL konfigurierbar |
+| Kartenlayer-Lizenzen | Werden in Phase 2, Schritt 6 je Quelle geklärt und dokumentiert | Tile-URL konfigurierbar |
+| Wegführung beim Planen | BRouter, selbst gehostet; Luftlinie als Rückfall (entschieden am 04.10.2026) | Abschnitt 9b |
 | Ausrüstung | Eigene Datenbank + gemeinsamer Katalog | Modul `gear` |
 | Essen | Eigene Datenbank + Barcode-Scan + gemeinsamer Katalog | Modul `nutrition` |
 | Kalorienverbrauch | Manuell, sonst automatische Schätzung | Abschnitt 7 |
@@ -547,6 +548,33 @@ Das Web-Frontend ist ein eigenes Projekt in `web/` und ersetzt die früher gepla
 - **Packlisten** (`/gear/lists`): anlegen, bearbeiten, löschen. Beim Bearbeiten einer Tour lässt sich eine Liste komplett übernehmen; Gegenstände, die schon in der Tour sind, kommen nicht doppelt hinzu.
 - Zeiten lassen sich nur mit JavaScript bearbeiten (Umrechnung der Ortszeit im Browser); alles andere funktioniert auch ohne.
 
+## 9b. Planung (Modul `planning`, Phase 2)
+
+Entschieden am 04.10.2026: Phase 2 beginnt mit der Routenplanung; Kartenstile und Ebenen folgen danach.
+
+**Abhängigkeiten**: `planning` hängt von `auth` und `protocols` ab und nutzt von `protocols` nur die Track-Auswertung (`track.py`: Punkte, Eckdaten, Reihen, GPX) und den Höhen-Adapter (`elevation.py`) sowie später dessen Service zum Anlegen einer Tour. `protocols` kennt `planning` nicht; eine Tour merkt sich höchstens die ID der Route.
+
+**Wegführung**: hinter dem Adapter `RoutingEngine` (`planning/routing.py`).
+- **BRouter** (MIT-Lizenz), selbst gehostet als eigener Container; die API erreicht ihn über `BROUTER_URL`. Die Wegpunkte gehen nur an den eigenen Server, nie an einen fremden Dienst. BRouter rechnet auf OSM-Wegdaten (ODbL, Quelle wird genannt), die je Region als Dateien unter `DATA_DIR` liegen, und liefert die Höhen mit.
+- **Luftlinie** (`direct`): gerade Verbindung, immer verfügbar; für wegloses Gelände, Skitouren und als Rückfall, wenn BRouter nicht eingerichtet ist. Die Höhen kommen dann vom Höhen-Adapter (Open-Meteo).
+- Jeder Wegpunkt kann festlegen, dass der Abschnitt zu ihm hin als Luftlinie verläuft (`direct`), auch wenn der Rest dem Wegenetz folgt.
+- Profile: `hiking` (Wandern, BRouter-Profil einstellbar über `BROUTER_PROFILE_HIKING`) und `direct`; weitere (Rad, Skitour) später.
+- Fehler: kein Weg gefunden → 422 `no_route`; BRouter nicht erreichbar oder nicht eingerichtet → 502 `routing_unavailable`.
+
+**Datenmodell** `planned_route`: id, owner_id, title, description, planned_date, profile, waypoints (JSON: `lat`, `lon`, `name`, `direct`), series (JSON wie bei Tracks: `distance_m`, `lat`, `lon`, `elevation_m`), engine, distance_m, ascent_m, descent_m, min_elevation_m, max_elevation_m, duration_s (geschätzt), version, created_at, updated_at, deleted_at. Der Server berechnet Linie und Eckdaten beim Speichern selbst aus den Wegpunkten; der Client schickt keine Geometrie. Konfliktschutz über `version` wie bei Touren (409).
+
+**Gehzeit** (immer als `estimated` gekennzeichnet), nach DIN 33466: waagrecht 4 km/h, Aufstieg 300 Hm/h, Abstieg 500 Hm/h. Aus der Zeit für die Strecke und der Zeit für die Höhenmeter zählt der größere Wert ganz, der kleinere zur Hälfte. Pausen sind nicht enthalten. Ohne Höhen zählt nur die Strecke.
+
+**Rechte**: Routen gehören ihrem Owner; fremde Routen antworten mit 404. Teilen von Routen ist nicht vorgesehen, bis es gewünscht wird.
+
+**API** (`/api/v1/planning`):
+- `GET /planning/info` – verfügbare Profile, ob die Wegführung eingerichtet ist, Quellenangabe
+- `POST /planning/preview` – Wegpunkte und Profil → Linie, Eckdaten, Gehzeit (nichts wird gespeichert)
+- `GET /planning/routes`, `POST /planning/routes`, `GET|PUT|DELETE /planning/routes/{id}`
+- `GET /planning/routes/{id}/gpx` – Route als GPX-Datei (Track und Wegpunkte)
+
+**Regionen** (entschieden am 04.10.2026): Schweiz, Österreich, Deutschland (Alpen/Bayern), Italien und der übrige Alpenraum. Daraus folgt für die Schritte 6 und 7: länderspezifische Quellen, wo sie frei sind (swisstopo, basemap.at, Bayerische Vermessungsverwaltung), sonst weltweite (OpenStreetMap, OpenTopoMap, Sentinel-2); jede Quelle nur über die Layer-Provider-Schnittstelle und mit dokumentierter Lizenz. Die Wegdaten für BRouter decken diese Länder ab.
+
 ## 10. Sicherheit und Datenschutz
 
 - Passwörter mit argon2, JWT kurzlebig + Refresh-Token. Passwortregeln nach BSI, zweiter Faktor (TOTP) Pflicht, optional SSO über OIDC (siehe Entscheidungen in Abschnitt 2).
@@ -582,7 +610,7 @@ Ziel: Ubuntu 26.04, Domain `hiker.lacasa.internal`, läuft auf dem bereits genut
 
 ## 12. Phasenplan
 
-**Phase 1 – Protokolle, Ausrüstung, Essen (aktuell)**
+**Phase 1 – Protokolle, Ausrüstung, Essen (abgeschlossen am 04.10.2026)**
 1. Backend-Grundgerüst, Auth, Profil, Modulregistry, Alembic
 2. Modul `gear`: Datenbank, CRUD, Bild-Upload, Katalog + Moderation
 3. Modul `nutrition`: Lebensmittel-DB, Open-Food-Facts-Adapter, Barcode-Endpunkt, Katalog + Moderation
@@ -598,7 +626,16 @@ Ziel: Ubuntu 26.04, Domain `hiker.lacasa.internal`, läuft auf dem bereits genut
 13. Web-Frontend mit Flask (Abschnitt 9a): Anmeldung, Ausrüstung, Essen, Protokolle, öffentliche Linkseite
 14. Tests, Docker Compose, Proxy-Beispiele, Backup-Skript, README
 
-**Phase 2 – Planung**: Layer-Provider-Schnittstelle, Stile (Sommer/Winter/Satellit), Ebenen (Hangneigung, Wetter, Schnee, Lawinenlage), Routen planen und als GPX speichern, Verknüpfung zu Protokollen; vorher Lizenzen der Kartenquellen klären. Optional FIT-Import.
+**Phase 2 – Planung (aktuell)**; Einzelheiten in Abschnitt 9b
+1. Backend-Modul `planning`: geplante Routen (CRUD, Vorschau, Eckdaten, Gehzeit-Schätzung, GPX-Export), Wegführung hinter einem Adapter, Luftlinie als Rückfall
+2. BRouter als eigener Container (Compose-Profil `routing`), Skript für die Wegdaten der Regionen
+3. Web-Frontend: Routenliste und Planer (Punkte setzen, verschieben, Höhenprofil, speichern, GPX)
+4. App: Routenliste, Detail, Planer, Offline-Abgleich
+5. Verknüpfung zu Protokollen: aus einer Route eine Tour anlegen, Plan und tatsächlichen Track vergleichen; GPX-Import als Route
+6. Layer-Provider-Schnittstelle im Modul `maps`; Kartenstile je Region (Sommer, Winter, Luftbild), Lizenzen je Quelle dokumentiert
+7. Ebenen: Hangneigung, Wetter, Schnee, Lawinenlage
+8. Eigene Karte aus OSM-Rohdaten (Regionsauszug, regelmäßig neu gebaut)
+9. Optional: FIT-Import
 
 **Phase 3 – Berichte**: Backend-Dienst, der hikr.org-Berichte für Gipfel im Umkreis findet (Nutzungsbedingungen und robots.txt prüfen, Zwischenspeicherung, nur Verweise + kurze Auszüge, Quelle klar angeben).
 

@@ -3,19 +3,20 @@
 Lies zuerst `DESIGN.md`. Sie ist die verbindliche Grundlage für Architektur, Datenmodell, API und Phasenplan.
 
 ## Projekt in Kürze
-Android-App (Flutter, nur Android), Web-Frontend (Python Flask) und eigenes Backend (FastAPI + PostgreSQL), selbst gehostet unter `hiker.lacasa.internal` (vorläufig, wird später auf die endgültige Domain umgestellt) auf Ubuntu 26.04. Module: auth, gear, nutrition, protocols, sync, maps (jetzt); planning, reports (später). Aktuell gilt Phase 1 aus `DESIGN.md`.
+Android-App (Flutter, nur Android), Web-Frontend (Python Flask) und eigenes Backend (FastAPI + PostgreSQL), selbst gehostet unter `hiker.lacasa.internal` (vorläufig, wird später auf die endgültige Domain umgestellt) auf Ubuntu 26.04. Module: auth, gear, nutrition, protocols, sync, maps, planning (jetzt); reports (später). Phase 1 ist abgeschlossen; aktuell gilt Phase 2 aus `DESIGN.md` (Abschnitt 9b).
 
 ## Sprache
 - UI-Texte und Dokumentation: Deutsch (App: ARB-Dateien; Web-Frontend: eine Übersetzungsdatei, keine Texte verstreut in den Vorlagen).
 - Code, Bezeichner, Commit-Nachrichten, API-Felder: Englisch.
 
 ## Architektur
-- Modulgrenzen einhalten: Core importiert keine Module. Ein Modul nutzt ein anderes nur über deklarierte `depends_on`-Einträge und dessen öffentliche Service-Schnittstelle oder über IDs. Keine Zyklen. `protocols` darf `gear` und `nutrition` nutzen, nie umgekehrt.
+- Modulgrenzen einhalten: Core importiert keine Module. Ein Modul nutzt ein anderes nur über deklarierte `depends_on`-Einträge und dessen öffentliche Service-Schnittstelle oder über IDs. Keine Zyklen. `protocols` darf `gear` und `nutrition` nutzen, nie umgekehrt. `planning` darf `protocols` nutzen (Track-Auswertung, Höhen-Adapter, Tour anlegen), nie umgekehrt.
 - Jedes Modul hat `register(app)` und `MODULE_INFO`; Aktivierung über `ENABLED_MODULES`.
 - API-first, Version `/api/v1` beibehalten; Änderungen müssen in OpenAPI sichtbar sein.
 - Local-first in der Android-App (Drift), Sync über `/sync/*`.
 - Flutter wird nur für Android gebaut; keine Web-Plattform und kein web-spezifischer Code im Flutter-Projekt.
 - Das Web-Frontend (Flask, `web/`) spricht ausschließlich mit der REST-API, nie direkt mit Datenbank oder Dateispeicher, und enthält keine eigene Fachlogik. Tokens bleiben serverseitig in der Sitzung; Formulare sind gegen CSRF geschützt. JavaScript-Bibliotheken werden vom eigenen Server ausgeliefert, nicht von einem CDN.
+- Wegführung beim Planen nur über den Adapter `RoutingEngine`; Wegpunkte gehen ausschließlich an den eigenen BRouter, nie an fremde Dienste.
 - Externe Dienste (Open-Meteo, Open-Meteo-Elevation, Open Food Facts, OpenStreetMap/Overpass, Kartenkacheln, Dateispeicher, später hikr.org) nur über Adapter-Interfaces ansprechen.
 - Datenbankänderungen nur über Alembic-Migrationen.
 - Konfiguration über Umgebungsvariablen; keine Geheimnisse oder feste Domains im Code (`PUBLIC_BASE_URL`).
@@ -36,6 +37,7 @@ Android-App (Flutter, nur Android), Web-Frontend (Python Flask) und eigenes Back
   - `read`: nur lesen.
 - Public-Link-Tokens sind kryptografisch zufällige UUIDv4, nie ableitbar, nie in Logs. Öffentliche Ansicht ohne Login, `noindex`, ohne E-Mail-Adressen und interne IDs, Gesundheitsdaten standardmäßig ausgeblendet.
 - Ausrüstungsgewicht und Kalorien in Touren als Momentaufnahme (Snapshot) speichern.
+- Geplante Routen: Linie und Eckdaten berechnet der Server aus den Wegpunkten; die Gehzeit ist eine Schätzung (`estimated`), Formel in `DESIGN.md` 9b.
 - Kalorienverbrauch: manuelle Eingabe hat immer Vorrang; sonst Schätzung, in API und UI klar als `estimated` gekennzeichnet; Formel und Parameter dokumentieren.
 - GPX-Parser tolerant: fehlende Zeit, Höhe, Herzfrequenz führen nie zu Fehlern. Sensordaten aus der Garmin TrackPointExtension lesen.
 - Fotos: EXIF lesen, dem Track zuordnen (GPS, sonst Zeit mit einstellbarem Versatz), Position korrigierbar halten; Uploads prüfen und neu kodieren; EXIF-GPS bei öffentlichen Links optional entfernen.
