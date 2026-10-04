@@ -2,6 +2,8 @@
 """Smoke test for a running hiker stack (API and web frontend). Python standard library only.
 
     deploy/smoke_test.py --api http://127.0.0.1:8010 --web http://127.0.0.1:8011
+    deploy/smoke_test.py --api https://hiker.example --web https://hiker.example \\
+        --ca data/caddy/caddy/pki/authorities/local/root.crt
 
 Registers a throwaway user (or signs in with SMOKE_EMAIL / SMOKE_PASSWORD when the
 registration is closed), sets up the second factor if the server demands it, walks
@@ -21,6 +23,7 @@ import json
 import math
 import os
 import re
+import ssl
 import struct
 import sys
 import time
@@ -46,11 +49,16 @@ def check(condition, message: str) -> None:
 
 
 class Client:
-    def __init__(self, base: str):
+    def __init__(self, base: str, ca_file: str | None = None):
         self.base = base.rstrip("/")
         self.token: str | None = None
         self.cookies = http.cookiejar.CookieJar()
-        self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.cookies))
+        handlers = [urllib.request.HTTPCookieProcessor(self.cookies)]
+        if ca_file:
+            # A server with a certificate of its own authority, e.g. the Caddy of the stack.
+            context = ssl.create_default_context(cafile=ca_file)
+            handlers.append(urllib.request.HTTPSHandler(context=context))
+        self.opener = urllib.request.build_opener(*handlers)
 
     def request(self, method: str, path: str, *, json_body=None, data=None, headers=None):
         """Returns (status, headers, body bytes); HTTP errors are returned, not raised."""
@@ -116,9 +124,9 @@ def step(name: str) -> None:
     print(f"  ok  {name}")
 
 
-def run(api_url: str, web_url: str) -> None:
-    api = Client(api_url)
-    web = Client(web_url)
+def run(api_url: str, web_url: str, ca_file: str | None = None) -> None:
+    api = Client(api_url, ca_file)
+    web = Client(web_url, ca_file)
     prefix = "/api/v1"
 
     status, _h, raw = api.request("GET", "/healthz")
@@ -257,9 +265,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--api", default="http://127.0.0.1:8010", help="base URL of the API")
     parser.add_argument("--web", default="http://127.0.0.1:8011", help="base URL of the web frontend")
+    parser.add_argument(
+        "--ca", help="root certificate of the server's own authority, e.g. Caddy's root.crt"
+    )
     arguments = parser.parse_args()
     try:
-        run(arguments.api, arguments.web)
+        run(arguments.api, arguments.web, arguments.ca)
     except Failure as failure:
         print(f"FAILED: {failure}", file=sys.stderr)
         return 1

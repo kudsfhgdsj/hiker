@@ -5,7 +5,7 @@
 #
 # Alle Daten liegen als normale Dateien unter DATA_DIR (Standard ./data), nicht in
 # Docker-Volumes: db/ (PostgreSQL), files/ (Fotos, GPX), tiles/ (Kartenkacheln),
-# web-sessions/ (Anmeldungen des Web-Frontends).
+# web-sessions/ (Anmeldungen des Web-Frontends), caddy/ (Zertifikate des Proxys).
 name: hiker
 
 # Kein Container läuft als root: alle Prozesse gehören HIKER_UID:HIKER_GID, haben keine
@@ -29,7 +29,7 @@ services:
       - sh
       - -c
       - |
-        if ! mkdir -p /data/db /data/files /data/tiles /data/web-sessions; then
+        if ! mkdir -p /data/db /data/files /data/tiles /data/web-sessions /data/caddy; then
           echo "DATA_DIR muss existieren und dem Benutzer $$(id -u):$$(id -g) gehören." >&2
           exit 1
         fi
@@ -136,3 +136,36 @@ services:
       start_period: 10s
     cpus: 0.5
     mem_limit: 256m
+
+  # Reverse Proxy mit selbst ausgestelltem Zertifikat. Nur mit dem Profil "proxy" aktiv
+  # (COMPOSE_PROFILES=proxy in der .env), damit der Stack auf einem Server mit eigenem
+  # Proxy keine Ports belegt. Der Port ist einstellbar (HTTPS_PORT).
+  caddy:
+    image: caddy:2
+    profiles: ["proxy"]
+    restart: unless-stopped
+    <<: *unprivileged
+    # The Caddy binary is marked for binding low ports; without this one capability the
+    # kernel refuses to start it. Everything else stays dropped.
+    cap_add:
+      - NET_BIND_SERVICE
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      web:
+        condition: service_healthy
+    environment:
+      CADDY_SITES: ${CADDY_SITES:-localhost}
+      CADDY_DEFAULT_SNI: ${CADDY_DEFAULT_SNI:-localhost}
+      # Hier liegen die eigene Zertifizierungsstelle und die Zertifikate.
+      XDG_DATA_HOME: /data
+      XDG_CONFIG_HOME: /tmp/config
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${DATA_DIR:-./data}/caddy:/data
+    ports:
+      - "${HTTPS_BIND:-0.0.0.0}:${HTTPS_PORT:-443}:8443"
+    cpus: 0.5
+    mem_limit: 128m

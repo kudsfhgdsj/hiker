@@ -6,7 +6,8 @@ und Schätzungen kommen von der API (siehe `DESIGN.md`, Abschnitt 9a).
 
 ## Umfang
 
-- Anmeldung (mit Code der Authenticator-App, optional SSO über OpenID Connect), Registrierung mit
+- Anmeldung in zwei Schritten (Passwort, dann Code der Authenticator-App; optional SSO über
+  OpenID Connect), Registrierung mit
   doppelter Passworteingabe, zweiten Faktor einrichten, Passwort ändern, Profil
 - Verwaltung für Administratoren: Nutzer ansehen, entfernen, Passwort und zweiten Faktor zurücksetzen
 - Ausrüstung: Liste mit Filtern, Formular, Bild, Summen mit Gruppierung, Tags und Kategorien, Katalog
@@ -118,4 +119,5 @@ Backend geprüft.
 ## Betrieb
 
 Im Compose-Stack läuft der Dienst `web` mit gunicorn nur auf `127.0.0.1:${WEB_PORT}`. Der
-Reverse Proxy leitet `/api/` an die API und alles andere an das Web-Frontend.
+Reverse Proxy – der mitgelieferte Caddy (Profil `proxy`) oder ein vorhandener – leitet `/api/` an
+die API und alles andere an das Web-Frontend.

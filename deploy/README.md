@@ -12,6 +12,8 @@ Reverse Proxy.
 | `backup.sh`, `restore.sh` | Sicherung und Wiederherstellung von Datenbank und Dateien |
 | `hiker-backup.service`, `hiker-backup.timer` | nächtliche Sicherung per systemd |
 | `smoke_test.py` | prüft einen laufenden Stack |
+| `caddy/Caddyfile` | Konfiguration des Caddy im Compose-Stack (Profil `proxy`) |
+| `reset-data.sh` | leert eine Testinstanz (löscht alle Daten) |
 
 ## Installation
 
@@ -62,10 +64,51 @@ Kartenkacheln holt der Server beim ersten Ansehen von OpenStreetMap und liefert 
 selbst aus. Nach `TILE_CACHE_DAYS` (14) fragt er nach, ob sich eine Kachel geändert hat. Der
 Speicher ist auf `TILE_CACHE_MAX_MB` (2000) begrenzt und muss nicht gesichert werden.
 
-Leere Instanz (z. B. nach Tests): `docker compose down`, dann `rm -rf data/db data/files
-data/web-sessions`, dann `docker compose up -d`.
+### Testinstanz leeren
+
+```sh
+deploy/reset-data.sh
+```
+
+Das löscht nach einer Rückfrage **alle** Konten, Touren, Ausrüstung, Lebensmittel, Fotos und
+GPX-Dateien der Instanz und startet sie leer neu. Kartenkacheln und die Zertifikate von Caddy
+bleiben. Das erste Konto, das sich danach registriert, wird Administrator.
 
 ## Reverse Proxy
+
+Zwei Wege: der mitgelieferte Caddy im Stack oder ein Proxy, der auf dem Server schon läuft.
+
+### Caddy im Stack (stellt sich das Zertifikat selbst aus)
+
+In der `.env`:
+
+```sh
+COMPOSE_PROFILES=proxy
+CADDY_SITES=hiker.lacasa.internal
+CADDY_DEFAULT_SNI=hiker.lacasa.internal
+HTTPS_PORT=443
+PUBLIC_BASE_URL=https://hiker.lacasa.internal
+```
+
+Danach `docker compose up -d`. Caddy legt beim ersten Start eine eigene Zertifizierungsstelle an
+(`DATA_DIR/caddy`) und stellt für jede Adresse aus `CADDY_SITES` ein Zertifikat aus, das ein Jahr
+gilt und rechtzeitig erneuert wird. Damit Browser und Geräte nicht warnen, das Wurzelzertifikat
+einmal installieren:
+
+```
+DATA_DIR/caddy/caddy/pki/authorities/local/root.crt
+```
+
+- Browser/Betriebssystem: als vertrauenswürdige Zertifizierungsstelle importieren.
+- Android-App: Es genügt, in der App den angezeigten Fingerabdruck zu bestätigen
+  (vergleichen mit `openssl s_client -connect <host>:<port> </dev/null | openssl x509 -noout
+  -fingerprint -sha256`). Nach einer Erneuerung des Zertifikats fragt die App erneut.
+- Smoke-Test: `deploy/smoke_test.py --api https://<host> --web https://<host> --ca <root.crt>`.
+
+Ohne `COMPOSE_PROFILES=proxy` startet Caddy nicht und der Stack belegt keinen Port nach außen.
+Caddy läuft wie alle Dienste ohne root; als einzige Capability hat er `NET_BIND_SERVICE`.
+
+### Vorhandener Proxy auf dem Server
 
 `/api/` geht an die API (`API_PORT`, Standard 8010), alles andere an das Web-Frontend (`WEB_PORT`,
 Standard 8011). Beide Beispiele
