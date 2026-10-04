@@ -7,10 +7,12 @@ without network. Unlike the tiles of the OpenStreetMap servers this map may be
 taken along: it is made from the raw data (ODbL).
 """
 
+import gzip
 import math
 import re
 import sqlite3
 import threading
+import zlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
@@ -20,8 +22,11 @@ from typing import Annotated
 from fastapi import Depends
 
 from app.core.config import get_settings
+from app.modules.maps.join import TileFormatError, join_tiles
 
 REGION_NAME = r"^[a-z0-9][a-z0-9-]{0,39}$"
+# How many joined border tiles are kept in memory.
+_JOINED_KEPT = 512
 VECTOR_ATTRIBUTION = "© OpenStreetMap-Mitwirkende (ODbL) · Schema © OpenMapTiles"
 
 
@@ -57,6 +62,7 @@ class VectorMaps:
         self._local = threading.local()
         self._lock = threading.Lock()
         self._known: dict[Path, tuple[float, VectorRegion]] = {}
+        self._joined: dict[tuple, bytes] = {}
 
     def _read(self, path: Path) -> VectorRegion | None:
         stat = path.stat()
@@ -117,8 +123,11 @@ class VectorMaps:
         return connections[key]
 
     def tile(self, z: int, x: int, y: int) -> bytes | None:
-        """The gzip-compressed tile of the first map that has it."""
+        """The gzip-compressed tile. Where several maps have it (at their borders),
+        their contents are joined into one tile."""
         west, south, east, north = _tile_bounds(z, x, y)
+        found: list[bytes] = []
+        versions = []
         for region in self.regions():
             left, bottom, right, top = region.bounds
             if not region.min_zoom <= z <= region.max_zoom:
@@ -139,8 +148,30 @@ class VectorMaps:
             except sqlite3.Error:
                 continue
             if row is not None:
-                return row[0]
-        return None
+                found.append(row[0])
+                versions.append((region.name, region.modified))
+        if len(found) < 2:
+            return found[0] if found else None
+        key = (z, x, y, tuple(versions))
+        with self._lock:
+            joined = self._joined.get(key)
+        if joined is None:
+            try:
+                joined = gzip.compress(
+                    join_tiles([gzip.decompress(tile) for tile in found]),
+                    compresslevel=5,
+                    mtime=0,
+                )
+            except (OSError, EOFError, zlib.error, TileFormatError):
+                # A tile that cannot be read: the largest map alone is better than none.
+                return found[0]
+            with self._lock:
+                if len(self._joined) >= _JOINED_KEPT:
+                    # Drop the oldest ones; a dict keeps the order of insertion.
+                    for old in list(self._joined)[: _JOINED_KEPT // 4]:
+                        del self._joined[old]
+                self._joined[key] = joined
+        return joined
 
     def max_zoom(self) -> int:
         return max((region.max_zoom for region in self.regions()), default=14)

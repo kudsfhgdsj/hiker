@@ -6,6 +6,7 @@ import sqlite3
 import pytest
 
 from app.core.config import get_settings
+from app.modules.maps.join import TileFormatError, _bytes_field, _fields, _varint, join_tiles
 from app.modules.maps.merge import merge
 from app.modules.maps.style import build_style
 from app.tests.conftest import auth_header, register
@@ -15,7 +16,7 @@ TILE = gzip.compress(b"vector tile")
 Z, X, Y = 10, 538, 359
 
 
-def write_map(path, tiles=((Z, X, Y),), bounds="9.0,47.0,10.0,47.5", max_zoom=14):
+def write_map(path, tiles=((Z, X, Y),), bounds="9.0,47.0,10.0,47.5", max_zoom=14, data=TILE):
     with sqlite3.connect(path) as db:
         db.execute("CREATE TABLE metadata (name TEXT, value TEXT)")
         db.execute(
@@ -28,7 +29,7 @@ def write_map(path, tiles=((Z, X, Y),), bounds="9.0,47.0,10.0,47.5", max_zoom=14
         )
         for z, x, y in tiles:
             # MBTiles count rows from the south.
-            db.execute("INSERT INTO tiles VALUES (?, ?, ?, ?)", (z, x, 2**z - 1 - y, TILE))
+            db.execute("INSERT INTO tiles VALUES (?, ?, ?, ?)", (z, x, 2**z - 1 - y, data))
 
 
 @pytest.fixture
@@ -224,3 +225,99 @@ def test_paths_are_coloured_by_their_difficulty():
     # What the colours mean travels with the style.
     legend = style["metadata"]["hiker"]["legend"]
     assert [entry["label"] for entry in legend] == ["T1", "T2", "T3", "T4", "T5", "T6", "KS"]
+
+
+def layer(name: str, features: list[tuple[dict, bytes]], extent: int = 4096) -> bytes:
+    """A layer of a vector tile: features as (attributes, geometry bytes)."""
+    keys: list[str] = []
+    values: list[str] = []
+    body = _varint(15 << 3) + _varint(2) + _bytes_field(1, name.encode())
+    for attributes, geometry in features:
+        tags = b""
+        for key, value in attributes.items():
+            if key not in keys:
+                keys.append(key)
+            if value not in values:
+                values.append(value)
+            tags += _varint(keys.index(key)) + _varint(values.index(value))
+        feature = _bytes_field(2, tags) + _varint(3 << 3) + _varint(2) + _bytes_field(4, geometry)
+        body += _bytes_field(2, feature)
+    for key in keys:
+        body += _bytes_field(3, key.encode())
+    for value in values:
+        # A value is a message with a string in field 1.
+        body += _bytes_field(4, _bytes_field(1, value.encode()))
+    return _bytes_field(3, body + _varint(5 << 3) + _varint(extent))
+
+
+def read_tile(tile: bytes) -> dict[str, list[tuple[dict, bytes]]]:
+    """Layers of a tile with their features as (attributes, geometry bytes)."""
+    result = {}
+    for number, _wire, value, _raw in _fields(tile):
+        assert number == 3
+        keys, values, features, name = [], [], [], ""
+        for field, _w, content, _r in _fields(value):
+            if field == 1:
+                name = content.decode()
+            elif field == 2:
+                features.append(content)
+            elif field == 3:
+                keys.append(content.decode())
+            elif field == 4:
+                values.append(next(v for n, _w2, v, _r2 in _fields(content) if n == 1).decode())
+        assert name not in result, "a layer name appears once"
+        result[name] = []
+        for feature in features:
+            parts = {field: content for field, _w, content, _r in _fields(feature)}
+            tags = list(parts[2])
+            attributes = {keys[tags[i]]: values[tags[i + 1]] for i in range(0, len(tags), 2)}
+            result[name].append((attributes, parts[4]))
+    return result
+
+
+def test_tiles_of_two_maps_are_joined_layer_by_layer():
+    swiss = layer("transportation", [({"class": "path"}, b"\x01"), ({"class": "road"}, b"\x02")])
+    swiss += layer("water", [({"class": "lake"}, b"\x09")])
+    austrian = layer(
+        "transportation",
+        # Other order of keys and values, one feature both maps have, one new.
+        [({"surface": "gravel", "class": "road"}, b"\x03"), ({"class": "road"}, b"\x02")],
+    )
+    austrian += layer("place", [({"name": "Feldkirch"}, b"\x05")])
+
+    joined = read_tile(join_tiles([swiss, austrian]))
+
+    assert list(joined) == ["transportation", "water", "place"]
+    assert joined["transportation"] == [
+        ({"class": "path"}, b"\x01"),
+        ({"class": "road"}, b"\x02"),
+        ({"surface": "gravel", "class": "road"}, b"\x03"),
+    ]
+    assert joined["water"] == [({"class": "lake"}, b"\x09")]
+    assert joined["place"] == [({"name": "Feldkirch"}, b"\x05")]
+    # A single tile stays as it is; a layer on another grid is left out.
+    assert join_tiles([swiss]) == swiss
+    other_grid = layer("water", [({"class": "river"}, b"\x07")], extent=512)
+    assert read_tile(join_tiles([swiss, other_grid]))["water"] == [({"class": "lake"}, b"\x09")]
+    with pytest.raises(TileFormatError):
+        join_tiles([swiss, b"\xff\xff\xff"])
+
+
+def test_a_tile_on_a_border_holds_both_regions(client, maps):
+    swiss = layer("place", [({"name": "Buchs"}, b"\x01")])
+    austrian = layer("place", [({"name": "Feldkirch"}, b"\x02")])
+    write_map(maps / "switzerland.mbtiles", data=gzip.compress(swiss))
+    write_map(maps / "austria.mbtiles", bounds="9.4,46.4,17.2,49.0", data=gzip.compress(austrian))
+
+    response = client.get(f"/api/v1/maps/vector/{Z}/{X}/{Y}.pbf")
+
+    assert response.status_code == 200
+    # The test client unpacks the compressed answer.
+    places = read_tile(response.content)["place"]
+    assert {attributes["name"] for attributes, _geometry in places} == {"Buchs", "Feldkirch"}
+    # Asked again, the joined tile is the same (kept in memory).
+    assert client.get(f"/api/v1/maps/vector/{Z}/{X}/{Y}.pbf").content == response.content
+
+    # A tile that cannot be read does not take the map away: the larger map answers.
+    write_map(maps / "bayern.mbtiles", bounds="9.0,47.0,13.9,50.6", data=gzip.compress(b"\xff\xff"))
+    assert client.get(f"/api/v1/maps/vector/{Z}/{X}/{Y}.pbf").status_code == 200
