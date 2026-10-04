@@ -17,6 +17,7 @@ class TrustedCertificatesSection extends ConsumerWidget {
     if (trusted.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
     return Card(
+      margin: const EdgeInsets.only(bottom: AppSpacing.m),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.m),
         child: Column(

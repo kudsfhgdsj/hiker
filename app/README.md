@@ -82,15 +82,19 @@ feste Quelle lässt sich beim Bauen setzen: `--dart-define=MAP_TILE_URL=https://
 
 - Registrierung mit doppelter Passworteingabe; die Regeln (BSI) werden schon in der App geprüft.
 - Zweiter Faktor: Nach dem ersten Login führt die App durch das Einrichten (Schlüssel für die
-  Authenticator-App, Wiederherstellungscodes). Beim Anmelden fragt sie nach dem Code.
+  Authenticator-App, Wiederherstellungscodes). Beim Anmelden fragt sie in einem zweiten Schritt
+  nach dem Code, nachdem das Passwort gestimmt hat.
 - SSO über OpenID Connect gibt es vorerst nur im Web-Frontend.
 
 ## Eigene oder selbst signierte Zertifikate
 
-- **Selbst signiert**: Scheitert die Verbindung am Zertifikat, zeigt die App dessen
-  SHA-256-Fingerabdruck. Vergleichen mit
+- **Selbst signiert** (auch der Caddy des Compose-Stacks): Scheitert die Verbindung am
+  Zertifikat, zeigt die App dessen SHA-256-Fingerabdruck. Vergleichen mit
   `openssl x509 -in server.crt -noout -fingerprint -sha256` und bestätigen – die App akzeptiert
   danach genau dieses Zertifikat für diesen Server.
+- Zeigt der Server später ein anderes Zertifikat (z. B. nach der Erneuerung), meldet die App das
+  beim nächsten Start und bietet das neue zur Bestätigung an.
+- Im Profil stehen die bestätigten Zertifikate; dort lässt sich das Vertrauen wieder entziehen.
 - **Eigene Zertifizierungsstelle**: Das Wurzelzertifikat in Android installieren (Einstellungen →
   Sicherheit → Zertifikat installieren). Die App vertraut installierten Stellen.
 - Die Karte lädt ihre Kacheln über eine native Bibliothek, die die Bestätigung in der App nicht
@@ -122,9 +126,9 @@ $ANDROID_HOME/platform-tools/adb install -r build/app/outputs/flutter-apk/app-de
 ```
 
 Im Emulator ist der Rechner unter `10.0.2.2` erreichbar. Die App erlaubt kein unverschlüsseltes
-HTTP; für einen lokalen Stack braucht es deshalb einen HTTPS-Proxy davor, z. B. nginx mit
-`deploy/nginx-hiker.conf` und einem selbst signierten Zertifikat (`subjectAltName=IP:10.0.2.2`).
-Als Server-Adresse dann `https://10.0.2.2:<Port>` eintragen und den Fingerabdruck bestätigen.
+HTTP; für einen lokalen Stack den mitgelieferten Caddy einschalten (`COMPOSE_PROFILES=proxy`,
+`CADDY_SITES=localhost, 10.0.2.2`, `CADDY_DEFAULT_SNI=10.0.2.2`, `HTTPS_PORT=8443` in der `.env`).
+Als Server-Adresse dann `https://10.0.2.2:8443` eintragen und den Fingerabdruck bestätigen.
 
 Am 04.10.2026 so geprüft (Android 15): Registrierung, Zertifikatsbestätigung, zweiten Faktor
 einrichten, Ausrüstung mit Favorit und Zusatzfeldern, Tour anlegen und bearbeiten, GPX und Foto
