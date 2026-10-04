@@ -59,4 +59,4 @@ Android-App (Flutter, nur Android), Web-Frontend (Python Flask) und eigenes Back
 - Container-Ressourcen begrenzen.
 - Kein Container läuft als root: Dienste laufen als `HIKER_UID`, ohne Capabilities, mit schreibgeschütztem Dateisystem.
 - Daten liegen als normale Ordner unter `DATA_DIR` (Bind-Mounts), nicht in Docker-Volumes.
-- Kartenkacheln kommen vom eigenen Server (Modul `maps`): beim ersten Ansehen geholt, als Datei gespeichert, frühestens nach 7 Tagen neu geprüft. Nie Kacheln auf Vorrat herunterladen (Nutzungsbedingungen von OpenStreetMap).
+- Kartenkacheln kommen vom eigenen Server (Modul `maps`): beim ersten Ansehen geholt, als Datei gespeichert, frühestens nach 7 Tagen neu geprüft. Nie Kacheln der OpenStreetMap-Server auf Vorrat herunterladen (Nutzungsbedingungen). Zum Mitnehmen gibt es die eigene Karte: `deploy/build-map.sh` baut sie aus OSM-Rohdaten nach `DATA_DIR/maps`, die API liefert sie aus und bietet sie der App als Datei an.

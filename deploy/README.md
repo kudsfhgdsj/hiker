@@ -53,6 +53,7 @@ in Docker-Volumes:
 | `web-sessions/` | Anmeldungen des Web-Frontends |
 | `caddy/` | Zertifizierungsstelle und Zertifikate des Proxys im Stack |
 | `brouter/segments/` | Wegdaten für die Routenplanung (neu ladbar) |
+| `maps/` | Eigene Karte je Gebiet (`*.mbtiles`, neu baubar) und Hilfsdaten für den Bau |
 
 **Kein Container läuft als root.** Alle Dienste laufen als `HIKER_UID:HIKER_GID` (Standard
 1000:1000, also der erste Benutzer des Systems), ohne Linux-Capabilities, ohne Möglichkeit, neue
@@ -133,6 +134,26 @@ installiert ist – auch auf dem Android-Telefon, sonst verbindet sich die App n
 
 Firewall: nur 22, 80 und 443 öffnen (`ufw`). Die Ports 8010 und 8011 sind von außen nicht
 erreichbar und sollen es nicht sein.
+
+## Eigene Karte
+
+Ohne eigene Karte zeigt hiker zwischengespeicherte Kacheln von OpenStreetMap. Mit ihr zeigen
+Web und App eine eigene Wanderkarte, und die App kann Kartengebiete herunterladen und ohne
+Netz zeigen.
+
+```sh
+deploy/build-map.sh switzerland          # ein Gebiet, Name wie bei download.geofabrik.de
+deploy/build-map.sh alps                 # der Alpenbogen; MAP_BUILD_MEMORY=6g in der .env
+```
+
+Der Bau läuft als einmaliger Container (Planetiler), lädt den OSM-Auszug des Gebiets und
+beim ersten Mal rund 1,5 GB Hilfsdaten und legt `DATA_DIR/maps/<gebiet>.mbtiles` ab. Die API
+liefert die Karte sofort aus, ein Neustart ist nicht nötig. Schweiz: rund 350 MB, gut fünf
+Minuten bei 3 GB RAM. Ein monatlicher Aufruf (cron) hält die Karte aktuell. Mehrere Gebiete
+ergänzen sich; an ihren Grenzen kann eine Kachel nur aus einem der Gebiete stammen, deshalb
+ist ein zusammenhängendes Gebiet (z. B. `alps`) besser als viele kleine.
+
+Die Karte lässt sich jederzeit neu bauen und gehört nicht in die Sicherung.
 
 ## Routenplanung mit BRouter
 

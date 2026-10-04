@@ -595,6 +595,15 @@ Entschieden am 04.10.2026: Phase 2 beginnt mit der Routenplanung; Kartenstile un
 - **2D und 3D** umschaltbar: Geländedarstellung mit MapLibre (Höhenkacheln aus offenen Daten, vom eigenen Server zwischengespeichert), Schritt 6.
 - **Schnelle Karte**: Verschieben und Drehen müssen flüssig sein. Dafür bleibt es bei MapLibre (GPU-Darstellung) in Web und App; Drehen wird in der App freigegeben; die eigene Karte aus OSM-Daten (Schritt 8) liefert Vektorkacheln, die schneller und in jeder Drehung scharf sind. Kacheln kommen weiterhin vom eigenen Server mit langer Cache-Dauer.
 
+**Eigene Karte aus OSM-Rohdaten** (Schritt 8, vorgezogen am 04.10.2026, damit die App Karten mitnehmen kann):
+- **Warum**: Kacheln der OpenStreetMap-Server dürfen nicht auf Vorrat geladen werden. Eine Karte, die der eigene Server aus den Rohdaten (ODbL) baut, darf als Ganzes heruntergeladen werden.
+- **Bau**: `deploy/build-map.sh <gebiet>` startet Planetiler 0.10.2 (Apache-2.0, Compose-Dienst `mapbuild`, Profil `mapbuild`, läuft nur auf Zuruf, nicht als root) und schreibt `DATA_DIR/maps/<gebiet>.mbtiles`: Vektorkacheln im OpenMapTiles-Schema, Zoom 0–14. Gebietsnamen wie bei Geofabrik (`switzerland`, `austria`, `alps` …). Gemessen: Schweiz 349 MB in gut 5 Minuten bei 3 GB RAM. Die Hilfsdaten (Küstenlinien, Natural Earth, rund 1,5 GB) bleiben unter `maps/build/sources`.
+- **Ausliefern** (Modul `maps`, `maps/vector.py`): `GET /maps/vector/{z}/{x}/{y}.pbf` (ohne Anmeldung; 204, wo die Karte nichts hat), `GET /maps/style.json`, `GET /maps/fonts/{fontstack}/{range}.pbf`, `GET /maps/regions` und `GET /maps/regions/{name}` (mit Anmeldung, Download der Datei, Range-Anfragen). Mehrere Gebietsdateien ergänzen sich: die größte antwortet zuerst. `GET /maps/info` nennt `style_url`, sobald eine Karte vorhanden ist; ohne Karte bleiben die zwischengespeicherten Rasterkacheln.
+- **Stil** (`maps/style.py`): eigene Wanderkarte, ohne Symbolbilder: Wege rot gestrichelt und hervorgehoben, Fahrwege braun, Wald/Fels/Eis/Wiese unterschieden, Gipfel mit Name und Höhe, Hütten, Gewässer, Orte. Schrift: Noto Sans (OFL), Glyphen für lateinische Schrift liegen im Modul. Farben nie achtstellig hexadezimal und Namen über `to-string(coalesce(…))`, weil die Kartenbibliothek der App sonst nichts zeichnet.
+- **Web**: Die Seiten benutzen die Vektorkarte, sobald die API eine hat (`hiker_web/maps.py`); Stil, Kacheln und Schriften reicht das Web-Frontend unter `/map/…` durch.
+- **App**: Der Kartenserver in der App (`TileProxy`, auf 127.0.0.1) beantwortet alles, was die Karte braucht: zuerst aus einer Kartendatei auf dem Gerät (`core/map/map_regions.dart`), sonst vom eigenen Server; was vom Server kam, bleibt als Datei (höchstens 300 MB). Unter Planung → „Offline-Daten“ lädt man Kartengebiete und Wegdaten. Die Karte lässt sich drehen.
+- **Noch offen**: Höhenlinien und Schummerung fehlen (Schritte 6 und 7, zusammen mit 2D/3D). Die Schwierigkeit der Wege (`sac_scale`) steht nicht im OpenMapTiles-Schema; dafür braucht der Bau eine eigene Ebene. Auf dem Emulator zeichnet die App die Beschriftungen der Vektorkarte nicht, obwohl Stil und Schriften richtig ankommen (auch ein fester Testtext fehlt); im Web sind sie da. Das muss auf einem echten Gerät geprüft werden.
+
 **Regionen** (entschieden am 04.10.2026): Schweiz, Österreich, Deutschland (Alpen/Bayern), Italien und der übrige Alpenraum. Daraus folgt für die Schritte 6 und 7: länderspezifische Quellen, wo sie frei sind (swisstopo, basemap.at, Bayerische Vermessungsverwaltung), sonst weltweite (OpenStreetMap, OpenTopoMap, Sentinel-2); jede Quelle nur über die Layer-Provider-Schnittstelle und mit dokumentierter Lizenz. Die Wegdaten für BRouter decken diese Länder ab.
 
 ## 10. Sicherheit und Datenschutz
@@ -656,7 +665,7 @@ Ziel: Ubuntu 26.04, Domain `hiker.lacasa.internal`, läuft auf dem bereits genut
 5. Verknüpfung zu Protokollen: aus einer Route eine Tour anlegen, Plan und tatsächlichen Track vergleichen; GPX-Import als Route
 6. Layer-Provider-Schnittstelle im Modul `maps`; Kartenstile je Region (Sommer, Winter, Luftbild, Topo), vom Betreiber eintragbare lizenzierte Quellen, Umschaltung 2D/3D, Lizenzen je Quelle dokumentiert
 7. Ebenen: Hangneigung, Wetter, Schnee, Lawinenlage
-8. Eigene Karte aus OSM-Rohdaten (Regionsauszug, regelmäßig neu gebaut)
+8. Eigene Karte aus OSM-Rohdaten (Regionsauszug, regelmäßig neu gebaut) – vorgezogen und umgesetzt am 04.10.2026 (ohne Höhenlinien und Schummerung)
 9. Optional: FIT-Import
 
 **Phase 3 – Berichte**: Backend-Dienst, der hikr.org-Berichte für Gipfel im Umkreis findet (Nutzungsbedingungen und robots.txt prüfen, Zwischenspeicherung, nur Verweise + kurze Auszüge, Quelle klar angeben).

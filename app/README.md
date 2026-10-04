@@ -116,6 +116,14 @@ Die Kartenkacheln kommen vom eigenen Server (`/api/v1/maps/tiles/…`, Modul `ma
 zwischenspeichert. Hat der Server das Modul nicht, lädt die App direkt von OpenStreetMap. Eine
 feste Quelle lässt sich beim Bauen setzen: `--dart-define=MAP_TILE_URL=https://…/{z}/{x}/{y}.png`.
 
+## Eigene Karte und Offline-Karten
+
+Hat der Server eine eigene Vektorkarte (`deploy/build-map.sh`), zeigt die App sie statt der
+Rasterkacheln. Die Karte fragt dafür den Kartenserver in der App (`core/map/tile_proxy.dart`,
+auf 127.0.0.1): Er antwortet aus einer Kartendatei auf dem Gerät, sonst vom eigenen Server,
+und hebt auf, was er ausgeliefert hat. Kartengebiete lädt man unter Planung → „Offline-Daten“
+(`core/map/map_regions.dart`).
+
 ## Planung
 
 Unter „Planung“ liegen die Routenliste und der Planer: Punkte auf der Karte setzen und
