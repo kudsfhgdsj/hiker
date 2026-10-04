@@ -124,20 +124,26 @@ class GearManageScreen extends ConsumerWidget {
                       ),
                       title: Text(tag.name),
                       onTap: () => _editTag(context, ref, tag),
-                      trailing: IconButton(
-                        tooltip: l10n.delete,
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: () async {
-                          if (await confirmDelete(context, tag.name) &&
-                              context.mounted) {
-                            await _guard(
-                              context,
-                              ref,
-                              () => repository.deleteTag(tag.id),
-                            );
-                          }
-                        },
-                      ),
+                      subtitle: tag.system == null
+                          ? null
+                          : Text(l10n.gearTagSystem),
+                      // The tags of the app itself stay.
+                      trailing: tag.system != null
+                          ? null
+                          : IconButton(
+                              tooltip: l10n.delete,
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () async {
+                                if (await confirmDelete(context, tag.name) &&
+                                    context.mounted) {
+                                  await _guard(
+                                    context,
+                                    ref,
+                                    () => repository.deleteTag(tag.id),
+                                  );
+                                }
+                              },
+                            ),
                     ),
                   ListTile(
                     leading: const Icon(Icons.add),

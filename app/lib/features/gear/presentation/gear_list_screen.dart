@@ -59,6 +59,9 @@ class _GearListScreenState extends ConsumerState<GearListScreen> {
         ref.watch(gearTypesProvider).asData?.value.value ?? const <GearType>[];
     final tags =
         ref.watch(gearTagsProvider).asData?.value.value ?? const <GearTag>[];
+    final favoriteTag = tags
+        .where((tag) => tag.system == GearTag.favorite)
+        .firstOrNull;
     final typeNames = {for (final type in types) type.id: type.name};
 
     return Scaffold(
@@ -200,7 +203,17 @@ class _GearListScreenState extends ConsumerState<GearListScreen> {
                                   subtitle: details.isEmpty
                                       ? null
                                       : Text(details),
-                                  trailing: Text(Format.weight(item.weightG)),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(Format.weight(item.weightG)),
+                                      if (favoriteTag != null)
+                                        _FavoriteStar(
+                                          item: item,
+                                          tagId: favoriteTag.id,
+                                        ),
+                                    ],
+                                  ),
                                   onTap: () =>
                                       context.push('/gear/item/${item.id}'),
                                 );
@@ -214,6 +227,37 @@ class _GearListScreenState extends ConsumerState<GearListScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The star that puts the tag "favorite" on an item or takes it off. It is a
+/// normal change of the item, so it also works offline.
+class _FavoriteStar extends ConsumerWidget {
+  const _FavoriteStar({required this.item, required this.tagId});
+
+  final GearItem item;
+  final String tagId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isFavorite = item.tagIds.contains(tagId);
+    return IconButton(
+      tooltip: AppLocalizations.of(context).gearFavorite,
+      isSelected: isFavorite,
+      icon: const Icon(Icons.star_border),
+      selectedIcon: const Icon(Icons.star, color: Color(0xFFF5B400)),
+      onPressed: () async {
+        final tags = isFavorite
+            ? item.tagIds.where((id) => id != tagId).toList()
+            : [...item.tagIds, tagId];
+        try {
+          await ref.read(gearRepositoryProvider).saveItem(item.withTags(tags));
+        } finally {
+          ref.invalidate(gearItemsProvider);
+          ref.invalidate(gearSummaryProvider);
+        }
+      },
     );
   }
 }

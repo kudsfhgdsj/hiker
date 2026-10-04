@@ -356,11 +356,9 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.textContaining('gehört die Währung'), findsOneWidget);
       expect(saved, isEmpty);
 
       await tester.enterText(field('Kaufpreis'), '120,50');
-      await tester.enterText(field('Währung'), 'chf');
       await tester.ensureVisible(
         find.widgetWithText(FilledButton, 'Speichern'),
       );
@@ -371,7 +369,8 @@ void main() {
       expect(body['name'], 'Pickel');
       expect(body['weight_g'], 450);
       expect(body['purchase_price'], 120.5);
-      expect(body['currency'], 'CHF');
+      // Prices are always in EUR: nothing to send.
+      expect(body.containsKey('currency'), isFalse);
       expect(body['tag_ids'], ['tag-winter']);
       expect(body['status'], 'active');
       expect(body['brand'], isNull);
@@ -402,6 +401,62 @@ void main() {
       expect(body['status'], 'retired');
       expect(body['purchase_price'], 399.9);
       expect(body['type_id'], 'type-tent');
+    });
+
+    testWidgets('shows the extra fields of the type and sends them', (
+      tester,
+    ) async {
+      final saved = <Object?>[];
+      final api = gearApi(saved: saved);
+      api.routes['GET /gear/types'] = (_, _) => ok([
+        {...types[0], 'kind': 'backpack'},
+        {...types[1], 'kind': 'shoes'},
+      ]);
+      api.routes['GET /gear/items/item-tent'] = (_, _) => ok({
+        ...tent,
+        'attributes': {'volume_l': 35},
+      });
+      await openGear(tester, api);
+
+      await tester.tap(find.text('Zelt Hubba'));
+      await tester.pumpAndSettle();
+      // The type has the kind "backpack": its field is there, the one for shoes is not.
+      expect(find.widgetWithText(TextFormField, '35'), findsOneWidget);
+      expect(find.text('Schuhkategorie'), findsNothing);
+      expect(find.textContaining('JPEG, PNG oder WebP'), findsOneWidget);
+      expect(find.text('Währung'), findsNothing);
+
+      await tester.enterText(field('Volumen (Liter)'), '42,5');
+      await tester.ensureVisible(
+        find.widgetWithText(FilledButton, 'Speichern'),
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Speichern'));
+      await tester.pumpAndSettle();
+
+      final body = saved.single! as Map<String, dynamic>;
+      expect(body['attributes'], {'volume_l': 42.5});
+    });
+
+    testWidgets('the star sets and removes the favourite tag', (tester) async {
+      final saved = <Object?>[];
+      final api = gearApi(saved: saved);
+      api.routes['GET /gear/tags'] = (_, _) => ok([
+        {
+          'id': 'tag-favorite',
+          'name': 'Favorit',
+          'color': '#f5b400',
+          'system': 'favorite',
+        },
+        ...tags,
+      ]);
+      await openGear(tester, api);
+
+      await tester.tap(find.byTooltip('Favorit').first);
+      await tester.pumpAndSettle();
+
+      final body = saved.single! as Map<String, dynamic>;
+      expect(body['tag_ids'], ['tag-winter', 'tag-favorite']);
+      expect(body['name'], 'Zelt Hubba');
     });
 
     testWidgets('uploads an image and proposes the item to the catalog', (

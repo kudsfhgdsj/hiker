@@ -58,7 +58,6 @@ class _GearItemFormState extends ConsumerState<_GearItemForm> {
   late final _price = TextEditingController(
     text: Format.input(_item.purchasePrice),
   );
-  late final _currency = TextEditingController(text: _item.currency);
   late final _description = TextEditingController(text: _item.description);
   late final _notes = TextEditingController(text: _item.notes);
   late final _website = TextEditingController(text: _item.websiteUrl);
@@ -69,6 +68,15 @@ class _GearItemFormState extends ConsumerState<_GearItemForm> {
   late String _status = _item.status;
   late String? _purchaseDate = _item.purchaseDate;
   late Set<String> _tagIds = {..._item.tagIds};
+  late final Map<String, dynamic> _attributes = {..._item.attributes};
+  late final _numberAttributes = {
+    for (final attributes in gearKinds.values)
+      for (final attribute in attributes)
+        if (attribute.options.isEmpty)
+          attribute.key: TextEditingController(
+            text: Format.input(_item.attributes[attribute.key] as num?),
+          ),
+  };
   String? _catalogId;
   bool _busy = false;
   Object? _error;
@@ -78,7 +86,6 @@ class _GearItemFormState extends ConsumerState<_GearItemForm> {
     _brand,
     _weight,
     _price,
-    _currency,
     _description,
     _notes,
     _website,
@@ -89,7 +96,7 @@ class _GearItemFormState extends ConsumerState<_GearItemForm> {
 
   @override
   void dispose() {
-    for (final controller in _controllers) {
+    for (final controller in [..._controllers, ..._numberAttributes.values]) {
       controller.dispose();
     }
     super.dispose();
@@ -108,7 +115,7 @@ class _GearItemFormState extends ConsumerState<_GearItemForm> {
     weightG: Format.parseNumber(_weight.text)?.round(),
     purchaseDate: _purchaseDate,
     purchasePrice: Format.parseNumber(_price.text),
-    currency: _text(_currency)?.toUpperCase(),
+    currency: _item.currency,
     description: _text(_description),
     notes: _text(_notes),
     websiteUrl: _text(_website),
@@ -117,7 +124,16 @@ class _GearItemFormState extends ConsumerState<_GearItemForm> {
     size: _text(_size),
     color: _text(_color),
     tagIds: _tagIds.toList(),
+    attributes: {
+      // Only what belongs to the kind of the chosen type.
+      for (final attribute in gearKinds[_kind] ?? const <GearAttribute>[])
+        attribute.key: attribute.options.isEmpty
+            ? Format.parseNumber(_numberAttributes[attribute.key]!.text)
+            : _attributes[attribute.key],
+    },
   );
+
+  String? _kind;
 
   void _refreshLists() {
     ref.invalidate(gearItemsProvider);
@@ -233,6 +249,7 @@ class _GearItemFormState extends ConsumerState<_GearItemForm> {
         ref.watch(gearTagsProvider).asData?.value.value ?? const <GearTag>[];
     final isNew = _item.id == null;
     const gap = SizedBox(height: AppSpacing.m);
+    _kind = types.where((type) => type.id == _typeId).firstOrNull?.kind;
     final date = DateTime.tryParse(_purchaseDate ?? '');
 
     return Form(
@@ -268,6 +285,10 @@ class _GearItemFormState extends ConsumerState<_GearItemForm> {
                           onPressed: _busy ? null : _removeImage,
                           child: Text(l10n.gearImageRemove),
                         ),
+                      Text(
+                        l10n.gearImageHint,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                     ],
                   ),
                 ),
@@ -297,6 +318,46 @@ class _GearItemFormState extends ConsumerState<_GearItemForm> {
             onChanged: (value) => setState(() => _typeId = value),
           ),
           gap,
+          for (final attribute
+              in gearKinds[_kind] ?? const <GearAttribute>[]) ...[
+            if (attribute.options.isEmpty)
+              TextFormField(
+                controller: _numberAttributes[attribute.key],
+                decoration: InputDecoration(
+                  labelText: gearAttributeLabel(l10n, attribute.key),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (value) =>
+                    (value ?? '').trim().isEmpty ||
+                        Format.parseNumber(value!) != null
+                    ? null
+                    : l10n.invalidNumber,
+              )
+            else
+              DropdownButtonFormField<String?>(
+                initialValue:
+                    attribute.options.contains(_attributes[attribute.key])
+                    ? _attributes[attribute.key] as String
+                    : null,
+                decoration: InputDecoration(
+                  labelText: gearAttributeLabel(l10n, attribute.key),
+                  helperText: attribute.key == 'shoe_category'
+                      ? l10n.gearShoeCategoryHint
+                      : null,
+                  helperMaxLines: 4,
+                ),
+                items: [
+                  const DropdownMenuItem(child: Text('–')),
+                  for (final option in attribute.options)
+                    DropdownMenuItem(value: option, child: Text(option)),
+                ],
+                onChanged: (value) =>
+                    setState(() => _attributes[attribute.key] = value),
+              ),
+            gap,
+          ],
           TextFormField(
             controller: _weight,
             decoration: InputDecoration(labelText: l10n.gearWeight),
@@ -341,55 +402,24 @@ class _GearItemFormState extends ConsumerState<_GearItemForm> {
                 setState(() => _status = value.first),
           ),
           gap,
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 2,
-                child: TextFormField(
-                  controller: _price,
-                  decoration: InputDecoration(
-                    labelText: l10n.gearPurchasePrice,
-                  ),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  validator: (value) {
-                    if ((value ?? '').trim().isEmpty) return null;
-                    final number = Format.parseNumber(value!);
-                    final cents = number == null ? null : number * 100;
-                    final valid =
-                        number != null &&
-                        number >= 0 &&
-                        number <= 1000000 &&
-                        (cents! - cents.round()).abs() < 1e-6;
-                    return valid ? null : l10n.gearPriceInvalid;
-                  },
-                ),
-              ),
-              const SizedBox(width: AppSpacing.s),
-              Expanded(
-                child: TextFormField(
-                  controller: _currency,
-                  decoration: InputDecoration(
-                    labelText: l10n.gearCurrency,
-                    hintText: 'CHF',
-                  ),
-                  textCapitalization: TextCapitalization.characters,
-                  validator: (value) {
-                    final text = (value ?? '').trim().toUpperCase();
-                    if (text.isEmpty) {
-                      return _price.text.trim().isEmpty
-                          ? null
-                          : l10n.gearCurrencyRequired;
-                    }
-                    return RegExp(r'^[A-Z]{3}$').hasMatch(text)
-                        ? null
-                        : l10n.gearCurrencyInvalid;
-                  },
-                ),
-              ),
-            ],
+          TextFormField(
+            controller: _price,
+            decoration: InputDecoration(
+              labelText: l10n.gearPurchasePrice,
+              suffixText: 'EUR',
+            ),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            validator: (value) {
+              if ((value ?? '').trim().isEmpty) return null;
+              final number = Format.parseNumber(value!);
+              final cents = number == null ? null : number * 100;
+              final valid =
+                  number != null &&
+                  number >= 0 &&
+                  number <= 1000000 &&
+                  (cents! - cents.round()).abs() < 1e-6;
+              return valid ? null : l10n.gearPriceInvalid;
+            },
           ),
           gap,
           InkWell(
@@ -551,3 +581,10 @@ class _CatalogSearchDialogState extends ConsumerState<_CatalogSearchDialog> {
     );
   }
 }
+
+/// Label of an extra field; the keys come from [gearKinds].
+String gearAttributeLabel(AppLocalizations l10n, String key) => switch (key) {
+  'volume_l' => l10n.gearAttrVolume,
+  'shoe_category' => l10n.gearAttrShoeCategory,
+  _ => key,
+};

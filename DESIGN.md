@@ -66,6 +66,9 @@ Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen k
 | Karten | MapLibre (`maplibre_gl`) | Open Source; ab Phase 1 für Track, Fotos, Punktauswahl |
 | Kartenkacheln | Modul `maps`: der eigene Server holt jede Kachel beim ersten Ansehen von OpenStreetMap, speichert sie als Datei und fragt erst nach `TILE_CACHE_DAYS` (Standard 14) mit dem ETag nach, ob sie sich geändert hat; entschieden am 04.10.2026 | Entlastet die OSM-Server und hält sich an deren Nutzungsbedingungen (Zwischenspeichern ja, Vorab-Download nein). Bekannte Gebiete funktionieren auch, wenn OSM nicht erreichbar ist. Für Phase 2 ist eine eigene Karte aus OSM-Rohdaten (Regionsauszug, alle x Tage neu gebaut) vorgesehen |
 | Datenablage im Betrieb | Normale Ordner unter `DATA_DIR` (Bind-Mounts) statt Docker-Volumes, entschieden am 04.10.2026 | Daten sind direkt sichtbar und mit üblichen Werkzeugen zu sichern; alles gehört dem Benutzer `HIKER_UID` |
+| Ausrüstung: Favoriten | Jeder Nutzer hat einen festen, nicht löschbaren Tag „Favorit“ (`system = favorite`); der Stern am Gegenstand setzt ihn. Entschieden am 04.10.2026 | Kein eigenes Feld: Filtern, Gruppieren und Offline-Sync laufen wie bei jedem anderen Tag |
+| Ausrüstung: Währung | Kaufpreise immer in EUR; das Währungsfeld entfällt, entschieden am 04.10.2026 | Eine Summe statt je Währung getrennter Summen |
+| Ausrüstung: Zusatzfelder | Eine Kategorie kann eine Art (`kind`) haben, die ihren Gegenständen Zusatzfelder gibt: `backpack` → Volumen in Litern, `shoes` → Schuhkategorie A, B, B/C, C, D. Werte liegen als JSON in `gear_item.attributes`; `GET /gear/meta` beschreibt die Felder. Entschieden am 04.10.2026 | Neue Arten und Felder kommen in `gear/attributes.py` (Server) und `gearKinds` (App) dazu, ohne Migration |
 | Container-Rechte | Kein Container läuft als root: alle Dienste (auch PostgreSQL) laufen als `HIKER_UID:HIKER_GID`, mit `cap_drop: ALL`, `no-new-privileges` und schreibgeschütztem Dateisystem; entschieden am 04.10.2026 | Ein Ausbruch aus einem Dienst hat auf dem geteilten Server nur die Rechte eines normalen Benutzers |
 | Kartenquellen | Konfigurierbare Tile-URL (Standard: OpenStreetMap) | Lizenzfragen später |
 | Diagramme | Eigenes Höhenprofil-Widget (Höhe, Herzfrequenz, Foto-Marker) | Foto-Marker und Kartenverknüpfung nötig |
@@ -429,6 +432,8 @@ Stand `schema_version` 1: Tour (mit effektiven Werten für Dauer und Startgewich
 | PATCH, DELETE | /contacts/{id} | Umbenennen, mit Nutzer verknüpfen (`linked_user_id`, `null` löst) / löschen |
 | GET | /sync/changes?since=, POST /sync/push | Offline-Sync |
 | GET | /maps/tiles/{z}/{x}/{y}.png | Kartenkachel aus dem Speicher des Servers; ohne Anmeldung (öffentliche Linkseiten), Rate-Limit 1500/Minute je Client |
+| GET | /gear/meta | Währung, erlaubte Bildformate, Upload-Grenze, Zusatzfelder je Art |
+| PUT/DELETE | /gear/items/{id}/favorite | Favorit setzen bzw. entfernen (setzt den Tag „Favorit“) |
 | GET | /maps/info | Kachel-Adresse, höchste Zoomstufe, Quellenangabe, Prüfintervall |
 
 ### Ausrüstung

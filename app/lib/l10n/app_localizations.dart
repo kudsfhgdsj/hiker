@@ -532,23 +532,41 @@ abstract class AppLocalizations {
   /// **'Kaufpreis'**
   String get gearPurchasePrice;
 
-  /// No description provided for @gearCurrency.
+  /// No description provided for @gearFavorite.
   ///
   /// In de, this message translates to:
-  /// **'Währung'**
-  String get gearCurrency;
+  /// **'Favorit'**
+  String get gearFavorite;
 
-  /// No description provided for @gearCurrencyRequired.
+  /// No description provided for @gearImageHint.
   ///
   /// In de, this message translates to:
-  /// **'Zur Angabe eines Preises gehört die Währung (z. B. CHF)'**
-  String get gearCurrencyRequired;
+  /// **'Erlaubt: JPEG, PNG oder WebP. Das Bild wird als JPEG gespeichert.'**
+  String get gearImageHint;
 
-  /// No description provided for @gearCurrencyInvalid.
+  /// No description provided for @gearAttrVolume.
   ///
   /// In de, this message translates to:
-  /// **'Drei Großbuchstaben, z. B. CHF'**
-  String get gearCurrencyInvalid;
+  /// **'Volumen (Liter)'**
+  String get gearAttrVolume;
+
+  /// No description provided for @gearAttrShoeCategory.
+  ///
+  /// In de, this message translates to:
+  /// **'Schuhkategorie'**
+  String get gearAttrShoeCategory;
+
+  /// No description provided for @gearShoeCategoryHint.
+  ///
+  /// In de, this message translates to:
+  /// **'A: leichte Wanderschuhe · B: Trekking · B/C: schwere Trekkingstiefel, bedingt steigeisenfest · C: Bergstiefel · D: Expeditionsstiefel'**
+  String get gearShoeCategoryHint;
+
+  /// No description provided for @gearTagSystem.
+  ///
+  /// In de, this message translates to:
+  /// **'Fester Tag'**
+  String get gearTagSystem;
 
   /// No description provided for @gearPriceInvalid.
   ///

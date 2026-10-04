@@ -4,6 +4,7 @@ class GearType {
     required this.name,
     this.sortOrder = 0,
     this.standard = false,
+    this.kind,
   });
 
   factory GearType.fromJson(Map<String, dynamic> json) => GearType(
@@ -11,6 +12,7 @@ class GearType {
     name: json['name'] as String,
     sortOrder: json['sort_order'] as int? ?? 0,
     standard: json['standard'] as bool? ?? false,
+    kind: json['kind'] as String?,
   );
 
   final String id;
@@ -19,15 +21,45 @@ class GearType {
 
   /// Standard types are shared by all users and changed by admins only.
   final bool standard;
+
+  /// Gives the items of this type extra fields, see [gearKinds].
+  final String? kind;
 }
 
+/// An extra field of gear that depends on the kind of its type.
+class GearAttribute {
+  const GearAttribute(this.key, {this.options = const []});
+
+  final String key;
+
+  /// Empty: a number. Otherwise one of these values.
+  final List<String> options;
+}
+
+/// The same definitions as on the server (`GET /gear/meta`), kept in the app
+/// so that the form works offline.
+const gearKinds = <String, List<GearAttribute>>{
+  'backpack': [GearAttribute('volume_l')],
+  'shoes': [
+    GearAttribute('shoe_category', options: ['A', 'B', 'B/C', 'C', 'D']),
+  ],
+};
+
 class GearTag {
-  const GearTag({required this.id, required this.name, this.color});
+  const GearTag({
+    required this.id,
+    required this.name,
+    this.color,
+    this.system,
+  });
+
+  static const favorite = 'favorite';
 
   factory GearTag.fromJson(Map<String, dynamic> json) => GearTag(
     id: json['id'] as String,
     name: json['name'] as String,
     color: json['color'] as String?,
+    system: json['system'] as String?,
   );
 
   final String id;
@@ -35,6 +67,9 @@ class GearTag {
 
   /// `#RRGGBB` or null.
   final String? color;
+
+  /// Set for tags every user has and cannot delete, e.g. [favorite].
+  final String? system;
 }
 
 class GearItem {
@@ -57,6 +92,7 @@ class GearItem {
     this.tagIds = const [],
     this.catalogId,
     this.imageFileId,
+    this.attributes = const {},
   });
 
   factory GearItem.fromJson(Map<String, dynamic> json) => GearItem(
@@ -78,6 +114,7 @@ class GearItem {
     tagIds: [...?(json['tag_ids'] as List<dynamic>?)?.cast<String>()],
     catalogId: json['catalog_id'] as String?,
     imageFileId: json['image_file_id'] as String?,
+    attributes: {...?(json['attributes'] as Map<String, dynamic>?)},
   );
 
   final String? id;
@@ -88,6 +125,8 @@ class GearItem {
 
   /// ISO date `yyyy-MM-dd`.
   final String? purchaseDate;
+
+  /// Always in EUR.
   final double? purchasePrice;
   final String? currency;
   final String? description;
@@ -101,6 +140,32 @@ class GearItem {
   final String? catalogId;
   final String? imageFileId;
 
+  /// Extra fields by kind of the type, e.g. `volume_l`.
+  final Map<String, dynamic> attributes;
+
+  /// The item with other tags, e.g. after the favourite star was tapped.
+  GearItem withTags(List<String> tagIds) => GearItem(
+    id: id,
+    name: name,
+    brand: brand,
+    typeId: typeId,
+    weightG: weightG,
+    purchaseDate: purchaseDate,
+    purchasePrice: purchasePrice,
+    currency: currency,
+    description: description,
+    notes: notes,
+    websiteUrl: websiteUrl,
+    status: status,
+    serialNumber: serialNumber,
+    size: size,
+    color: color,
+    tagIds: tagIds,
+    catalogId: catalogId,
+    imageFileId: imageFileId,
+    attributes: attributes,
+  );
+
   /// The fields the user edits; `id`, catalog link and image are handled apart.
   Map<String, dynamic> toJson() => {
     'name': name,
@@ -109,7 +174,6 @@ class GearItem {
     'weight_g': weightG,
     'purchase_date': purchaseDate,
     'purchase_price': purchasePrice,
-    'currency': currency,
     'description': description,
     'notes': notes,
     'website_url': websiteUrl,
@@ -118,6 +182,7 @@ class GearItem {
     'size': size,
     'color': color,
     'tag_ids': tagIds,
+    'attributes': attributes,
   };
 }
 

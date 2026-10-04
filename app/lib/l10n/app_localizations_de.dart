@@ -240,14 +240,24 @@ class AppLocalizationsDe extends AppLocalizations {
   String get gearPurchasePrice => 'Kaufpreis';
 
   @override
-  String get gearCurrency => 'Währung';
+  String get gearFavorite => 'Favorit';
 
   @override
-  String get gearCurrencyRequired =>
-      'Zur Angabe eines Preises gehört die Währung (z. B. CHF)';
+  String get gearImageHint =>
+      'Erlaubt: JPEG, PNG oder WebP. Das Bild wird als JPEG gespeichert.';
 
   @override
-  String get gearCurrencyInvalid => 'Drei Großbuchstaben, z. B. CHF';
+  String get gearAttrVolume => 'Volumen (Liter)';
+
+  @override
+  String get gearAttrShoeCategory => 'Schuhkategorie';
+
+  @override
+  String get gearShoeCategoryHint =>
+      'A: leichte Wanderschuhe · B: Trekking · B/C: schwere Trekkingstiefel, bedingt steigeisenfest · C: Bergstiefel · D: Expeditionsstiefel';
+
+  @override
+  String get gearTagSystem => 'Fester Tag';
 
   @override
   String get gearPriceInvalid =>
