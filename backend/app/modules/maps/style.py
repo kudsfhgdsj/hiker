@@ -119,6 +119,9 @@ def build_style(
     slope_url: str | None = None,
     satellite_url: str | None = None,
     contour_url: str | None = None,
+    snow_url: str | None = None,
+    precipitation_url: str | None = None,
+    avalanche_url: str | None = None,
     attributions: dict[str, str] | None = None,
 ) -> dict:
     """The MapLibre style; the `*_url` arguments are URL templates.
@@ -518,6 +521,81 @@ def build_style(
                     {"from": 35, "color": "#f0821e"},
                     {"from": 40, "color": "#c82828"},
                     {"from": 45, "color": "#7c3aad"},
+                ],
+            }
+        )
+    # Snow cover and precipitation: coarse satellite products, drawn over the ground.
+    for name, url, max_zoom in (("snow", snow_url, 8), ("precipitation", precipitation_url, 6)):
+        if not url:
+            continue
+        sources[name] = {
+            "type": "raster",
+            "tiles": [url],
+            "tileSize": 256,
+            "maxzoom": max_zoom,
+            "attribution": notes.get(name, ""),
+        }
+        insert_before(
+            "tunnel",
+            {
+                "id": name,
+                "type": "raster",
+                "source": name,
+                "layout": {"visibility": "none"},
+                "paint": {"raster-opacity": 0.65, "raster-fade-duration": 0},
+            },
+        )
+        hiker["overlays"].append({"id": name, "layers": [name]})
+    if avalanche_url:
+        # The colours of the European avalanche danger scale, levels 1 to 5.
+        colours = ["#ccff66", "#ffff00", "#ff9900", "#ff0000", "#000000"]
+        sources["avalanche"] = {
+            "type": "geojson",
+            "data": avalanche_url,
+            "attribution": notes.get("avalanche", ""),
+        }
+        level = ["get", "danger"]
+        insert_before(
+            "tunnel",
+            {
+                "id": "avalanche",
+                "type": "fill",
+                "source": "avalanche",
+                "layout": {"visibility": "none"},
+                "paint": {
+                    "fill-color": [
+                        "match",
+                        level,
+                        1,
+                        colours[0],
+                        2,
+                        colours[1],
+                        3,
+                        colours[2],
+                        4,
+                        colours[3],
+                        colours[4],
+                    ],
+                    "fill-opacity": 0.4,
+                },
+            },
+        )
+        insert_before(
+            "tunnel",
+            {
+                "id": "avalanche-outline",
+                "type": "line",
+                "source": "avalanche",
+                "layout": {"visibility": "none"},
+                "paint": {"line-color": "#5a5a5a", "line-width": 0.8, "line-opacity": 0.7},
+            },
+        )
+        hiker["overlays"].append(
+            {
+                "id": "avalanche",
+                "layers": ["avalanche", "avalanche-outline"],
+                "legend": [
+                    {"level": index + 1, "color": colour} for index, colour in enumerate(colours)
                 ],
             }
         )

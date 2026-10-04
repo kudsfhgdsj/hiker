@@ -88,6 +88,29 @@ SATELLITE = (
     ),
 )
 
+# From satellites, through NASA's open tile service GIBS; "default" is the newest image.
+_GIBS = "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best"
+SNOW = Provider(
+    id="snow",
+    url=_GIBS
+    + "/MODIS_Terra_NDSI_Snow_Cover/default/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png",
+    attribution="Schneebedeckung: MODIS/Terra, NASA EOSDIS GIBS",
+    licence="NASA Earth science data: free and open, acknowledgement requested",
+    max_zoom=8,
+    media_type="image/png",
+)
+PRECIPITATION = Provider(
+    id="precipitation",
+    url=_GIBS
+    + "/IMERG_Precipitation_Rate/default/default/GoogleMapsCompatible_Level6/{z}/{y}/{x}.png",
+    attribution="Niederschlag: GPM IMERG, NASA EOSDIS GIBS",
+    licence="NASA Earth science data: free and open, acknowledgement requested",
+    max_zoom=6,
+    media_type="image/png",
+)
+# How long a tile of a layer is kept before the source is asked again, in days.
+_FRESH_DAYS = {"snow": 0.25, "precipitation": 0.02}
+
 # An image smaller than this is a blank tile outside the area a provider covers.
 _BLANK_BYTES = 1500
 SLOPE_MIN_ZOOM = 9
@@ -194,7 +217,9 @@ class Layers:
     def __init__(self, cache_path: str, cache_days: float, max_bytes: int, sources: dict):
         self._sources: dict[str, TileSource] = sources
         self._caches = {
-            name: TileCache(Path(cache_path) / "_layers" / name, cache_days, max_bytes)
+            name: TileCache(
+                Path(cache_path) / "_layers" / name, _FRESH_DAYS.get(name, cache_days), max_bytes
+            )
             for name in (*sources, "slope", "contours")
         }
 
@@ -235,7 +260,7 @@ class Layers:
 
 
 def media_type(layer: str) -> str:
-    return "image/png" if layer in ("terrain", "slope") else "image/jpeg"
+    return "image/jpeg" if layer == "satellite" else "image/png"
 
 
 def attributions(available: set[str]) -> dict[str, str]:
@@ -245,6 +270,9 @@ def attributions(available: set[str]) -> dict[str, str]:
         result["terrain"] = TERRAIN.attribution
     if "satellite" in available:
         result["satellite"] = " · ".join(provider.attribution for provider in SATELLITE)
+    for provider in (SNOW, PRECIPITATION):
+        if provider.id in available:
+            result[provider.id] = provider.attribution
     return result
 
 
@@ -255,6 +283,7 @@ def _layers(
     max_mb: int,
     terrain_url: str,
     satellite: bool,
+    weather: bool,
     public_base_url: str,
 ) -> Layers:
     user_agent = f"hiker/{__version__} (self-hosted; {public_base_url})"
@@ -268,6 +297,9 @@ def _layers(
                 for provider in SATELLITE
             ]
         )
+    if weather:
+        for provider in (SNOW, PRECIPITATION):
+            sources[provider.id] = HttpTileSource(provider.url, user_agent, public_base_url)
     return Layers(cache_path, cache_days, max_mb * 1024 * 1024, sources)
 
 
@@ -279,6 +311,7 @@ def get_layers() -> Layers:
         settings.tile_cache_max_mb,
         settings.terrain_tiles_url if settings.terrain_enabled else "",
         settings.satellite_enabled,
+        settings.weather_layers_enabled,
         settings.public_base_url,
     )
 

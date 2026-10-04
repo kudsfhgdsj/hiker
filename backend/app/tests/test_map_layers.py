@@ -1,11 +1,13 @@
 import gzip
 import io
 import math
+from datetime import date
 
 import pytest
 from PIL import Image
 
 from app.core.config import get_settings
+from app.modules.maps.avalanche import Avalanche, AvalancheSourceError, _thin, get_avalanche
 from app.modules.maps.contours import _grid, contour_tile, interval_for, trace
 from app.modules.maps.layers import (
     SATELLITE,
@@ -196,7 +198,13 @@ def test_style_offers_the_layers_the_server_has(client, layers, tmp_path, monkey
     hiker = style["metadata"]["hiker"]
     assert [entry["id"] for entry in hiker["bases"]] == ["map", "winter", "satellite"]
     assert style["sources"]["contours"]["tiles"] == [f"{base}/contours/{{z}}/{{x}}/{{y}}.pbf"]
-    assert [entry["id"] for entry in hiker["overlays"]] == ["slope"]
+    assert [entry["id"] for entry in hiker["overlays"]] == ["slope", "avalanche"]
+    assert style["sources"]["avalanche"] == {
+        "type": "geojson",
+        "data": f"{base}/avalanche.geojson",
+        "attribution": style["sources"]["avalanche"]["attribution"],
+    }
+    assert "avalanche.report" in style["sources"]["avalanche"]["attribution"]
     assert hiker["terrain"] == {"source": "terrain-3d", "exaggeration": 1.3}
 
 
@@ -346,3 +354,137 @@ def test_contour_tiles_are_computed_once_and_served_compressed(client, layers):
     client.get("/api/v1/maps/contours/12/2153/1436.pbf")
     assert layers["terrain"].calls == [(12, 2153, 1436)]
     assert client.get("/api/v1/maps/contours/15/1/1.pbf").status_code == 422
+
+
+# --- Snow, precipitation, avalanche danger ---
+
+
+def test_weather_layers_are_overlays_that_start_hidden():
+    style = build_style(
+        "t", "g", "©", 14, snow_url="snow", precipitation_url="rain", avalanche_url="danger"
+    )
+    layers = {layer["id"]: layer for layer in style["layers"]}
+    overlays = {entry["id"]: entry for entry in style["metadata"]["hiker"]["overlays"]}
+
+    assert set(overlays) == {"snow", "precipitation", "avalanche"}
+    for name in ("snow", "precipitation", "avalanche", "avalanche-outline"):
+        assert layers[name]["layout"]["visibility"] == "none"
+    assert style["sources"]["snow"]["maxzoom"] == 8
+    assert style["sources"]["precipitation"]["maxzoom"] == 6
+    assert overlays["avalanche"]["layers"] == ["avalanche", "avalanche-outline"]
+    # The colours of the European danger scale, one per level.
+    assert [entry["level"] for entry in overlays["avalanche"]["legend"]] == [1, 2, 3, 4, 5]
+    assert overlays["avalanche"]["legend"][2]["color"] == "#ff9900"
+
+
+def test_snow_tiles_are_kept_only_for_hours(client, tmp_path):
+    snow = FakeSource(b"\x89PNG" + b"s" * 2000)
+    client.app.dependency_overrides[get_layers] = lambda: Layers(
+        str(tmp_path), 14, 10_000_000, {"snow": snow}
+    )
+
+    response = client.get("/api/v1/maps/raster/snow/7/67/44")
+
+    assert response.status_code == 200 and response.headers["content-type"] == "image/png"
+    assert "max-age=1800" in response.headers["cache-control"]
+    assert client.get("/api/v1/maps/raster/precipitation/5/16/11").status_code == 404
+
+
+SQUARE = [[9.0, 47.0], [9.1, 47.0], [9.1, 47.1], [9.0, 47.1], [9.0, 47.0]]
+
+
+class FakeAvalancheSource:
+    def __init__(self):
+        self.rating_calls = 0
+        self.region_calls: list[str] = []
+        self.fail = False
+        self.levels = {"CH-1111": 3, "CH-1111:high": 3, "CH-1111:low": 2, "AT-07-01": 4}
+
+    def ratings(self, day):
+        self.rating_calls += 1
+        if self.fail:
+            raise AvalancheSourceError("unreachable")
+        return self.levels
+
+    def regions(self, area):
+        self.region_calls.append(area)
+        names = {"CH": ["CH-1111", "CH-2222"], "AT-07": ["AT-07-01", "AT-07-99"]}.get(area, [])
+        features = [
+            {
+                "type": "Feature",
+                # AT-07-99 was replaced by a newer region.
+                "properties": {
+                    "id": name,
+                    "end_date": "2023-01-01" if name == "AT-07-99" else None,
+                },
+                "geometry": {"type": "Polygon", "coordinates": [SQUARE]},
+            }
+            for name in names
+        ]
+        return {"type": "FeatureCollection", "features": features}
+
+
+def test_avalanche_layer_shows_the_danger_level_of_today(tmp_path):
+    source = FakeAvalancheSource()
+    layer = Avalanche(source, str(tmp_path))
+
+    data = layer.geojson(date(2026, 2, 1))
+
+    assert data["date"] == "2026-02-01" and "avalanche.report" in data["attribution"]
+    regions = {feature["properties"]["id"]: feature for feature in data["features"]}
+    # Only regions with a bulletin today; regions that no longer exist are left out.
+    assert set(regions) == {"CH-1111", "AT-07-01"}
+    assert regions["CH-1111"]["properties"] == {
+        "id": "CH-1111",
+        "danger": 3,
+        "danger_high": 3,
+        "danger_low": 2,
+        "date": "2026-02-01",
+    }
+    assert regions["AT-07-01"]["properties"]["danger_low"] == 4
+    assert regions["CH-1111"]["geometry"]["type"] == "MultiPolygon"
+
+    # Kept for a while: neither the levels nor the outlines are fetched again.
+    calls = len(source.region_calls)
+    layer.geojson(date(2026, 2, 1))
+    assert source.rating_calls == 1 and len(source.region_calls) == calls
+    # Another day asks again; the outlines come from the files kept here.
+    layer.geojson(date(2026, 2, 2))
+    assert source.rating_calls == 2 and len(source.region_calls) == calls
+
+
+def test_avalanche_layer_survives_missing_data(tmp_path):
+    source = FakeAvalancheSource()
+    layer = Avalanche(source, str(tmp_path))
+    source.fail = True
+    # No answer and nothing kept: an empty layer, not an error.
+    assert layer.geojson(date(2026, 2, 1))["features"] == []
+
+    source.fail = False
+    source.levels = {}
+    # Out of season nobody publishes: no region is coloured and none is fetched.
+    assert layer.geojson(date(2026, 8, 1))["features"] == []
+    assert source.region_calls == []
+
+
+def test_outlines_are_thinned_but_keep_their_shape():
+    # A square with many points along its edges.
+    edge = [[9 + i / 1000, 47.0] for i in range(101)]
+    ring = edge + [[9.1, 47.1], [9.0, 47.1], [9.0, 47.0]]
+
+    thinned = _thin(ring, 0.0015)
+
+    assert thinned == [[9.0, 47.0], [9.1, 47.0], [9.1, 47.1], [9.0, 47.1], [9.0, 47.0]]
+    assert _thin(SQUARE, 0.0015) == SQUARE
+
+
+def test_avalanche_endpoint(client, tmp_path):
+    client.app.dependency_overrides[get_avalanche] = lambda: Avalanche(
+        FakeAvalancheSource(), str(tmp_path)
+    )
+    response = client.get("/api/v1/maps/avalanche.geojson")
+    assert response.status_code == 200 and "max-age=1800" in response.headers["cache-control"]
+    assert len(response.json()["features"]) == 2
+
+    client.app.dependency_overrides[get_avalanche] = lambda: None
+    assert client.get("/api/v1/maps/avalanche.geojson").status_code == 404

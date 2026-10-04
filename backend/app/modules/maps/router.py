@@ -4,13 +4,15 @@ from pathlib import Path as FilePath
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
 from app.core.errors import NotFoundError, error_responses
 from app.core.ratelimit import rate_limit
 from app.modules.auth.deps import CurrentUser
+from app.modules.maps.avalanche import ATTRIBUTION as AVALANCHE_ATTRIBUTION
+from app.modules.maps.avalanche import AvalancheLayer
 from app.modules.maps.contours import CONTOUR_MAX_ZOOM, CONTOUR_MIN_ZOOM
 from app.modules.maps.layers import (
     SLOPE_MAX_ZOOM,
@@ -94,7 +96,7 @@ class RegionInfo(BaseModel):
 
 
 @router.get("/style.json", responses=error_responses(404))
-def read_style(vectors: Vectors, layers: MapLayers) -> dict:
+def read_style(vectors: Vectors, layers: MapLayers, avalanche: AvalancheLayer) -> dict:
     """The MapLibre style of the own map. No login (public link pages)."""
     if not vectors.regions():
         raise NotFoundError("No vector map is installed")
@@ -118,7 +120,16 @@ def read_style(vectors: Vectors, layers: MapLayers) -> dict:
         contour_url=(
             f"{base}/contours/{{z}}/{{x}}/{{y}}.pbf" if "contours" in layers.available() else None
         ),
-        attributions=attributions(layers.available()),
+        snow_url=(
+            f"{base}/raster/snow/{{z}}/{{x}}/{{y}}" if "snow" in layers.available() else None
+        ),
+        precipitation_url=(
+            f"{base}/raster/precipitation/{{z}}/{{x}}/{{y}}"
+            if "precipitation" in layers.available()
+            else None
+        ),
+        avalanche_url=f"{base}/avalanche.geojson" if avalanche is not None else None,
+        attributions=attributions(layers.available()) | {"avalanche": AVALANCHE_ATTRIBUTION},
     )
 
 
@@ -153,20 +164,35 @@ def read_vector_tile(
     dependencies=[Depends(rate_limit("tiles", limit=1500))],
 )
 def read_layer_tile(
-    layer: Annotated[str, Path(pattern="^(terrain|satellite)$")],
+    layer: Annotated[str, Path(pattern="^(terrain|satellite|snow|precipitation)$")],
     z: Annotated[int, Path(ge=0, le=20)],
     x: Annotated[int, Path(ge=0)],
     y: Annotated[int, Path(ge=0)],
     layers: MapLayers,
 ):
-    """A tile of an open raster layer (elevation, aerial image), cached here. No login."""
+    """A tile of an open raster layer (elevation, aerial image, snow, precipitation),
+    cached here. No login."""
     if x >= 2**z or y >= 2**z:
         raise NotFoundError("No such tile")
+    # Snow and precipitation change within hours; the others hardly ever.
+    lasting = layer in ("terrain", "satellite")
     return Response(
         layers.raster(layer, z, x, y),
         media_type=media_type(layer),
-        headers={"Cache-Control": "public, max-age=604800"},
+        headers={"Cache-Control": f"public, max-age={604800 if lasting else 1800}"},
     )
+
+
+@router.get("/avalanche.geojson", responses=error_responses(404))
+def read_avalanche(avalanche: AvalancheLayer):
+    """The avalanche warning regions with their highest danger level of today (1 to 5).
+
+    No login. Regions without a bulletin today are left out; out of season the list is
+    short or empty. `date` names the day, `attribution` the sources.
+    """
+    if avalanche is None:
+        raise NotFoundError("No such layer")
+    return JSONResponse(avalanche.geojson(), headers={"Cache-Control": "public, max-age=1800"})
 
 
 @router.get(
