@@ -23,6 +23,14 @@ from app.modules.maps.layers import (
 )
 from app.modules.maps.style import build_style
 from app.modules.maps.tiles import FetchedTile, TileSourceError
+from app.modules.maps.weather import (
+    ForecastSourceError,
+    day_label,
+    get_forecast_source,
+    places_of,
+    weather_tile,
+    word_for,
+)
 from app.tests.test_vector_maps import write_map
 
 SIZE = 64
@@ -201,7 +209,14 @@ def test_style_offers_the_layers_the_server_has(client, layers, tmp_path, monkey
     hiker = style["metadata"]["hiker"]
     assert [entry["id"] for entry in hiker["bases"]] == ["map", "winter", "satellite"]
     assert style["sources"]["contours"]["tiles"] == [f"{base}/contours/{{z}}/{{x}}/{{y}}.pbf"]
-    assert [entry["id"] for entry in hiker["overlays"]] == ["slope", "avalanche"]
+    assert [entry["id"] for entry in hiker["overlays"]] == [
+        "slope",
+        "avalanche",
+        "weather0",
+        "weather1",
+        "weather2",
+        "snowdepth",
+    ]
     assert style["sources"]["avalanche"] == {
         "type": "geojson",
         "data": f"{base}/avalanche.geojson",
@@ -506,3 +521,109 @@ def test_avalanche_endpoint(client, tmp_path):
 
     client.app.dependency_overrides[get_avalanche] = lambda: None
     assert client.get("/api/v1/maps/avalanche.geojson").status_code == 404
+
+
+# --- Weather forecast and snow depth ---
+
+
+class FakeForecast:
+    def __init__(self):
+        self.calls: list[int] = []
+        self.fail = False
+
+    def forecast(self, places):
+        self.calls.append(len(places))
+        if self.fail:
+            raise ForecastSourceError("unreachable")
+        hours = [f"2026-02-01T{hour:02d}:00" for hour in range(24)]
+        return [
+            {
+                "daily": {
+                    "weather_code": [71, 3, 0],
+                    "temperature_2m_max": [-2.4, 1.2, 4.0],
+                    "temperature_2m_min": [-9.1, -6.0, -3.6],
+                    "precipitation_sum": [14.0, 0.4, 0.0],
+                    "snowfall_sum": [15.2, 0.0, 0.0],
+                },
+                # More snow in the north of the tile.
+                "hourly": {"time": hours, "snow_depth": [0.87 if lat > 47.2 else 0.0] * 24},
+            }
+            for lat, _lon in places
+        ]
+
+
+def test_forecast_labels_are_short_and_readable():
+    daily = FakeForecast().forecast([(47.0, 9.0)])[0]["daily"]
+
+    assert day_label(daily, 0) == "Schnee\n-2°/-9° · 15 cm neu"
+    # Less than a millimetre is not worth a number.
+    assert day_label(daily, 1) == "bedeckt\n1°/-6°"
+    assert day_label(daily, 2) == "sonnig\n4°/-4°"
+    assert day_label({"temperature_2m_max": [None]}, 0) is None
+    assert day_label({}, 0) is None
+    rain = {**daily, "snowfall_sum": [0, 0, 0], "weather_code": [63, 3, 0]}
+    assert day_label(rain, 0) == "Regen\n-2°/-9° · 14 mm"
+    assert word_for(95) == "Gewitter" and word_for(1234) == ""
+
+
+def test_weather_tile_holds_a_grid_of_places():
+    source = FakeForecast()
+    now = datetime(2026, 2, 1, 12, 30, tzinfo=UTC)
+
+    tile = weather_tile(source, 9, 269, 179, now)
+
+    assert source.calls == [9]
+    places = places_of(9, 269, 179)
+    assert len(places) == 9 and {px for _, _, px, _ in places} == {683, 2048, 3413}
+    ((number, layer),) = read_message(gzip.decompress(tile))
+    assert number == 3
+    fields = read_message(layer)
+    assert [value for key, value in fields if key == 1] == [b"weather"]
+    keys = [value.decode() for key, value in fields if key == 3]
+    values = [read_message(value)[0][1].decode() for key, value in fields if key == 4]
+    features = [dict(read_message(value)) for key, value in fields if key == 2]
+    assert len(features) == 9 and all(feature[3] == 1 for feature in features)  # POINT
+    assert keys == ["day0", "day1", "day2", "snow"]
+    assert "Schnee\n-2°/-9° · 15 cm neu" in values and "87 cm" in values
+    # Snow depth only where snow lies: the northern places of the tile.
+    with_snow = [feature for feature in features if len(feature[2]) == 8]
+    assert 0 < len(with_snow) < 9
+
+
+def test_weather_tiles_are_kept_and_survive_an_outage(client, layers):
+    source = FakeForecast()
+    client.app.dependency_overrides[get_forecast_source] = lambda: source
+
+    first = client.get("/api/v1/maps/weather/9/269/179.pbf")
+    assert first.status_code == 200 and first.headers["content-encoding"] == "gzip"
+    assert "max-age=3600" in first.headers["cache-control"]
+    client.get("/api/v1/maps/weather/9/269/179.pbf")
+    assert source.calls == [9]
+
+    source.fail = True
+    assert client.get("/api/v1/maps/weather/9/269/180.pbf").status_code == 502
+    assert client.get("/api/v1/maps/weather/9/269/179.pbf").status_code == 200
+    assert client.get("/api/v1/maps/weather/12/1/1.pbf").status_code == 422
+
+    client.app.dependency_overrides[get_forecast_source] = lambda: None
+    assert client.get("/api/v1/maps/weather/9/269/179.pbf").status_code == 404
+
+
+def test_forecast_days_and_snow_depth_are_overlays():
+    style = build_style("t", "g", "©", 14, weather_url="weather")
+    layers = {layer["id"]: layer for layer in style["layers"]}
+    overlays = {entry["id"]: entry["layers"] for entry in style["metadata"]["hiker"]["overlays"]}
+
+    assert overlays == {
+        "weather0": ["weather-0"],
+        "weather1": ["weather-1"],
+        "weather2": ["weather-2"],
+        "snowdepth": ["snow-depth"],
+    }
+    assert layers["weather-1"]["layout"]["text-field"] == ["get", "day1"]
+    assert layers["snow-depth"]["filter"] == ["has", "snow"]
+    assert all(
+        layers[name]["layout"]["visibility"] == "none"
+        for name in ("weather-0", "weather-1", "weather-2", "snow-depth")
+    )
+    assert style["sources"]["weather"]["maxzoom"] == 10

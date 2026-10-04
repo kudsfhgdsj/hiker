@@ -125,6 +125,7 @@ def build_style(
     snow_url: str | None = None,
     precipitation_url: str | None = None,
     avalanche_url: str | None = None,
+    weather_url: str | None = None,
     attributions: dict[str, str] | None = None,
 ) -> dict:
     """The MapLibre style; the `*_url` arguments are URL templates.
@@ -653,6 +654,44 @@ def build_style(
                 ],
             }
         )
+    if weather_url:
+        sources["weather"] = {
+            "type": "vector",
+            "tiles": [weather_url],
+            "minzoom": 8,
+            "maxzoom": 10,
+            "attribution": notes.get("weather", ""),
+        }
+
+        def forecast_layer(layer_id: str, field: str, colour: str) -> dict:
+            return {
+                "id": layer_id,
+                "type": "symbol",
+                "source": "weather",
+                "source-layer": "weather",
+                "minzoom": 8,
+                "filter": ["has", field],
+                "layout": {
+                    "visibility": "none",
+                    "text-field": ["get", field],
+                    "text-font": BOLD,
+                    "text-size": 12,
+                    "text-max-width": 12,
+                    # The forecast matters more than the names beneath it.
+                    "text-allow-overlap": True,
+                },
+                "paint": {
+                    "text-color": colour,
+                    "text-halo-color": "rgba(255, 255, 255, 0.92)",
+                    "text-halo-width": 2,
+                },
+            }
+
+        for day in range(3):
+            layers.append(forecast_layer(f"weather-{day}", f"day{day}", "#14315c"))
+            hiker["overlays"].append({"id": f"weather{day}", "layers": [f"weather-{day}"]})
+        layers.append(forecast_layer("snow-depth", "snow", "#0b6fa4"))
+        hiker["overlays"].append({"id": "snowdepth", "layers": ["snow-depth"]})
     if satellite_url:
         sources["satellite"] = {
             "type": "raster",

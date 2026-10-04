@@ -35,6 +35,7 @@ from app.modules.maps.tiles import (
     TileSource,
     TileSourceError,
 )
+from app.modules.maps.weather import ForecastSourceError, weather_tile
 
 
 @dataclass(frozen=True)
@@ -111,7 +112,7 @@ PRECIPITATION = Provider(
     media_type="image/png",
 )
 # How long a tile of a layer is kept before the source is asked again, in days.
-_FRESH_DAYS = {"snow": 0.25, "precipitation": 0.02}
+_FRESH_DAYS = {"snow": 0.25, "precipitation": 0.02, "weather": 0.125}
 
 # An image smaller than this is a blank tile outside the area a provider covers.
 _BLANK_BYTES = 1500
@@ -236,7 +237,7 @@ class Layers:
             name: TileCache(
                 Path(cache_path) / "_layers" / name, _FRESH_DAYS.get(name, cache_days), max_bytes
             )
-            for name in (*sources, "slope", "contours")
+            for name in (*sources, "slope", "contours", "weather")
         }
 
     def available(self) -> set[str]:
@@ -273,6 +274,18 @@ class Layers:
                 return FetchedTile(contour_tile(layers.raster("terrain", z, x, y), z))
 
         return self._caches["contours"].get(_Computed(), z, x, y)
+
+    def weather(self, source, z: int, x: int, y: int) -> bytes:
+        """Gzip-compressed vector tile with the forecast, kept for three hours."""
+
+        class _Computed:
+            def fetch(self, z: int, x: int, y: int, etag: str | None) -> FetchedTile | None:
+                try:
+                    return FetchedTile(weather_tile(source, z, x, y, None))
+                except ForecastSourceError as exc:
+                    raise TileSourceError(str(exc)) from exc
+
+        return self._caches["weather"].get(_Computed(), z, x, y)
 
 
 def media_type(layer: str) -> str:

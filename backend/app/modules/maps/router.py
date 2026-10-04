@@ -24,6 +24,12 @@ from app.modules.maps.layers import (
 from app.modules.maps.style import build_style
 from app.modules.maps.tiles import OSM_ATTRIBUTION, Cache, Tiles
 from app.modules.maps.vector import REGION_NAME, VECTOR_ATTRIBUTION, Vectors
+from app.modules.maps.weather import (
+    WEATHER_ATTRIBUTION,
+    WEATHER_MAX_ZOOM,
+    WEATHER_MIN_ZOOM,
+    Forecast,
+)
 
 router = APIRouter()
 PROTOBUF = "application/x-protobuf"
@@ -96,7 +102,9 @@ class RegionInfo(BaseModel):
 
 
 @router.get("/style.json", responses=error_responses(404))
-def read_style(vectors: Vectors, layers: MapLayers, avalanche: AvalancheLayer) -> dict:
+def read_style(
+    vectors: Vectors, layers: MapLayers, avalanche: AvalancheLayer, forecast: Forecast
+) -> dict:
     """The MapLibre style of the own map. No login (public link pages)."""
     if not vectors.regions():
         raise NotFoundError("No vector map is installed")
@@ -129,7 +137,9 @@ def read_style(vectors: Vectors, layers: MapLayers, avalanche: AvalancheLayer) -
             else None
         ),
         avalanche_url=f"{base}/avalanche.geojson" if avalanche is not None else None,
-        attributions=attributions(layers.available()) | {"avalanche": AVALANCHE_ATTRIBUTION},
+        weather_url=f"{base}/weather/{{z}}/{{x}}/{{y}}.pbf" if forecast is not None else None,
+        attributions=attributions(layers.available())
+        | {"avalanche": AVALANCHE_ATTRIBUTION, "weather": WEATHER_ATTRIBUTION},
     )
 
 
@@ -214,6 +224,30 @@ def read_contour_tile(
         layers.contours(z, x, y),
         media_type=PROTOBUF,
         headers={"Content-Encoding": "gzip", "Cache-Control": "public, max-age=604800"},
+    )
+
+
+@router.get(
+    "/weather/{z}/{x}/{y}.pbf",
+    response_class=Response,
+    responses={200: {"content": {PROTOBUF: {}}}, **error_responses(404, 429, 502)},
+    dependencies=[Depends(rate_limit("weather-tiles", limit=300))],
+)
+def read_weather_tile(
+    z: Annotated[int, Path(ge=WEATHER_MIN_ZOOM, le=WEATHER_MAX_ZOOM)],
+    x: Annotated[int, Path(ge=0)],
+    y: Annotated[int, Path(ge=0)],
+    layers: MapLayers,
+    forecast: Forecast,
+):
+    """Weather forecast (today and the two days after) and snow depth at a grid of places,
+    as a vector tile (layer `weather`). A model forecast from Open-Meteo. No login."""
+    if forecast is None or x >= 2**z or y >= 2**z:
+        raise NotFoundError("No such tile")
+    return Response(
+        layers.weather(forecast, z, x, y),
+        media_type=PROTOBUF,
+        headers={"Content-Encoding": "gzip", "Cache-Control": "public, max-age=3600"},
     )
 
 
