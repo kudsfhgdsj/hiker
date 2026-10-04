@@ -44,14 +44,42 @@ def login():
         payload = {
             "email": request.form.get("email", ""),
             "password": request.form.get("password", ""),
-            "code": (request.form.get("code") or "").strip() or None,
         }
         try:
             _sign_in("/auth/login", payload)
             return redirect(_safe_next(request.args.get("next")))
         except ApiError as error:
+            token = error.body.get("mfa_token")
+            if error.code == "mfa_required" and token:
+                # The password was right: ask for the code on the next page. The token
+                # of the API stands for the first step; the password is not kept.
+                session["mfa_token"] = token
+                session["mfa_next"] = _safe_next(request.args.get("next"))
+                return redirect(url_for("auth.login_code"))
             flash(error_text(error), "error")
     return render_template("auth/login.html", register=False, sso=_sso())
+
+
+@blueprint.route("/login/code", methods=["GET", "POST"])
+def login_code():
+    """Second step of the sign-in: the code of the authenticator app."""
+    token = session.get("mfa_token")
+    if not token:
+        return redirect(url_for("auth.login"))
+    if request.method == "POST":
+        code = (request.form.get("code") or "").strip()
+        # Signing in starts a new session: remember where to go before that.
+        target = _safe_next(session.get("mfa_next"))
+        try:
+            _sign_in("/auth/login/mfa", {"mfa_token": token, "code": code})
+        except ApiError as error:
+            flash(error_text(error), "error")
+            if error.code == "mfa_token_invalid":
+                session.pop("mfa_token", None)
+                return redirect(url_for("auth.login"))
+            return redirect(url_for("auth.login_code"))
+        return redirect(target)
+    return render_template("auth/login_code.html")
 
 
 @blueprint.route("/register", methods=["GET", "POST"])

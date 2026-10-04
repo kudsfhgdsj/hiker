@@ -187,6 +187,50 @@ def test_login_needs_the_code_once_the_second_factor_is_set_up(client, db, mfa_m
     assert client.get(ME_PROFILE, headers=auth_header(refreshed)).status_code == 200
 
 
+def test_sign_in_in_two_steps_with_the_token_of_the_first(client, db, mfa_mandatory):
+    set_up_mfa(client, db, register(client))
+
+    first = login(client)
+    token = first.json()["mfa_token"]
+    wrong = client.post("/api/v1/auth/login/mfa", json={"mfa_token": token, "code": "000000"})
+    second = client.post(
+        "/api/v1/auth/login/mfa", json={"mfa_token": token, "code": code_for(db, step=1)}
+    )
+
+    assert first.status_code == 401 and first.json()["error"]["code"] == "mfa_required"
+    assert (wrong.status_code, wrong.json()["error"]["code"]) == (401, "invalid_mfa_code")
+    assert second.status_code == 200 and second.json()["auth_method"] == "mfa"
+    assert client.get(ME_PROFILE, headers=auth_header(second.json())).status_code == 200
+    # The token of the first step is no access token, and a wrong password gets none.
+    assert client.get("/api/v1/me", headers={"Authorization": f"Bearer {token}"}).status_code == 401
+    assert "mfa_token" not in login(client, password="wrong-password").json()
+    forged = client.post("/api/v1/auth/login/mfa", json={"mfa_token": "x", "code": "123456"})
+    assert (forged.status_code, forged.json()["error"]["code"]) == (401, "mfa_token_invalid")
+    # An access token does not work as the token of the first step either.
+    misuse = client.post(
+        "/api/v1/auth/login/mfa",
+        json={"mfa_token": second.json()["access_token"], "code": "123456"},
+    )
+    assert misuse.status_code == 401
+
+
+def test_wrong_codes_make_the_account_wait(client, db, mfa_mandatory):
+    set_up_mfa(client, db, register(client))
+    token = login(client).json()["mfa_token"]
+
+    answers = [
+        client.post("/api/v1/auth/login/mfa", json={"mfa_token": token, "code": "000000"})
+        for _ in range(6)
+    ]
+    right = client.post(
+        "/api/v1/auth/login/mfa", json={"mfa_token": token, "code": code_for(db, step=1)}
+    )
+
+    assert [a.status_code for a in answers] == [401, 401, 401, 401, 401, 429]
+    # Even the right code has to wait now.
+    assert right.status_code == 429
+
+
 def test_a_code_works_only_once(client, db, mfa_mandatory):
     set_up_mfa(client, db, register(client))
     code = code_for(db, step=1)

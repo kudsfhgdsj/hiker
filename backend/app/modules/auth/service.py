@@ -1,6 +1,11 @@
 import logging
+import math
 import secrets
 import string
+import threading
+import time
+import uuid
+from collections import deque
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -19,8 +24,11 @@ from app.core.errors import (
     UnauthorizedError,
     UnprocessableError,
 )
+from app.core.ratelimit import RateLimitError
 from app.core.security import (
     create_access_token,
+    create_mfa_token,
+    decode_mfa_token,
     hash_password,
     hash_token,
     new_refresh_token,
@@ -208,14 +216,60 @@ def login(db: Session, *, email: str, password: str, code: str | None) -> tuple[
     method = METHOD_PASSWORD
     if user.mfa_enabled:
         if not code:
-            raise UnauthorizedError("The code of the second factor is needed", code="mfa_required")
-        if not _use_code(db, user, code):
-            db.rollback()
-            raise UnauthorizedError("The code is not correct", code="invalid_mfa_code")
+            # The password was right: the client asks for the code in a second step
+            # and sends it together with this token.
+            error = UnauthorizedError(
+                "The code of the second factor is needed", code="mfa_required"
+            )
+            error.extra = {"mfa_token": create_mfa_token(user.id)}
+            raise error
+        _check_second_factor(db, user, code)
         method = METHOD_MFA
     user.last_login_at = utcnow()
     db.commit()
     return user, method
+
+
+# Wrong codes per account before it has to wait; guessing six digits must not pay off.
+MFA_ATTEMPTS = 5
+MFA_ATTEMPT_WINDOW_SECONDS = 600
+_mfa_failures: dict[uuid.UUID, deque[float]] = {}
+_mfa_lock = threading.Lock()
+
+
+def _check_second_factor(db: Session, user: User, code: str) -> None:
+    now = time.monotonic()
+    with _mfa_lock:
+        failures = _mfa_failures.setdefault(user.id, deque())
+        while failures and failures[0] <= now - MFA_ATTEMPT_WINDOW_SECONDS:
+            failures.popleft()
+        if len(failures) >= MFA_ATTEMPTS:
+            wait = math.ceil(failures[0] + MFA_ATTEMPT_WINDOW_SECONDS - now)
+            raise RateLimitError(wait)
+    if not _use_code(db, user, code):
+        db.rollback()
+        with _mfa_lock:
+            _mfa_failures.setdefault(user.id, deque()).append(now)
+        raise UnauthorizedError("The code is not correct", code="invalid_mfa_code")
+    with _mfa_lock:
+        _mfa_failures.pop(user.id, None)
+
+
+def reset_mfa_attempts() -> None:
+    with _mfa_lock:
+        _mfa_failures.clear()
+
+
+def login_second_step(db: Session, *, mfa_token: str, code: str) -> tuple[User, str]:
+    """Finish a sign-in that was answered with `mfa_required`."""
+    user_id = decode_mfa_token(mfa_token)
+    user = db.get(User, user_id) if user_id else None
+    if user is None or not user.mfa_enabled:
+        raise UnauthorizedError("This sign-in has expired, start again", code="mfa_token_invalid")
+    _check_second_factor(db, user, code)
+    user.last_login_at = utcnow()
+    db.commit()
+    return user, METHOD_MFA
 
 
 def issue_tokens(db: Session, user: User, method: str = METHOD_PASSWORD) -> TokenPair:

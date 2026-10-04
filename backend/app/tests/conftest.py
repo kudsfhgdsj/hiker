@@ -32,6 +32,7 @@ from app.core.registry import import_all_models  # noqa: E402
 from app.core.storage import get_storage  # noqa: E402
 from app.core.storage.local_fs import LocalFsStorage  # noqa: E402
 from app.main import create_app  # noqa: E402
+from app.modules.auth import service as auth_service  # noqa: E402
 from app.modules.nutrition.deps import get_food_source  # noqa: E402
 from app.modules.nutrition.sources import FoodData, FoodSourceError  # noqa: E402
 from app.modules.protocols.elevation import (  # noqa: E402
@@ -59,6 +60,7 @@ def _fast_password_hashing():
 def _fresh_settings():
     get_settings.cache_clear()
     ratelimit.reset()
+    auth_service.reset_mfa_attempts()
     yield
     get_settings.cache_clear()
 

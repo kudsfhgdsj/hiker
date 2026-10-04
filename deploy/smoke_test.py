@@ -232,11 +232,15 @@ def run(api_url: str, web_url: str) -> None:
             step("web pages and map library served (web login skipped: Secure cookie over HTTP)")
         else:
             fields = {"email": email, "password": password, "csrf_token": csrf.group(1)}
-            if secret:
-                # Every code works once: the next period has one that was not used yet.
-                fields["code"] = totp(secret, offset=1)
             form = urllib.parse.urlencode(fields).encode()
             status, _h, raw = web.request("POST", "/login", data=form)
+            if secret:
+                # Second step: the page asks for the code. Every code works once, so
+                # take the one of the next period, which was not used yet.
+                check('name="code"' in raw.decode(), "web login did not ask for the code")
+                fields = {"code": totp(secret, offset=1), "csrf_token": csrf.group(1)}
+                form = urllib.parse.urlencode(fields).encode()
+                status, _h, raw = web.request("POST", "/login/code", data=form)
             check(status == 200 and title in raw.decode(), f"web login or tour list failed ({status})")
             status, _h, raw = web.request("GET", f"/tours/{tour['id']}")
             check(status == 200 and "tour-data" in raw.decode(), "web tour page incomplete")

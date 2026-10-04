@@ -27,6 +27,7 @@ from app.modules.auth.schemas import (
     RecoveryCodes,
     RefreshRequest,
     RegisterRequest,
+    SecondStepRequest,
     TemporaryPassword,
     TokenResponse,
     UserLookupOut,
@@ -85,11 +86,28 @@ def register(body: RegisterRequest, db: DbSession):
 def login(body: LoginRequest, db: DbSession):
     """Sign in with e-mail and password.
 
-    With a second factor set up, the code is needed too: without it the answer is
-    401 `mfa_required`, with a wrong one 401 `invalid_mfa_code`. A recovery code works
-    in place of the code, once.
+    With a second factor set up, the answer to a correct password is 401
+    `mfa_required` with an `mfa_token`: the client asks for the code and finishes with
+    `/auth/login/mfa`. Sending `code` right away works too.
     """
     user, method = service.login(db, email=body.email, password=body.password, code=body.code)
+    return _auth_response(user, service.issue_tokens(db, user, method), method)
+
+
+@router.post(
+    "/auth/login/mfa",
+    dependencies=[auth_rate_limit],
+    response_model=AuthResponse,
+    tags=["auth"],
+    responses=error_responses(401, 429),
+)
+def login_second_step(body: SecondStepRequest, db: DbSession):
+    """Second step of the sign-in: the code of the authenticator app or a recovery code.
+
+    A wrong code is answered with 401 `invalid_mfa_code`; after five wrong codes the
+    account has to wait (429). The token is valid for five minutes.
+    """
+    user, method = service.login_second_step(db, mfa_token=body.mfa_token, code=body.code)
     return _auth_response(user, service.issue_tokens(db, user, method), method)
 
 

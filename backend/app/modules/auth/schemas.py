@@ -58,6 +58,11 @@ class CodeRequest(BaseModel):
     code: OneTimeCode
 
 
+class SecondStepRequest(BaseModel):
+    mfa_token: str = Field(max_length=1024, description="From the answer `mfa_required`")
+    code: OneTimeCode
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str = Field(max_length=256)
 

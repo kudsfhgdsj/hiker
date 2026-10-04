@@ -13,7 +13,6 @@
     {{ field('password_repeat', t('auth.password_repeat'), type='password', required=True, attrs='autocomplete="new-password" minlength="8" maxlength="128"') }}
     {% else %}
     {{ field('password', t('auth.password'), type='password', required=True, attrs='autocomplete="current-password"') }}
-    {{ field('code', t('auth.code'), hint=t('auth.code_hint'), attrs='autocomplete="one-time-code" inputmode="numeric" maxlength="32"') }}
     {% endif %}
     <button class="primary">{{ t('auth.register' if register else 'auth.login') }}</button>
   </form>

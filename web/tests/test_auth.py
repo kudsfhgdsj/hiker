@@ -31,11 +31,7 @@ def test_login_keeps_the_tokens_on_the_server(browser, fake_api, app):
     response = browser.login()
 
     assert response.headers["location"] == "/"
-    assert fake_api.body(0) == {
-        "email": "anna@example.org",
-        "password": "secret-password",
-        "code": None,
-    }
+    assert fake_api.body(0) == {"email": "anna@example.org", "password": "secret-password"}
     cookie = response.headers["set-cookie"]
     assert "HttpOnly" in cookie and "SameSite=Lax" in cookie
     # The browser only gets a session id; the tokens stay in a file on the server.

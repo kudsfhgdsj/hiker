@@ -65,6 +65,40 @@ def decode_access(token: str) -> tuple[uuid.UUID, str] | None:
         return None
 
 
+MFA_TOKEN_MINUTES = 5
+
+
+def create_mfa_token(user_id: uuid.UUID) -> str:
+    """Proof that the password was right, for the second step of the sign-in.
+
+    It is not an access token: it only lets its holder try the one-time code, for a
+    few minutes.
+    """
+    now = utcnow()
+    payload = {
+        "sub": str(user_id),
+        "type": "mfa",
+        "iat": now,
+        "exp": now + timedelta(minutes=MFA_TOKEN_MINUTES),
+    }
+    return jwt.encode(payload, get_settings().secret_key, algorithm=JWT_ALGORITHM)
+
+
+def decode_mfa_token(token: str) -> uuid.UUID | None:
+    try:
+        payload = jwt.decode(
+            token,
+            get_settings().secret_key,
+            algorithms=[JWT_ALGORITHM],
+            options={"require": ["sub", "exp"]},
+        )
+        if payload.get("type") != "mfa":
+            return None
+        return uuid.UUID(payload["sub"])
+    except (jwt.InvalidTokenError, ValueError):
+        return None
+
+
 def decode_access_token(token: str) -> uuid.UUID | None:
     """Return the user id of a valid access token, otherwise None."""
     decoded = decode_access(token)

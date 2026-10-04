@@ -80,26 +80,69 @@ def test_weak_password_is_explained_with_the_reason_of_the_api(browser, fake_api
 # --- Second factor ---
 
 
-def test_login_sends_the_code_and_asks_for_it_when_it_is_missing(browser, fake_api):
+def test_login_asks_for_the_code_on_a_second_page(browser, fake_api):
     fake_api.route(
         "POST",
         "/auth/login",
-        lambda r: (
-            httpx2.Response(200, json=fake_api.auth())
-            if json.loads(r.content).get("code") == "123456"
-            else error(401, "mfa_required")
+        lambda r: httpx2.Response(
+            401,
+            json={"error": {"code": "mfa_required", "message": "x"}, "mfa_token": "step-1-token"},
         ),
     )
+    fake_api.route(
+        "POST",
+        "/auth/login/mfa",
+        lambda r: (
+            httpx2.Response(200, json=fake_api.auth())
+            if json.loads(r.content)["code"] == "123456"
+            else error(401, "invalid_mfa_code")
+        ),
+    )
+    fake_api.route("GET", "/gear/items", {"items": [], "total": 0, "limit": 200, "offset": 0})
+    fake_api.route("GET", "/gear/types", [])
+    fake_api.route("GET", "/gear/tags", [])
 
     form = text(browser.get("/login"))
-    missing = browser.post("/login", {"email": "anna@example.org", "password": "pw"})
-    with_code = browser.post(
-        "/login", {"email": "anna@example.org", "password": "pw", "code": " 123456 "}
-    )
+    first = browser.post("/login?next=/gear/", {"email": "anna@example.org", "password": "pw"})
+    page = text(browser.get("/login/code"))
+    wrong = browser.post("/login/code", {"code": "000000"})
+    again = text(browser.get("/login/code"))
+    right = browser.post("/login/code", {"code": " 123456 "})
 
-    assert 'name="code"' in form and "Code der Authenticator-App" in form
-    assert "Bitte auch den Code der Authenticator-App eingeben." in text(missing)
-    assert with_code.status_code == 302
+    # The first page only asks for e-mail and password.
+    assert 'name="code"' not in form
+    assert first.headers["location"] == "/login/code"
+    assert "Das Passwort stimmt." in page and 'name="code"' in page
+    assert 'name="password"' not in page
+    assert wrong.headers["location"] == "/login/code"
+    assert "Der Code stimmt nicht" in again
+    assert json.loads(fake_api.last("POST", "/auth/login/mfa").content) == {
+        "mfa_token": "step-1-token",
+        "code": "123456",
+    }
+    # On to the page the user wanted, signed in.
+    assert right.headers["location"] == "/gear/"
+    assert browser.get("/gear/").status_code == 200
+    # The token of the first step is used up.
+    assert browser.get("/login/code").headers["location"] == "/login"
+
+
+def test_second_step_without_first_or_after_it_expired(browser, fake_api):
+    assert browser.get("/login/code").headers["location"] == "/login"
+    fake_api.route(
+        "POST",
+        "/auth/login",
+        lambda r: httpx2.Response(
+            401, json={"error": {"code": "mfa_required", "message": "x"}, "mfa_token": "old"}
+        ),
+    )
+    fake_api.route("POST", "/auth/login/mfa", lambda r: error(401, "mfa_token_invalid"))
+    browser.post("/login", {"email": "anna@example.org", "password": "pw"})
+
+    expired = browser.post("/login/code", {"code": "123456"})
+
+    assert expired.headers["location"] == "/login"
+    assert "zu lange gedauert" in text(browser.get("/login"))
 
 
 def test_session_without_second_factor_only_reaches_the_setup(browser, fake_api):

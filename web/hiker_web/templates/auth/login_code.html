@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "macros.html" import field, csrf %}
+{% block title %}{{ t('auth.code_title') }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<section class="narrow">
+  <h1>{{ t('auth.code_title') }}</h1>
+  <p>{{ t('auth.code_intro') }}</p>
+  <form method="post" class="stack">
+    {{ csrf() }}
+    {{ field('code', t('auth.code'), required=True, hint=t('auth.code_hint'), attrs='autocomplete="one-time-code" inputmode="numeric" maxlength="32" autofocus') }}
+    <button class="primary">{{ t('auth.login') }}</button>
+  </form>
+  <p><a href="{{ url_for('auth.login') }}">{{ t('auth.code_back') }}</a></p>
+</section>
+{% endblock %}

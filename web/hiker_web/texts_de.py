@@ -39,7 +39,12 @@ TEXTS = {
     "auth.password_forced": "Dein Passwort wurde zurückgesetzt. Bitte wähle jetzt ein neues.",
     "auth.password_sessions": "Andere Geräte werden dabei abgemeldet.",
     "auth.code": "Code der Authenticator-App",
-    "auth.code_hint": "Sechs Ziffern – nur nötig, wenn der zweite Faktor eingerichtet ist.",
+    "auth.code_hint": "Sechs Ziffern – oder einer deiner Wiederherstellungscodes.",
+    "auth.code_title": "Zweiter Faktor",
+    "auth.code_intro": (
+        "Das Passwort stimmt. Bitte jetzt den Code aus der Authenticator-App eingeben."
+    ),
+    "auth.code_back": "Mit einem anderen Konto anmelden",
     "auth.sso": "Mit {name} anmelden",
     "auth.security": "Sicherheit",
     "mfa.title": "Zweiten Faktor einrichten",
@@ -494,6 +499,7 @@ TEXTS = {
     "error.validation": "Die Eingaben wurden nicht angenommen. Bitte prüfen.",
     "error.invalid_credentials": "E-Mail oder Passwort ist falsch.",
     "error.mfa_required": "Bitte auch den Code der Authenticator-App eingeben.",
+    "error.mfa_token_invalid": "Die Anmeldung hat zu lange gedauert. Bitte neu beginnen.",
     "error.invalid_mfa_code": "Der Code stimmt nicht oder wurde schon benutzt.",
     "error.mfa_mandatory": "Der zweite Faktor ist auf diesem Server Pflicht.",
     "error.wrong_password": "Das bisherige Passwort stimmt nicht.",
