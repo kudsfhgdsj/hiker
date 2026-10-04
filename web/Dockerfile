@@ -23,4 +23,4 @@ EXPOSE 8000
 
 # The port is only published on 127.0.0.1, so the forwarded headers of the local reverse
 # proxy can be trusted. No access log: the paths of public links contain their token.
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--threads", "4", "--timeout", "120", "--forwarded-allow-ips", "*", "hiker_web.wsgi:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--threads", "4", "--timeout", "120", "--forwarded-allow-ips", "*", "--no-control-socket", "hiker_web.wsgi:app"]

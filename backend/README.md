@@ -29,7 +29,10 @@ Die Tests laufen gegen SQLite im Arbeitsspeicher und brauchen keine `.env`.
 ```sh
 cp .env.example .env           # im Repository-Hauptverzeichnis; Werte ausfüllen
 docker compose up -d --build
+deploy/smoke_test.py           # prüft den laufenden Stack
 ```
+
+Betrieb auf dem Server (Proxy, Sicherung): `../deploy/README.md`.
 
 Die API lauscht nur auf `127.0.0.1:${API_PORT}`; Migrationen laufen beim Start des Containers.
 

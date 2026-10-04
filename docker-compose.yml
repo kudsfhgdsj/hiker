@@ -1,4 +1,4 @@
-# Entwurf. Läuft neben anderen Diensten auf einem geteilten Server: keine Ports 80/443,
+# Läuft neben anderen Diensten auf einem geteilten Server: keine Ports 80/443,
 # API und Web-Frontend sind nur über 127.0.0.1 erreichbar; der vorhandene Reverse Proxy
 # leitet /api/ an die API und alles andere an das Web-Frontend.
 # Konfiguration über .env (siehe .env.example).

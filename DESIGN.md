@@ -541,6 +541,8 @@ Ziel: Ubuntu 26.04, Domain `hiker.lacasa.internal`, läuft auf dem bereits genut
 - Konfiguration in `.env` (nicht im Repository, Vorlage `.env.example`): Datenbankpasswort, `SECRET_KEY`, `PUBLIC_BASE_URL=https://hiker.lacasa.internal`, Speicherpfad, `ENABLED_MODULES`, `REGISTRATION_MODE`, für das Web-Frontend `WEB_SECRET_KEY` und `WEB_PORT`.
 - Upload-Größen im Proxy erhöhen (Fotos, GPX).
 - Backups: Nächtlicher `pg_dump` plus Sicherung des Foto-/GPX-Verzeichnisses nach `/var/backups/hiker`, 14 Tage Rotation, per systemd-Timer. Eine Kopie außerhalb des Servers ist empfohlen (Ziel noch offen). Wiederherstellung einmal testen.
+- **Umsetzung (Schritt 14)**: `deploy/` enthält `install-docker.sh`, Proxy-Beispiele für nginx und Caddy (beide halten Link-Tokens und Referer aus dem Log), `backup.sh`/`restore.sh` mit systemd-Units und `smoke_test.py`, der einen laufenden Stack von der Registrierung bis zum öffentlichen Link prüft. Am 04.10.2026 lief der Stack erstmals in Docker mit PostgreSQL; Smoke-Test, Sicherung und Wiederherstellung sowie die nginx-Konfiguration wurden dabei praktisch geprüft, die Caddy-Konfiguration nur mit `caddy validate`. Anleitung: `deploy/README.md`.
+- Zertifikat: Für eine interne Domain (`*.internal`) stellt Let's Encrypt nichts aus; bis zur Umstellung auf die endgültige Domain braucht es eine eigene Zertifizierungsstelle, deren Wurzelzertifikat auch auf dem Android-Gerät installiert ist.
 - Datenbankmigrationen mit Alembic, Updates über neue Images.
 - Health-Endpunkt `/healthz`; Logs über Docker/journald; Firewall (ufw) nur 22/80/443.
 - Ressourcen schonen, da der Server geteilt ist: Container-Limits setzen, Bildverarbeitung in der Größe begrenzen.
@@ -574,7 +576,7 @@ Stehen in der separaten Datei `CLAUDE.md` im Repository-Hauptverzeichnis.
 ## 14. Noch offen
 
 1. Backup-Ziel außerhalb des Servers (z. B. zweiter Server, externer Speicher).
-2. Welcher Webserver bzw. Reverse Proxy läuft auf dem Server bereits (nginx, Apache, Caddy)? Davon hängt die Beispielkonfiguration in `deploy/` ab.
+2. Welcher Webserver bzw. Reverse Proxy läuft auf dem Server bereits? Beispiele für nginx und Caddy liegen in `deploy/`; für Apache gibt es noch keines.
 3. Kartenquellen und Lizenzen (bis Phase 2).
 4. Das Rate-Limit liegt im Arbeitsspeicher eines API-Prozesses. Läuft die API später in mehreren Prozessen, muss es in den Proxy oder einen gemeinsamen Speicher wandern.
 5. Genauer Wunsch zur Foto-Darstellung nach Sichtung der wanderer-Demo (Abschnitt 9), falls etwas anders sein soll.

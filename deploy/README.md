@@ -1,0 +1,104 @@
+# hiker – Betrieb
+
+Der Stack läuft per Docker Compose neben anderen Diensten auf einem Server. Er belegt keine Ports
+80/443: API und Web-Frontend lauschen nur auf `127.0.0.1`, nach außen bringt sie der vorhandene
+Reverse Proxy.
+
+| Datei | Zweck |
+|---|---|
+| `install-docker.sh` | Docker Engine und Compose aus dem offiziellen apt-Repository installieren |
+| `nginx-hiker.conf` | Beispiel für nginx |
+| `Caddyfile` | Beispiel für Caddy |
+| `backup.sh`, `restore.sh` | Sicherung und Wiederherstellung von Datenbank und Dateien |
+| `hiker-backup.service`, `hiker-backup.timer` | nächtliche Sicherung per systemd |
+| `smoke_test.py` | prüft einen laufenden Stack |
+
+## Installation
+
+```sh
+sudo deploy/install-docker.sh            # optional mit Benutzername: Docker ohne sudo
+cp .env.example .env && chmod 600 .env   # Werte ausfüllen, siehe Kommentare in der Datei
+docker compose up -d --build
+deploy/smoke_test.py
+```
+
+Wichtige Werte in `.env`:
+
+- `SECRET_KEY`, `WEB_SECRET_KEY`, `POSTGRES_PASSWORD`: je ein eigener, zufälliger Wert.
+- `PUBLIC_BASE_URL`: die Adresse, unter der Nutzer die Seite erreichen (`https://…`). Sie steht in
+  den öffentlichen Links.
+- `WEB_COOKIE_SECURE`: nur für einen Test ohne HTTPS auf `false`; im Betrieb weglassen.
+- `REGISTRATION_MODE`: nach dem Anlegen des ersten Kontos (wird Administrator) auf `closed`.
+
+Der Smoke-Test legt ein Wegwerf-Konto an. Auf einer frischen Instanz würde dieses Konto zum
+Administrator – dort erst das eigene Konto anlegen oder den Test mit `SMOKE_EMAIL` und
+`SMOKE_PASSWORD` eines vorhandenen Kontos starten.
+
+## Reverse Proxy
+
+`/api/` geht an die API (`API_PORT`, Standard 8010), alles andere an das Web-Frontend (`WEB_PORT`,
+Standard 8011). Beide Beispiele
+
+- leiten genau eine Client-Adresse weiter (`X-Forwarded-For`), nach der das Rate-Limit zählt,
+- erlauben Uploads bis 320 MB (mehrere Fotos auf einmal),
+- **halten die Tokens öffentlicher Links aus dem Log**: `/p/<token>` und
+  `/api/v1/public/tours/<token>` erscheinen als `[redacted]`, der Referer wird nicht protokolliert
+  (die Unterseiten eines Links tragen das Token im Referer).
+
+nginx: `nginx-hiker.conf` nach `/etc/nginx/conf.d/hiker.conf` kopieren, Domain und Zertifikat
+anpassen, `nginx -t && systemctl reload nginx`.
+
+Caddy: den Block aus `Caddyfile` in die eigene Caddy-Konfiguration übernehmen.
+
+Zertifikat: Für eine öffentliche Domain stellt Let's Encrypt eines aus (certbot bzw. Caddy von
+selbst). Für eine interne Domain wie `hiker.lacasa.internal` geht das nicht; dort braucht es eine
+eigene Zertifizierungsstelle (bei Caddy `tls internal`), deren Wurzelzertifikat auf den Geräten
+installiert ist – auch auf dem Android-Telefon, sonst verbindet sich die App nicht.
+
+Firewall: nur 22, 80 und 443 öffnen (`ufw`). Die Ports 8010 und 8011 sind von außen nicht
+erreichbar und sollen es nicht sein.
+
+## Sicherung
+
+```sh
+sudo mkdir -p /var/backups/hiker
+sudo cp deploy/hiker-backup.service deploy/hiker-backup.timer /etc/systemd/system/
+sudoedit /etc/systemd/system/hiker-backup.service    # Pfad zum Repository anpassen
+sudo systemctl daemon-reload && sudo systemctl enable --now hiker-backup.timer
+sudo systemctl start hiker-backup.service             # einmal sofort; Ergebnis: journalctl -u hiker-backup
+```
+
+`backup.sh` schreibt je Lauf zwei Dateien nach `BACKUP_DIR` (Standard `/var/backups/hiker`):
+`hiker-<Zeit>.dump` (Datenbank, `pg_dump` im Custom-Format) und `hiker-<Zeit>.files.tar.gz`
+(Fotos und GPX). Sicherungen, die älter als `KEEP_DAYS` (14) Tage sind, werden gelöscht. Die
+Sitzungen des Web-Frontends werden nicht gesichert; nach einer Wiederherstellung melden sich die
+Nutzer neu an.
+
+**Die Sicherung liegt auf demselben Server.** Eine Kopie außerhalb (zweiter Server, externer
+Speicher) ist noch einzurichten, z. B. mit `rsync` oder `restic` auf `BACKUP_DIR`. Die `.env`
+gehört ebenfalls gesichert – ohne `SECRET_KEY` sind alle Anmeldungen ungültig.
+
+## Wiederherstellung
+
+```sh
+deploy/restore.sh /var/backups/hiker/hiker-<Zeit>.dump /var/backups/hiker/hiker-<Zeit>.files.tar.gz
+```
+
+Das ersetzt Datenbank und Dateien vollständig und fragt vorher nach. Geprüft am 04.10.2026:
+Instanz mit Tour, Track und Foto gesichert, alle Volumes gelöscht, Sicherung eingespielt, Daten
+und Dateien waren wieder da.
+
+## Aktualisieren
+
+```sh
+git pull
+docker compose up -d --build     # Datenbankmigrationen laufen beim Start der API
+deploy/smoke_test.py
+```
+
+## Betrieb im Blick
+
+- Zustand: `docker compose ps`, `curl http://127.0.0.1:8010/healthz`, `…:8011/healthz`
+- Logs: `docker compose logs -f api web`
+- Grenzen je Container: `db` und `api` 1 CPU / 512 MB, `web` 0,5 CPU / 256 MB (im Leerlauf
+  brauchen sie zusammen etwa 200 MB).
