@@ -10,6 +10,7 @@ import '../../../core/sync/sync_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/error_text.dart';
 import '../../../core/widgets/sync_section.dart';
+import '../../../core/widgets/trusted_certificates_section.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/auth_repository.dart';
 
@@ -223,6 +224,7 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
           if (widget.header != null) ...[widget.header!, gap],
           const SyncSection(),
           gap,
+          const TrustedCertificatesSection(),
           Text(
             l10n.profileIntro,
             style: Theme.of(context).textTheme.bodyMedium,

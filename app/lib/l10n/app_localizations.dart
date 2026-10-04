@@ -334,6 +334,72 @@ abstract class AppLocalizations {
   /// **'Einrichten'**
   String get mfaEnable;
 
+  /// No description provided for @mfaStepTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Zweiter Faktor'**
+  String get mfaStepTitle;
+
+  /// No description provided for @mfaStepIntro.
+  ///
+  /// In de, this message translates to:
+  /// **'Das Passwort stimmt. Bitte jetzt den Code aus der Authenticator-App eingeben.'**
+  String get mfaStepIntro;
+
+  /// No description provided for @mfaStepBack.
+  ///
+  /// In de, this message translates to:
+  /// **'Mit einem anderen Konto anmelden'**
+  String get mfaStepBack;
+
+  /// No description provided for @errorMfaTokenInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Anmeldung hat zu lange gedauert. Bitte neu beginnen.'**
+  String get errorMfaTokenInvalid;
+
+  /// No description provided for @gearTypeKind.
+  ///
+  /// In de, this message translates to:
+  /// **'Zusatzfelder'**
+  String get gearTypeKind;
+
+  /// No description provided for @gearKindNone.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine'**
+  String get gearKindNone;
+
+  /// No description provided for @gearKindBackpack.
+  ///
+  /// In de, this message translates to:
+  /// **'Rucksack (Volumen)'**
+  String get gearKindBackpack;
+
+  /// No description provided for @gearKindShoes.
+  ///
+  /// In de, this message translates to:
+  /// **'Schuhe (Schuhkategorie)'**
+  String get gearKindShoes;
+
+  /// No description provided for @certificatesTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Vertraute Zertifikate'**
+  String get certificatesTitle;
+
+  /// No description provided for @certificatesIntro.
+  ///
+  /// In de, this message translates to:
+  /// **'Diesen selbst signierten Zertifikaten vertraust du. Ohne den Eintrag fragt die App beim nächsten Verbinden erneut.'**
+  String get certificatesIntro;
+
+  /// No description provided for @certificateRemove.
+  ///
+  /// In de, this message translates to:
+  /// **'Vertrauen entziehen'**
+  String get certificateRemove;
+
   /// No description provided for @mfaRecoveryTitle.
   ///
   /// In de, this message translates to:

@@ -319,6 +319,34 @@ void main() {
       );
     });
 
+    testWidgets('trust can be taken back in the profile', (tester) async {
+      final api = FakeApi({
+        'GET /modules': (_, _) => ok([]),
+        'GET /me/profile': (_, _) => ok(<String, dynamic>{}),
+      });
+      final container = await pumpApp(
+        tester,
+        api: api,
+        store: MemoryKeyValueStore({
+          ...signedInStore,
+          'trusted_certificates': '{"hiker.test:443":"AB:CD:EF:01"}',
+        }),
+      );
+      await container.read(trustedCertificatesProvider.notifier).load();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Vertraute Zertifikate'), findsOneWidget);
+      expect(find.text('hiker.test:443'), findsOneWidget);
+      expect(find.text(fingerprint), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Vertrauen entziehen'));
+      await tester.pumpAndSettle();
+
+      expect(container.read(trustedCertificatesProvider), isEmpty);
+      // Without an entry the section is gone.
+      expect(find.text('Vertraute Zertifikate'), findsNothing);
+    });
+
     test('decisions are stored and restored per server', () async {
       final store = MemoryKeyValueStore();
       final first = createContainer(api: FakeApi(), store: store);
@@ -348,32 +376,80 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('login asks for the code when the account has one', (
-      tester,
-    ) async {
+    testWidgets('login asks for the code in a second step', (tester) async {
       final api = FakeApi({
-        'POST /auth/login': (_, body) =>
+        'POST /auth/login': (_, _) => (
+          status: 401,
+          body: {
+            'error': {'code': 'mfa_required', 'message': 'x'},
+            'mfa_token': 'step-1-token',
+          },
+        ),
+        'POST /auth/login/mfa': (_, body) =>
             (body! as Map<String, dynamic>)['code'] == '123456'
             ? ok(authJson())
-            : apiError(401, 'mfa_required'),
+            : apiError(401, 'invalid_mfa_code'),
         'GET /modules': (_, _) => ok([]),
         'GET /me/profile': (_, _) => ok(<String, dynamic>{}),
       });
       final container = await pumpApp(tester, api: api);
 
+      // The first step only asks for the server, e-mail and password.
       expect(find.text('Code der Authenticator-App'), findsNothing);
       await signIn(tester);
+
+      // The second step asks for nothing but the code.
+      expect(find.text('Zweiter Faktor'), findsOneWidget);
+      expect(find.textContaining('Das Passwort stimmt.'), findsOneWidget);
+      expect(field('Passwort'), findsNothing);
+      expect(field('E-Mail'), findsNothing);
+
+      await tester.enterText(field('Code der Authenticator-App'), '000000');
+      await tester.tap(find.widgetWithText(FilledButton, 'Anmelden'));
+      await tester.pumpAndSettle();
       expect(
-        find.text('Bitte auch den Code der Authenticator-App eingeben.'),
+        find.text('Der Code stimmt nicht oder wurde schon benutzt.'),
         findsOneWidget,
       );
+      expect(container.read(sessionProvider).isSignedIn, isFalse);
+
       await tester.enterText(field('Code der Authenticator-App'), '123456');
       await tester.tap(find.widgetWithText(FilledButton, 'Anmelden'));
       await tester.pumpAndSettle();
 
-      final logins = api.calls.where((c) => c.path == '/auth/login');
-      expect((logins.last.body! as Map)['code'], '123456');
+      final second = api.calls.lastWhere((c) => c.path == '/auth/login/mfa');
+      expect(second.body, {'mfa_token': 'step-1-token', 'code': '123456'});
+      // The password is sent in the first step only.
+      expect(api.calls.where((c) => c.path == '/auth/login').single.body, {
+        'email': 'anna@example.org',
+        'password': 'Correct-Horse-7',
+      });
       expect(container.read(sessionProvider).isSignedIn, isTrue);
+    });
+
+    testWidgets('the second step can be left to use another account', (
+      tester,
+    ) async {
+      final api = FakeApi({
+        'POST /auth/login': (_, _) => (
+          status: 401,
+          body: {
+            'error': {'code': 'mfa_required', 'message': 'x'},
+            'mfa_token': 't',
+          },
+        ),
+        'POST /auth/login/mfa': (_, _) => apiError(401, 'mfa_token_invalid'),
+      });
+      await pumpApp(tester, api: api);
+      await signIn(tester);
+
+      await tester.enterText(field('Code der Authenticator-App'), '123456');
+      await tester.tap(find.widgetWithText(FilledButton, 'Anmelden'));
+      await tester.pumpAndSettle();
+
+      // The first step is too long ago: back to the start, with the reason.
+      expect(find.textContaining('zu lange gedauert'), findsOneWidget);
+      expect(field('Passwort'), findsOneWidget);
     });
 
     testWidgets('a session without second factor has to set it up first', (

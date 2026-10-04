@@ -192,11 +192,20 @@ class GearRepository {
     ], offline: loaded.offline);
   }
 
-  Future<void> saveType({String? id, required String name}) => apiCall(
-    () => id == null
-        ? _dio.post<void>('/gear/types', data: {'name': name})
-        : _dio.put<void>('/gear/types/$id', data: {'name': name}),
-  );
+  /// [kind] gives the items of the type extra fields, see [gearKinds].
+  Future<void> saveType({
+    String? id,
+    required String name,
+    String? kind,
+    int sortOrder = 0,
+  }) {
+    final data = {'name': name, 'kind': kind, 'sort_order': sortOrder};
+    return apiCall(
+      () => id == null
+          ? _dio.post<void>('/gear/types', data: data)
+          : _dio.put<void>('/gear/types/$id', data: data),
+    );
+  }
 
   Future<void> deleteType(String id) =>
       apiCall(() => _dio.delete<void>('/gear/types/$id'));

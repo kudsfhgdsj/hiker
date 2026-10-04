@@ -32,8 +32,9 @@ class _AuthFormScreenState extends ConsumerState<AuthFormScreen> {
   final _repeat = TextEditingController();
   final _code = TextEditingController();
 
-  /// The server asked for the code of the second factor.
-  bool _needsCode = false;
+  /// Set after the password was right for an account with a second factor:
+  /// the screen then asks for the code only. It stands for the first step.
+  String? _mfaToken;
   bool _busy = false;
   Object? _error;
 
@@ -115,7 +116,13 @@ class _AuthFormScreenState extends ConsumerState<AuthFormScreen> {
     try {
       await session.setBaseUrl(normalizeBaseUrl(_server.text)!);
       final repository = ref.read(authRepositoryProvider);
-      final result = widget.register
+      final mfaToken = _mfaToken;
+      final result = mfaToken != null
+          ? await repository.loginSecondStep(
+              mfaToken: mfaToken,
+              code: _code.text.trim(),
+            )
+          : widget.register
           ? await repository.register(
               email: _email.text.trim(),
               displayName: _name.text.trim(),
@@ -124,19 +131,27 @@ class _AuthFormScreenState extends ConsumerState<AuthFormScreen> {
           : await repository.login(
               email: _email.text.trim(),
               password: _password.text,
-              code: _code.text.trim().isEmpty ? null : _code.text.trim(),
             );
       await session.signIn(result.tokens, result.user, pending: result.pending);
     } catch (error) {
       if (await _offerToTrustCertificate(error)) return _submit();
       if (mounted) {
         setState(() {
-          _error = error;
-          // The account has a second factor: show the field for its code.
+          final body = error is ApiException ? error.body : null;
+          final token = body == null ? null : body['mfa_token'];
           if (error is ApiException &&
-              (error.code == 'mfa_required' ||
-                  error.code == 'invalid_mfa_code')) {
-            _needsCode = true;
+              error.code == 'mfa_required' &&
+              token is String) {
+            // The password was right: go on to the second step.
+            _mfaToken = token;
+            _code.clear();
+            _error = null;
+            return;
+          }
+          _error = error;
+          // The first step is too long ago: start again.
+          if (error is ApiException && error.code == 'mfa_token_invalid') {
+            _mfaToken = null;
           }
         });
       }
@@ -145,9 +160,57 @@ class _AuthFormScreenState extends ConsumerState<AuthFormScreen> {
     }
   }
 
+  /// Second step of the sign-in: nothing but the code.
+  Widget _codeStep(AppLocalizations l10n) {
+    const gap = SizedBox(height: AppSpacing.m);
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.mfaStepTitle)),
+      body: Form(
+        key: _formKey,
+        child: CenteredForm(
+          children: [
+            Text(l10n.mfaStepIntro),
+            gap,
+            TextFormField(
+              controller: _code,
+              decoration: InputDecoration(
+                labelText: l10n.mfaCode,
+                helperText: l10n.mfaCodeHint,
+                helperMaxLines: 2,
+              ),
+              keyboardType: TextInputType.visiblePassword,
+              autofillHints: const [AutofillHints.oneTimeCode],
+              autofocus: true,
+              onFieldSubmitted: (_) => _submit(),
+              validator: (value) =>
+                  (value ?? '').trim().isEmpty ? l10n.requiredField : null,
+            ),
+            if (_error != null) ...[gap, ErrorText(_error!)],
+            const SizedBox(height: AppSpacing.l),
+            FilledButton(
+              onPressed: _busy ? null : _submit,
+              child: Text(l10n.loginAction),
+            ),
+            const SizedBox(height: AppSpacing.s),
+            TextButton(
+              onPressed: _busy
+                  ? null
+                  : () => setState(() {
+                      _mfaToken = null;
+                      _error = null;
+                    }),
+              child: Text(l10n.mfaStepBack),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    if (_mfaToken != null) return _codeStep(l10n);
     const gap = SizedBox(height: AppSpacing.m);
     return Scaffold(
       appBar: AppBar(
@@ -210,12 +273,10 @@ class _AuthFormScreenState extends ConsumerState<AuthFormScreen> {
                       ? AutofillHints.newPassword
                       : AutofillHints.password,
                 ],
-                textInputAction: widget.register || _needsCode
+                textInputAction: widget.register
                     ? TextInputAction.next
                     : TextInputAction.done,
-                onFieldSubmitted: widget.register || _needsCode
-                    ? null
-                    : (_) => _submit(),
+                onFieldSubmitted: widget.register ? null : (_) => _submit(),
                 validator: (value) {
                   if ((value ?? '').isEmpty) return l10n.requiredField;
                   return widget.register ? passwordProblem(l10n, value!) : null;
@@ -231,20 +292,6 @@ class _AuthFormScreenState extends ConsumerState<AuthFormScreen> {
                   onFieldSubmitted: (_) => _submit(),
                   validator: (value) =>
                       value == _password.text ? null : l10n.passwordsDiffer,
-                ),
-              ],
-              if (_needsCode && !widget.register) ...[
-                gap,
-                TextFormField(
-                  controller: _code,
-                  decoration: InputDecoration(
-                    labelText: l10n.mfaCode,
-                    helperText: l10n.mfaCodeHint,
-                    helperMaxLines: 2,
-                  ),
-                  autofillHints: const [AutofillHints.oneTimeCode],
-                  autofocus: true,
-                  onFieldSubmitted: (_) => _submit(),
                 ),
               ],
               if (_error != null) ...[gap, ErrorText(_error!)],

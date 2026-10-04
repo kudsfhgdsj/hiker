@@ -63,8 +63,8 @@ class AuthRepository {
     ),
   );
 
-  /// [code] is the code of the authenticator app or a recovery code; the
-  /// server asks for it with `mfa_required` once a second factor is set up.
+  /// For an account with a second factor the server answers `mfa_required`
+  /// and a token; [loginSecondStep] finishes the sign-in with the code.
   Future<AuthResult> login({
     required String email,
     required String password,
@@ -74,6 +74,21 @@ class AuthRepository {
       () => _dio.post<Map<String, dynamic>>(
         '/auth/login',
         data: {'email': email, 'password': password, 'code': ?code},
+      ),
+    );
+    return _result(response.data!);
+  }
+
+  /// Second step of the sign-in: [code] is the code of the authenticator app
+  /// or a recovery code, [mfaToken] comes from the answer `mfa_required`.
+  Future<AuthResult> loginSecondStep({
+    required String mfaToken,
+    required String code,
+  }) async {
+    final response = await apiCall(
+      () => _dio.post<Map<String, dynamic>>(
+        '/auth/login/mfa',
+        data: {'mfa_token': mfaToken, 'code': code},
       ),
     );
     return _result(response.data!);

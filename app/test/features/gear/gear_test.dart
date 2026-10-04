@@ -631,6 +631,42 @@ void main() {
       expect(own.enabled, isTrue);
       expect(own.trailing, isNotNull);
     });
+
+    testWidgets('an own category can get extra fields', (tester) async {
+      final saved = <Object?>[];
+      final api = gearApi();
+      api.routes['PUT /gear/types/type-photo'] = (_, body) {
+        saved.add(body);
+        return ok(body);
+      };
+      api.routes['POST /gear/types'] = (_, body) {
+        saved.add(body);
+        return ok(body, 201);
+      };
+      await openGear(tester, api);
+      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tags und Kategorien'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(Tab, 'Kategorie'));
+      await tester.pumpAndSettle();
+
+      // An existing own category: choose the fields of shoes.
+      await tester.tap(find.text('Fotoausrüstung'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Keine'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Schuhe (Schuhkategorie)').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Speichern'));
+      await tester.pumpAndSettle();
+
+      expect(saved.single, {
+        'name': 'Fotoausrüstung',
+        'kind': 'shoes',
+        'sort_order': 20,
+      });
+    });
   });
 
   group('catalog', () {

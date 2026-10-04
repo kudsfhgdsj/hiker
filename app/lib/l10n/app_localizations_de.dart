@@ -138,6 +138,42 @@ class AppLocalizationsDe extends AppLocalizations {
   String get mfaEnable => 'Einrichten';
 
   @override
+  String get mfaStepTitle => 'Zweiter Faktor';
+
+  @override
+  String get mfaStepIntro =>
+      'Das Passwort stimmt. Bitte jetzt den Code aus der Authenticator-App eingeben.';
+
+  @override
+  String get mfaStepBack => 'Mit einem anderen Konto anmelden';
+
+  @override
+  String get errorMfaTokenInvalid =>
+      'Die Anmeldung hat zu lange gedauert. Bitte neu beginnen.';
+
+  @override
+  String get gearTypeKind => 'Zusatzfelder';
+
+  @override
+  String get gearKindNone => 'Keine';
+
+  @override
+  String get gearKindBackpack => 'Rucksack (Volumen)';
+
+  @override
+  String get gearKindShoes => 'Schuhe (Schuhkategorie)';
+
+  @override
+  String get certificatesTitle => 'Vertraute Zertifikate';
+
+  @override
+  String get certificatesIntro =>
+      'Diesen selbst signierten Zertifikaten vertraust du. Ohne den Eintrag fragt die App beim nächsten Verbinden erneut.';
+
+  @override
+  String get certificateRemove => 'Vertrauen entziehen';
+
+  @override
   String get mfaRecoveryTitle => 'Wiederherstellungscodes';
 
   @override

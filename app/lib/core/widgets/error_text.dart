@@ -13,6 +13,7 @@ String describeError(AppLocalizations l10n, Object error) {
     ApiException.validation => l10n.errorValidation,
     'invalid_credentials' => l10n.errorInvalidCredentials,
     'mfa_required' => l10n.errorMfaRequired,
+    'mfa_token_invalid' => l10n.errorMfaTokenInvalid,
     'invalid_mfa_code' => l10n.errorInvalidMfaCode,
     'wrong_password' => l10n.errorWrongPassword,
     'weak_password' => switch (error.body?['reason']) {

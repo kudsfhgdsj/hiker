@@ -37,7 +37,7 @@ class GearManageScreen extends ConsumerWidget {
     WidgetRef ref,
     GearTag? tag,
   ) async {
-    final result = await showDialog<({String name, String? color})>(
+    final result = await showDialog<_NameResult>(
       context: context,
       builder: (context) => _NameDialog(
         title: tag == null ? AppLocalizations.of(context).gearTagNew : tag.name,
@@ -61,13 +61,15 @@ class GearManageScreen extends ConsumerWidget {
     WidgetRef ref,
     GearType? type,
   ) async {
-    final result = await showDialog<({String name, String? color})>(
+    final result = await showDialog<_NameResult>(
       context: context,
       builder: (context) => _NameDialog(
         title: type == null
             ? AppLocalizations.of(context).gearTypeNew
             : type.name,
         name: type?.name,
+        kind: type?.kind,
+        withKind: true,
       ),
     );
     if (result == null || !context.mounted) return;
@@ -76,7 +78,12 @@ class GearManageScreen extends ConsumerWidget {
       ref,
       () => ref
           .read(gearRepositoryProvider)
-          .saveType(id: type?.id, name: result.name),
+          .saveType(
+            id: type?.id,
+            name: result.name,
+            kind: result.kind,
+            sortOrder: type?.sortOrder ?? 0,
+          ),
     );
   }
 
@@ -163,9 +170,13 @@ class GearManageScreen extends ConsumerWidget {
                     ListTile(
                       title: Text(type.name),
                       subtitle: Text(
-                        type.standard
-                            ? l10n.gearStandardType
-                            : l10n.gearOwnType,
+                        [
+                          type.standard
+                              ? l10n.gearStandardType
+                              : l10n.gearOwnType,
+                          if (type.kind != null)
+                            gearKindLabel(l10n, type.kind!),
+                        ].join(' · '),
                       ),
                       // The standard list is shared by all users; only admins change it.
                       enabled: !type.standard || isAdmin,
@@ -202,18 +213,26 @@ class GearManageScreen extends ConsumerWidget {
   }
 }
 
+typedef _NameResult = ({String name, String? color, String? kind});
+
 class _NameDialog extends StatefulWidget {
   const _NameDialog({
     required this.title,
     this.name,
     this.color,
+    this.kind,
     this.withColor = false,
+    this.withKind = false,
   });
 
   final String title;
   final String? name;
   final String? color;
+  final String? kind;
   final bool withColor;
+
+  /// For gear types: which extra fields their items get.
+  final bool withKind;
 
   @override
   State<_NameDialog> createState() => _NameDialogState();
@@ -223,6 +242,7 @@ class _NameDialogState extends State<_NameDialog> {
   final _formKey = GlobalKey<FormState>();
   late final _name = TextEditingController(text: widget.name);
   late final _color = TextEditingController(text: widget.color);
+  late String? _kind = gearKinds.containsKey(widget.kind) ? widget.kind : null;
 
   @override
   void dispose() {
@@ -234,9 +254,10 @@ class _NameDialogState extends State<_NameDialog> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     final color = _color.text.trim();
-    Navigator.pop(context, (
+    Navigator.pop<_NameResult>(context, (
       name: _name.text.trim(),
       color: color.isEmpty ? null : color,
+      kind: _kind,
     ));
   }
 
@@ -272,6 +293,24 @@ class _NameDialogState extends State<_NameDialog> {
                     : l10n.gearColorInvalid,
               ),
             ],
+            if (widget.withKind) ...[
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String?>(
+                initialValue: _kind,
+                // The dialog is narrow: long names must not overflow it.
+                isExpanded: true,
+                decoration: InputDecoration(labelText: l10n.gearTypeKind),
+                items: [
+                  DropdownMenuItem(child: Text(l10n.gearKindNone)),
+                  for (final kind in gearKinds.keys)
+                    DropdownMenuItem(
+                      value: kind,
+                      child: Text(gearKindLabel(l10n, kind)),
+                    ),
+                ],
+                onChanged: (value) => setState(() => _kind = value),
+              ),
+            ],
           ],
         ),
       ),
@@ -285,3 +324,10 @@ class _NameDialogState extends State<_NameDialog> {
     );
   }
 }
+
+/// Name of a kind of gear type; the keys come from [gearKinds].
+String gearKindLabel(AppLocalizations l10n, String kind) => switch (kind) {
+  'backpack' => l10n.gearKindBackpack,
+  'shoes' => l10n.gearKindShoes,
+  _ => kind,
+};
