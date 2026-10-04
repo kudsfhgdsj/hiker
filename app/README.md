@@ -37,6 +37,7 @@ Dafür braucht es ein JDK (21) und das Android-SDK (Plattform 36, Build-Tools 36
 
 ```sh
 flutter config --android-sdk ~/Android/Sdk --jdk-dir ~/development/jdk
+export JAVA_HOME=~/development/jdk   # falls kein java im PATH liegt
 flutter build apk --debug      # build/app/outputs/flutter-apk/app-debug.apk
 flutter build apk --release    # build/app/outputs/flutter-apk/app-release.apk
 ```
@@ -74,9 +75,11 @@ diesen Namen auflösen und erreichen können.
 Das Symbol erzeugt `tool/make_icon.py` (braucht Pillow) in allen Auflösungen, als adaptives
 Symbol und als einfaches Bild für ältere Geräte: `python3 tool/make_icon.py`.
 
-Die App verlangt nur Internet und Kamera (Barcode-Scan). Berechtigungen, die Bibliotheken
-mitbringen (Standort von der Karte, Mikrofon von der Kamera), entfernt das Manifest wieder
-(`tools:node="remove"`), weil die App sie nicht nutzt.
+Die App verlangt Internet, Kamera (Barcode-Scan) und Lesezugriff auf Dateien (Auswahl von
+GPX-Dateien und Fotos). Berechtigungen, die Bibliotheken zusätzlich mitbringen (Standort von
+der Karte, Mikrofon von der Kamera), entfernt das Manifest wieder (`tools:node="remove"`),
+weil die App sie nicht nutzt. Was in einer fertigen APK steht, zeigt
+`~/Android/Sdk/build-tools/36.0.0/aapt2 dump permissions app-release.apk`.
 
 ## Aufbau
 
