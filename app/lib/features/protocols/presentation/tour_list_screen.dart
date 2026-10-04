@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/format.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/api_image.dart';
+import '../../../core/widgets/empty_list.dart';
 import '../../../core/widgets/error_text.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/tour_models.dart';
@@ -115,7 +116,11 @@ class _TourList extends ConsumerWidget {
           if (loaded.offline) const OfflineBanner(),
           Expanded(
             child: loaded.value.isEmpty
-                ? Center(child: Text(empty))
+                ? EmptyList(
+                    text: empty,
+                    onRefresh: () =>
+                        ref.refresh(tourListProvider(request).future),
+                  )
                 : RefreshIndicator(
                     onRefresh: () =>
                         ref.refresh(tourListProvider(request).future),

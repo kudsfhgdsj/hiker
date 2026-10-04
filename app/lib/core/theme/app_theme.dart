@@ -44,7 +44,8 @@ class AppTheme {
     return ThemeData(
       colorScheme: scheme,
       useMaterial3: true,
-      // The app paints its own background behind all screens (MountainBackground).
+      // Every screen stands on the painted background (MountainBackground), which the
+      // navigation frame and the router put behind it.
       scaffoldBackgroundColor: Colors.transparent,
       inputDecorationTheme: const InputDecorationTheme(
         border: OutlineInputBorder(),

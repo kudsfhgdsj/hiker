@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../modules/feature_module.dart';
 import '../session/session.dart';
 import '../widgets/app_shell.dart';
+import '../widgets/mountain_background.dart';
 
 /// Screens that core needs but that belong to the auth feature; set in `main.dart`.
 class AuthScreens {
@@ -90,18 +91,24 @@ final routerProvider = Provider<GoRouter>((ref) {
       );
     },
     routes: [
+      // Screens outside the navigation frame get the background themselves.
       GoRoute(
         path: AppRoutes.splash,
-        builder: (context, state) =>
-            const Scaffold(body: Center(child: CircularProgressIndicator())),
+        builder: (context, state) => const MountainBackground(
+          child: Scaffold(body: Center(child: CircularProgressIndicator())),
+        ),
       ),
-      GoRoute(path: AppRoutes.login, builder: (c, s) => screens.login(c)),
-      GoRoute(path: AppRoutes.register, builder: (c, s) => screens.register(c)),
-      GoRoute(path: AppRoutes.mfaSetup, builder: (c, s) => screens.mfaSetup(c)),
-      GoRoute(
-        path: AppRoutes.passwordChange,
-        builder: (c, s) => screens.passwordChange(c),
-      ),
+      for (final (path, screen) in [
+        (AppRoutes.login, screens.login),
+        (AppRoutes.register, screens.register),
+        (AppRoutes.mfaSetup, screens.mfaSetup),
+        (AppRoutes.passwordChange, screens.passwordChange),
+      ])
+        GoRoute(
+          path: path,
+          builder: (context, state) =>
+              MountainBackground(child: screen(context)),
+        ),
       ShellRoute(
         builder: (context, state, child) =>
             AppShell(location: state.matchedLocation, child: child),
