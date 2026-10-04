@@ -101,3 +101,15 @@ button.star.on { color: #f5b400; }
 .qr svg { background: #fff; border-radius: .5rem; max-width: 100%; height: auto; }
 ul.codes { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(2, max-content); gap: .4rem 2rem; font-size: 1.1rem; }
 code { font-family: ui-monospace, monospace; }
+/* A mountain in grey behind every page; it stays in place while the page scrolls. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: auto 0 0 0;
+  /* Twice as wide as high, like the drawing: the summit is never cut off. */
+  height: min(50vw, 62vh);
+  background: url("background.svg") no-repeat bottom center / cover;
+  pointer-events: none;
+  z-index: -1;
+}
+@media print { body::before { display: none; } }

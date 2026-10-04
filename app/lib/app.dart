@@ -9,6 +9,7 @@ import 'core/router/app_router.dart';
 import 'core/session/session.dart';
 import 'core/sync/sync_service.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/mountain_background.dart';
 import 'features/auth/presentation/account_security_screens.dart';
 import 'features/auth/presentation/auth_form_screen.dart';
 import 'features/auth/presentation/profile_screen.dart';
@@ -96,6 +97,8 @@ class _HikerAppState extends ConsumerState<HikerApp>
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       routerConfig: ref.watch(routerProvider),
+      // The mountain stands behind every screen; scaffolds are transparent.
+      builder: (context, child) => MountainBackground(child: child!),
       locale: const Locale('de'),
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: const [

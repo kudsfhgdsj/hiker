@@ -44,6 +44,8 @@ class AppTheme {
     return ThemeData(
       colorScheme: scheme,
       useMaterial3: true,
+      // The app paints its own background behind all screens (MountainBackground).
+      scaffoldBackgroundColor: Colors.transparent,
       inputDecorationTheme: const InputDecorationTheme(
         border: OutlineInputBorder(),
       ),
