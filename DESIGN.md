@@ -693,21 +693,23 @@ Ziel: Ubuntu 26.04, Domain `hiker.lacasa.internal`, läuft auf dem bereits genut
 
 **Phase 3 – Berichte**: Backend-Dienst, der hikr.org-Berichte für Gipfel im Umkreis findet (Nutzungsbedingungen und robots.txt prüfen, Zwischenspeicherung, nur Verweise + kurze Auszüge, Quelle klar angeben).
 
-**Aufträge vom 04.10.2026** (Reihenfolge der Bearbeitung; Stand 05.10.2026):
-1. Gehzeit-Vorgaben wählbar machen – Server und Web fertig, **App offen**.
-2. Planer: Karte füllt den Bildschirm; Ebenen-Auswahl als kleine Aufklappfelder oben (Ebenen, Darstellung, Schwierigkeit) – Web fertig, **App offen**.
-3. Kartenmodus: Karte ansehen und Orte heraussuchen, ohne zu planen – Web fertig (`/map`); **App offen, dort auch ohne Anmeldung**. Eine Ortssuche nach Namen gibt es noch nicht.
-4. Knopf 2D/3D – Web fertig, das Gelände ist angehoben (im Browser geprüft). Die Karte der App (MapLibre Native) kann kein 3D-Gelände; dort bleibt es bei der Schummerung.
-5. Hangneigung mit Reglern von beiden Enden – Server und Web fertig, **App offen**.
-6. Lawinengefahr, Schneehöhe, Wetter und Schneebedeckung für einen Tag in der Vergangenheit – Server und Web fertig, **App offen**. Ein eigenes Archiv braucht es nicht: die Quellen liefern vergangene Tage selbst.
+**Aufträge vom 04./05.10.2026** (Stand 05.10.2026):
+1. Gehzeit-Vorgaben (DAV, SAC, Profi, individuell, eigene unter einem Namen) – fertig in Server, Web und App.
+2. Planer: Karte füllt den Bildschirm; Aufklappfelder „Ebenen“, „Darstellung“, „Schwierigkeit“ – fertig in Web und App (App: Blatt zum Hochziehen über der Karte).
+3. Kartenmodus – fertig im Web (`/map`) und in der App (Seite „Karte“, vom Anmeldebildschirm aus auch ohne Anmeldung). Eine Ortssuche nach Namen gibt es noch nicht.
+4. 2D/3D – fertig im Web, das Gelände ist angehoben. Die Karte der App (MapLibre Native) kann kein 3D-Gelände; dort bleibt es bei der Schummerung.
+5. Hangneigung mit Reglern von beiden Enden – fertig in Server, Web und App.
+6. Lawinengefahr, Schnee und Wetter für einen Tag im letzten Jahr – fertig in Server, Web und App. Ein eigenes Archiv braucht es nicht: die Quellen liefern vergangene Tage selbst.
 7. Web: Navigationsleiste in der Mitte – fertig.
-8. Regen- und Wolkenradar mit Zeitverlauf – Server und Web fertig, **App offen**.
-9. Sonnenauf- und -untergang für Gipfel – Server (`GET /maps/sun`) und Web (Klick in der Karte) fertig, **App offen**.
-10. Planer: Tags statt „Geplant für“ – Server und Web fertig, **App offen**.
-11. Planer: Startzeitpunkt und Sonnenverlauf entlang der Tour – Server und Web fertig, **App offen**.
-12. Karten und Wegdaten für Österreich und Bayern sind gebaut, Norditalien läuft; **offen**: Kacheln an Gebietsgrenzen aus mehreren Gebieten zusammenführen.
-13. **Offen**: Schritt 5 – aus einer Route eine Tour anlegen, GPX-Import.
-14. **Offen**: Beschriftungen der Vektorkarte in der App auf einem echten Gerät prüfen.
+8. Regen- und Wolkenradar mit Zeitregler – fertig in Server, Web und App.
+9. Sonnenauf- und -untergang für Gipfel – fertig: Tipp bzw. Klick in die Karte (Web über `GET /maps/sun`, App rechnet selbst).
+10. Planer: Tags statt „Geplant für“ – fertig in Server, Web und App.
+11. Planer: Startzeitpunkt und Sonnenverlauf entlang der Tour – fertig in Server, Web und App.
+12. Karten, Wegdaten und Ebenen-Pakete für Schweiz, Österreich, Bayern, Nordost- und Nordwestitalien sind gebaut. Kacheln an Gebietsgrenzen führt der Server aus allen Gebieten zusammen (`maps/join.py`): Ebenen gleichen Namens werden vereint, doppelte Objekte entfallen. Die App antwortet ohne Netz aus *einer* Kartendatei; dort bleibt eine Grenzkachel einseitig.
+13. Luftbild als zuschaltbare Ebene über der Karte mit Regler für die Deckkraft (statt als eigene Darstellung) – fertig in Server, Web und App.
+14. „Ebenen“ in Gruppen: Gelände (Hangneigung, Luftbild), Schnee und Lawinen (Lawinengefahr, Schneebedeckung, Schneehöhe), Wetter (Vorhersage, Niederschlag, Radar, Wolken). Reihenfolge und Gruppe nennt der Stil des Servers (`overlays[].group`) – fertig.
+15. **Offen**: Schritt 5 – aus einer Route eine Tour anlegen, GPX-Import.
+16. **Offen**: Beschriftungen der Vektorkarte in der App auf einem echten Gerät prüfen (im Emulator fehlen sie).
 
 **Sonnenzeiten.** Die Rechnung (NOAA-Näherung) liegt in `core/sun.py`, weil Planung und Karte sie brauchen. `GET /maps/sun?lat=&lon=&date=&elevation_m=` braucht keine Anmeldung. Gerechnet wird für den mathematischen Horizont: Berge davor sind nicht berücksichtigt. Mit `elevation_m` sinkt der Horizont um die Kimmtiefe (1,76′ · √Höhe in m); für einen Gipfel ist das der früheste Aufgang und späteste Untergang, die dort möglich sind. Das Web zeigt beide Angaben.
 

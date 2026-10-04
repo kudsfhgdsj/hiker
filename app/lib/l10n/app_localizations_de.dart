@@ -1686,6 +1686,18 @@ class AppLocalizationsDe extends AppLocalizations {
   String get mapLooks => 'Darstellung';
 
   @override
+  String get mapGroupTerrain => 'Gelände';
+
+  @override
+  String get mapGroupSnow => 'Schnee und Lawinen';
+
+  @override
+  String get mapGroupWeather => 'Wetter';
+
+  @override
+  String get mapOpacity => 'Deckkraft';
+
+  @override
   String get mapSlopeOpen => 'senkrecht';
 
   @override

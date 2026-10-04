@@ -214,15 +214,17 @@ def test_style_offers_the_layers_the_server_has(client, layers, tmp_path, monkey
     assert style["sources"]["satellite"]["tiles"] == [f"{base}/raster/satellite/{{z}}/{{x}}/{{y}}"]
     assert "swisstopo" in style["sources"]["satellite"]["attribution"]
     hiker = style["metadata"]["hiker"]
-    assert [entry["id"] for entry in hiker["bases"]] == ["map", "winter", "satellite"]
+    assert [entry["id"] for entry in hiker["bases"]] == ["map", "winter"]
     assert style["sources"]["contours"]["tiles"] == [f"{base}/contours/{{z}}/{{x}}/{{y}}.pbf"]
-    assert [entry["id"] for entry in hiker["overlays"]] == [
-        "slope",
-        "avalanche",
-        "weather0",
-        "weather1",
-        "weather2",
-        "snowdepth",
+    # In the order the clients offer them: the ground, then snow, then the weather.
+    assert [(entry["id"], entry["group"]) for entry in hiker["overlays"]] == [
+        ("slope", "terrain"),
+        ("satellite", "terrain"),
+        ("avalanche", "snow"),
+        ("snowdepth", "snow"),
+        ("weather0", "weather"),
+        ("weather1", "weather"),
+        ("weather2", "weather"),
     ]
     assert style["sources"]["avalanche"] == {
         "type": "geojson",
@@ -251,12 +253,14 @@ def test_switchable_layers_start_hidden_and_keep_their_place():
     # Shading lies on the ground and under water, roads and names.
     assert order.index("wood") < order.index("hillshade") < order.index("waterway")
     assert order.index("hillshade") < order.index("slope") < order.index("path")
-    assert order.index("satellite") == 1
+    # The aerial image is laid over the ground, under water lines, slope, paths and names.
+    assert order.index("hillshade") < order.index("satellite") < order.index("waterway")
+    assert order.index("satellite") < order.index("slope")
+    assert layers["satellite"]["paint"]["raster-opacity"] == 0.7
     assert layers["slope"]["layout"]["visibility"] == "none"
     assert layers["satellite"]["layout"]["visibility"] == "none"
     assert "visibility" not in layers["hillshade"].get("layout", {})
 
-    # The aerial image replaces the drawn ground and the shading, not paths and names.
     # Winter is a white veil under the shading; contour lines lie on the ground too.
     assert order.index("wood") < order.index("winter-snow") < order.index("hillshade")
     assert layers["winter-snow"]["layout"]["visibility"] == "none"
@@ -264,10 +268,14 @@ def test_switchable_layers_start_hidden_and_keep_their_place():
     assert order.index("hillshade") < order.index("contour") < order.index("waterway")
     assert layers["contour"]["source-layer"] == "contour"
     assert layers["contour-label"]["filter"] == ["==", ["get", "index"], 1]
-    satellite = hiker["bases"][2]
-    assert satellite["show"] == ["satellite"]
-    assert {"wood", "rock", "water", "hillshade"} <= set(satellite["hide"])
-    assert not {"background", "path", "peak-name", "waterway"} & set(satellite["hide"])
+    # The user chooses how much of the map shines through the aerial image.
+    assert [base["id"] for base in hiker["bases"]] == ["map", "winter"]
+    assert hiker["overlays"][1] == {
+        "id": "satellite",
+        "layers": ["satellite"],
+        "opacity": {"layer": "satellite", "default": 0.7, "min": 0.1},
+        "group": "terrain",
+    }
     legend = [entry["from"] for entry in hiker["overlays"][0]["legend"]]
     assert legend == [15, 20, 25, 30, 35, 40, 45]
     assert (

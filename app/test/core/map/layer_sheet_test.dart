@@ -26,8 +26,20 @@ void main() {
       'overlays': [
         {
           'id': 'slope',
+          'group': 'terrain',
           'layers': ['slope'],
           'range': {'min': 15, 'max': 60, 'step': 5, 'low': 30},
+        },
+        {
+          'id': 'satellite',
+          'group': 'terrain',
+          'layers': ['satellite'],
+          'opacity': {'layer': 'satellite', 'default': 0.7, 'min': 0.1},
+        },
+        {
+          'id': 'avalanche',
+          'group': 'snow',
+          'layers': ['avalanche'],
         },
       ],
       'history': {
@@ -66,6 +78,36 @@ void main() {
     expect(find.byType(RangeSlider), findsOneWidget);
     expect(find.text('Eingefärbt von 30° bis senkrecht'), findsOneWidget);
     expect(find.text('Stand vom'), findsOneWidget);
+    // Groups: the ground, snow and avalanches, the weather (with the radar).
+    expect(find.text('Gelände'), findsOneWidget);
+    expect(find.text('Schnee und Lawinen'), findsOneWidget);
+    expect(find.text('Wetter'), findsOneWidget);
+    final order = [
+      for (final text in [
+        'Hangneigung',
+        'Luftbild',
+        'Lawinengefahr',
+        'Regenradar',
+      ])
+        tester.getTopLeft(find.text(text)).dy,
+    ];
+    expect(order, [...order]..sort());
+    // The aerial image lies over the map; a slider says how opaque.
+    expect(find.byKey(const ValueKey('opacity-satellite')), findsNothing);
+    await tester.tap(find.text('Luftbild'));
+    await tester.pump();
+    expect(find.text('70 %'), findsOneWidget);
+    container
+        .read(mapLayerChoiceProvider.notifier)
+        .setOpacity('satellite', 0.4);
+    await tester.pump();
+    expect(find.text('40 %'), findsOneWidget);
+    expect(
+      tester
+          .widget<Slider>(find.byKey(const ValueKey('opacity-satellite')))
+          .value,
+      0.4,
+    );
     await tester.tap(find.text('Regenradar'));
     await tester.pump();
 
@@ -73,8 +115,9 @@ void main() {
       container.read(mapLayerChoiceProvider),
       const MapLayerChoice(
         base: 'satellite',
-        overlays: {'slope'},
+        overlays: {'slope', 'satellite'},
         radar: {'rain'},
+        opacity: {'satellite': 0.4},
       ),
     );
   });

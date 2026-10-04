@@ -100,7 +100,13 @@ window.hikerMapLayers = (map, texts, options = {}) => {
         }
       };
 
+      let group = null;
       for (const overlay of meta.overlays) {
+        // The overlays come in groups: the ground, snow and avalanches, the weather.
+        if (overlay.group && overlay.group !== group) {
+          group = overlay.group;
+          layers.append(element("strong", "map-group", (texts.group || {})[group] || group));
+        }
         const on = stored(`overlay-${overlay.id}`, "off") === "on";
         const apply = (visible) => {
           for (const layer of overlay.layers) show(layer, visible);
@@ -116,6 +122,30 @@ window.hikerMapLayers = (map, texts, options = {}) => {
             legend.append(swatch, entry.from != null ? `${entry.from}°` : String(entry.level));
           }
           row.append(legend);
+        }
+        if (overlay.opacity) {
+          // How much of the map shines through, e.g. through the aerial image.
+          const opacity = overlay.opacity;
+          const box = element("div", "map-range");
+          const input = element("input");
+          input.type = "range";
+          input.min = Math.round(opacity.min * 100);
+          input.max = 100;
+          input.step = 5;
+          input.value = stored(`opacity-${overlay.id}`, String(Math.round(opacity.default * 100)));
+          input.setAttribute("aria-label", texts.opacity);
+          const label = element("span");
+          const update = () => {
+            label.textContent = `${texts.opacity}: ${input.value} %`;
+            remember(`opacity-${overlay.id}`, input.value);
+            if (map.getLayer(opacity.layer)) {
+              map.setPaintProperty(opacity.layer, "raster-opacity", Number(input.value) / 100);
+            }
+          };
+          input.addEventListener("input", update);
+          box.append(input, label);
+          layers.append(box);
+          update();
         }
         if (overlay.range) {
           // Two sliders: from which angle and up to which angle slopes are coloured.
@@ -158,35 +188,10 @@ window.hikerMapLayers = (map, texts, options = {}) => {
         apply(on);
       }
 
-      // --- A day in the past for the layers that have a history ---
-      if (meta.history) {
-        layers.append(element("hr"));
-        const row = element("label", "map-option");
-        const input = element("input");
-        input.type = "date";
-        const today = new Date();
-        const iso = (date) => date.toISOString().slice(0, 10);
-        input.max = iso(today);
-        input.min = iso(new Date(today.getTime() - meta.history.days * 86400000));
-        input.addEventListener("change", () => {
-          day = input.value && input.value < iso(new Date()) ? input.value : "";
-          applySources();
-        });
-        const reset = element("button", "link", texts.history.today);
-        reset.type = "button";
-        reset.addEventListener("click", () => {
-          input.value = "";
-          day = "";
-          applySources();
-        });
-        row.append(`${texts.history.label} `, input, reset);
-        layers.append(row);
-        note(layers, texts.history.note);
-      }
-
       // --- Rain radar and clouds with their time ---
       if (meta.radar) {
-        layers.append(element("hr"));
+        // Radar and clouds belong to the weather, the last group of the overlays.
+        if (group !== "weather") layers.append(element("hr"));
         const radar = meta.radar;
         const state = { rain: false, clouds: false, frames: null, index: 0, timer: null };
         const controls = element("div", "map-radar");
@@ -280,6 +285,32 @@ window.hikerMapLayers = (map, texts, options = {}) => {
         controls.append(play, slider, clock);
         layers.append(controls);
         note(layers, texts.radar.note);
+      }
+
+      // --- A day in the past for the layers that have a history ---
+      if (meta.history) {
+        layers.append(element("hr"));
+        const row = element("label", "map-option");
+        const input = element("input");
+        input.type = "date";
+        const today = new Date();
+        const iso = (date) => date.toISOString().slice(0, 10);
+        input.max = iso(today);
+        input.min = iso(new Date(today.getTime() - meta.history.days * 86400000));
+        input.addEventListener("change", () => {
+          day = input.value && input.value < iso(new Date()) ? input.value : "";
+          applySources();
+        });
+        const reset = element("button", "link", texts.history.today);
+        reset.type = "button";
+        reset.addEventListener("click", () => {
+          input.value = "";
+          day = "";
+          applySources();
+        });
+        row.append(`${texts.history.label} `, input, reset);
+        layers.append(row);
+        note(layers, texts.history.note);
       }
 
       // --- Darstellung ---

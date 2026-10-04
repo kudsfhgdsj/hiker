@@ -3064,6 +3064,30 @@ abstract class AppLocalizations {
   /// **'Darstellung'**
   String get mapLooks;
 
+  /// No description provided for @mapGroupTerrain.
+  ///
+  /// In de, this message translates to:
+  /// **'Gelände'**
+  String get mapGroupTerrain;
+
+  /// No description provided for @mapGroupSnow.
+  ///
+  /// In de, this message translates to:
+  /// **'Schnee und Lawinen'**
+  String get mapGroupSnow;
+
+  /// No description provided for @mapGroupWeather.
+  ///
+  /// In de, this message translates to:
+  /// **'Wetter'**
+  String get mapGroupWeather;
+
+  /// No description provided for @mapOpacity.
+  ///
+  /// In de, this message translates to:
+  /// **'Deckkraft'**
+  String get mapOpacity;
+
   /// No description provided for @mapSlopeOpen.
   ///
   /// In de, this message translates to:

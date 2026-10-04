@@ -150,6 +150,13 @@ def test_pages_carry_the_texts_of_the_layer_control(user, fake_api):
     assert set(texts["slope"]) == {"from", "to", "low", "high", "open"}
     assert set(texts["history"]) == {"label", "today", "note"}
     assert set(texts["radar"]) == {"rain", "clouds", "play", "note"}
+    # The overlays are offered in groups; the aerial image is one of them, with its opacity.
+    assert texts["group"] == {
+        "terrain": "Gelände",
+        "snow": "Schnee und Lawinen",
+        "weather": "Wetter",
+    }
+    assert texts["overlay"]["satellite"] == "Luftbild" and texts["opacity"] == "Deckkraft"
     assert texts["overlay"]["avalanche"] == "Lawinengefahr"
     assert "Bulletin" in texts["note"]["avalanche"]
     assert "map_layers.js" in page

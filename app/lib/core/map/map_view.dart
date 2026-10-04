@@ -212,6 +212,7 @@ class MapLayerChoice {
     this.slopeHigh,
     this.day,
     this.radar = const {},
+    this.opacity = const {},
   });
 
   /// `map` (the drawn map) or `satellite` (aerial image under paths and names).
@@ -229,13 +230,19 @@ class MapLayerChoice {
   /// `rain` and `clouds`: images with their time, laid over the map.
   final Set<String> radar;
 
+  /// How opaque an overlay is drawn (0 to 1), by its id; missing: as the
+  /// server draws it. Used for the aerial image over the map.
+  final Map<String, double> opacity;
+
   MapLayerChoice _with({
     String? base,
     Set<String>? overlays,
     (int?, int?)? slope,
     (String?,)? day,
     Set<String>? radar,
+    Map<String, double>? opacity,
   }) => MapLayerChoice(
+    opacity: opacity ?? this.opacity,
     base: base ?? this.base,
     overlays: overlays ?? this.overlays,
     slopeLow: slope == null ? slopeLow : slope.$1,
@@ -255,7 +262,9 @@ class MapLayerChoice {
       other.slopeLow == slopeLow &&
       other.slopeHigh == slopeHigh &&
       other.day == day &&
-      _same(other.radar, radar);
+      _same(other.radar, radar) &&
+      other.opacity.length == opacity.length &&
+      opacity.entries.every((entry) => other.opacity[entry.key] == entry.value);
 
   @override
   int get hashCode => Object.hash(
@@ -265,6 +274,8 @@ class MapLayerChoice {
     slopeHigh,
     day,
     Object.hashAllUnordered(radar),
+    Object.hashAllUnordered(opacity.keys),
+    Object.hashAllUnordered(opacity.values),
   );
 }
 
@@ -282,6 +293,9 @@ class MapLayerChoiceNotifier extends Notifier<MapLayerChoice> {
 
   /// The angles of the slope layer; null for both: the usual colours.
   void setSlope(int? low, int? high) => state = state._with(slope: (low, high));
+
+  void setOpacity(String overlay, double value) =>
+      state = state._with(opacity: {...state.opacity, overlay: value});
 
   void setDay(String? day) => state = state._with(day: (day,));
 
@@ -389,6 +403,7 @@ class MapLayerSheet extends ConsumerWidget {
     };
     String overlayLabel(String id) => switch (id) {
       'slope' => l10n.mapOverlaySlope,
+      'satellite' => l10n.mapBaseSatellite,
       'avalanche' => l10n.mapOverlayAvalanche,
       'snow' => l10n.mapOverlaySnow,
       'precipitation' => l10n.mapOverlayPrecipitation,
@@ -459,9 +474,49 @@ class MapLayerSheet extends ConsumerWidget {
         ),
     ];
 
+    String groupLabel(String id) => switch (id) {
+      'terrain' => l10n.mapGroupTerrain,
+      'snow' => l10n.mapGroupSnow,
+      'weather' => l10n.mapGroupWeather,
+      _ => id,
+    };
+    Widget groupHeading(String id) => Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Text(
+        groupLabel(id),
+        style: theme.textTheme.labelLarge?.copyWith(
+          color: theme.colorScheme.primary,
+        ),
+      ),
+    );
+    // Radar and clouds belong to the weather, the last group of the overlays.
+    final radarSwitches = [
+      if (radar != null) ...[
+        if (overlays.every((overlay) => overlay['group'] != 'weather'))
+          groupHeading('weather'),
+        for (final (kind, label) in [
+          ('rain', l10n.mapRadarRain),
+          ('clouds', l10n.mapRadarClouds),
+        ])
+          SwitchListTile(
+            value: choice.radar.contains(kind),
+            title: Text(label),
+            onChanged: (on) => notifier.setRadar(kind, on: on),
+          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Text(l10n.mapRadarNote, style: theme.textTheme.bodySmall),
+        ),
+      ],
+    ];
+
     final layers = [
       heading(l10n.mapLayers),
-      for (final overlay in overlays) ...[
+      for (final (index, overlay) in overlays.indexed) ...[
+        // The overlays come in groups: the ground, snow and avalanches, weather.
+        if (overlay['group'] case final String group
+            when index == 0 || overlays[index - 1]['group'] != group)
+          groupHeading(group),
         SwitchListTile(
           value: choice.overlays.contains(overlay['id']),
           title: Text(overlayLabel(overlay['id'] as String)),
@@ -475,7 +530,34 @@ class MapLayerSheet extends ConsumerWidget {
         if (overlay['range'] case final Map<String, dynamic> range
             when choice.overlays.contains(overlay['id']))
           _SlopeRange(range: range),
+        if (overlay['opacity'] case final Map<String, dynamic> opacity
+            when choice.overlays.contains(overlay['id']))
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Text(l10n.mapOpacity),
+                Expanded(
+                  child: Slider(
+                    key: ValueKey('opacity-${overlay['id']}'),
+                    min: (opacity['min'] as num).toDouble(),
+                    max: 1,
+                    divisions: 18,
+                    value:
+                        choice.opacity[overlay['id']] ??
+                        (opacity['default'] as num).toDouble(),
+                    onChanged: (value) =>
+                        notifier.setOpacity(overlay['id'] as String, value),
+                  ),
+                ),
+                Text(
+                  '${(100 * (choice.opacity[overlay['id']] ?? (opacity['default'] as num).toDouble())).round()} %',
+                ),
+              ],
+            ),
+          ),
       ],
+      ...radarSwitches,
       if (history != null) ...[
         const Divider(),
         ListTile(
@@ -508,22 +590,6 @@ class MapLayerSheet extends ConsumerWidget {
               today ? null : picked.toIso8601String().substring(0, 10),
             );
           },
-        ),
-      ],
-      if (radar != null) ...[
-        const Divider(),
-        for (final (kind, label) in [
-          ('rain', l10n.mapRadarRain),
-          ('clouds', l10n.mapRadarClouds),
-        ])
-          SwitchListTile(
-            value: choice.radar.contains(kind),
-            title: Text(label),
-            onChanged: (on) => notifier.setRadar(kind, on: on),
-          ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Text(l10n.mapRadarNote, style: theme.textTheme.bodySmall),
         ),
       ],
     ];

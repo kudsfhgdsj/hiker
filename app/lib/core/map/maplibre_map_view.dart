@@ -149,6 +149,25 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
         // A layer the style does not have: nothing to switch.
       }
     }
+    // How much of the map shines through an overlay, e.g. the aerial image.
+    for (final overlay
+        in (options['overlays'] as List<dynamic>)
+            .cast<Map<String, dynamic>>()) {
+      final opacity = overlay['opacity'] as Map<String, dynamic>?;
+      if (opacity == null) continue;
+      try {
+        await controller.setLayerProperties(
+          opacity['layer'] as String,
+          RasterLayerProperties(
+            rasterOpacity:
+                choice.opacity[overlay['id']] ??
+                (opacity['default'] as num).toDouble(),
+          ),
+        );
+      } on Exception {
+        // Not a layer of this style.
+      }
+    }
   }
 
   @override
@@ -175,6 +194,9 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
   Future<void> _onStyleLoaded() async {
     final controller = _controller;
     if (controller == null) return;
+    // The map counts in physical pixels.
+    final covered =
+        widget.content.coveredBottom * MediaQuery.devicePixelRatioOf(context);
     await controller.addGeoJsonSource(_source, _trackGeoJson());
     await controller.addLineLayer(
       _source,
@@ -204,11 +226,7 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
                 // Below the fields at the top, above what covers the bottom.
                 top: 70,
                 right: 40,
-                // The map counts in physical pixels.
-                bottom:
-                    40 +
-                    widget.content.coveredBottom *
-                        MediaQuery.devicePixelRatioOf(context),
+                bottom: 40 + covered,
               ),
       );
     }

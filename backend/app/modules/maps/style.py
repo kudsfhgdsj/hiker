@@ -112,6 +112,14 @@ def _roads() -> list[dict]:
     return layers
 
 
+SATELLITE_OPACITY = 0.7
+OVERLAY_GROUPS = {
+    "terrain": ("slope", "satellite"),
+    "snow": ("avalanche", "snow", "snowdepth"),
+    "weather": ("weather0", "weather1", "weather2", "precipitation"),
+}
+
+
 def build_style(
     tile_url: str,
     glyph_url: str,
@@ -454,12 +462,6 @@ def build_style(
             {"label": "KS", "color": VIA_FERRATA},
         ],
     }
-    # What an aerial image replaces: the drawn ground, not paths, water lines and names.
-    ground = [
-        layer["id"]
-        for layer in layers
-        if layer["type"] == "fill" or layer["id"] in ("background", "path-halo")
-    ]
 
     def insert_before(layer_id: str, layer: dict) -> None:
         layers.insert(next(i for i, item in enumerate(layers) if item["id"] == layer_id), layer)
@@ -715,23 +717,33 @@ def build_style(
             "maxzoom": 19,
             "attribution": notes.get("satellite", ""),
         }
-        layers.insert(
-            1,
+        # The aerial image lies over the drawn ground and under water lines, paths and
+        # names. The user chooses how much of the map shines through.
+        insert_before(
+            "waterway",
             {
                 "id": "satellite",
                 "type": "raster",
                 "source": "satellite",
                 "layout": {"visibility": "none"},
+                "paint": {"raster-opacity": SATELLITE_OPACITY, "raster-fade-duration": 0},
             },
         )
-        hiker["bases"].append(
+        hiker["overlays"].append(
             {
                 "id": "satellite",
-                "show": ["satellite"],
-                "hide": [name for name in ground if name != "background"]
-                + (["hillshade"] if terrain_url else []),
+                "layers": ["satellite"],
+                "opacity": {"layer": "satellite", "default": SATELLITE_OPACITY, "min": 0.1},
             }
         )
+    # The order and the groups in which the clients offer the overlays: what belongs to
+    # the ground, then everything about snow, then the weather.
+    for overlay in hiker["overlays"]:
+        overlay["group"] = next(
+            group for group, members in OVERLAY_GROUPS.items() if overlay["id"] in members
+        )
+    order = [name for members in OVERLAY_GROUPS.values() for name in members]
+    hiker["overlays"].sort(key=lambda overlay: order.index(overlay["id"]))
     # Layers that also show a day in the past: the clients add `?date=YYYY-MM-DD` to the
     # addresses of these sources.
     dated = [name for name in ("avalanche", "snow", "weather") if name in sources]
