@@ -114,9 +114,12 @@ Geplante Routen bestehen aus Wegpunkten; Linie, Eckdaten und Gehzeit berechnet d
   Luftlinien planen (Profil `direct`), und `GET /planning/info` meldet das.
 - **Luftlinien** bekommen etwa alle 50 m einen Punkt; ihre Höhen kommen vom Höhen-Adapter
   (`OPEN_METEO_ELEVATION_URL`). Fällt er aus, bleibt die Route ohne Höhen.
-- **Schwierigkeit**: `max_difficulty` (1–6 für T1–T6) und `via_ferrata` werden angenommen und
-  gespeichert und an den Adapter gereicht. Der BRouter-Adapter wertet sie erst aus, sobald
-  das eigene BRouter-Profil eingerichtet ist (Phase 2, Schritt 2).
+- **Schwierigkeit**: `max_difficulty` (1–6 für T1–T6) und `via_ferrata` gehen als Parameter
+  an das BRouter-Profil `hiker-hiking` (`deploy/brouter/profiles/`). Wege über der gewählten
+  Stufe und Klettersteige ohne Freigabe sind gesperrt; gibt es dann keinen Weg, antwortet die
+  API mit 422 `no_route`.
+- **BRouter** läuft als Dienst `brouter` im Compose-Profil `routing`; die Wegdaten holt
+  `deploy/brouter-segments.sh` (siehe `deploy/README.md`).
 - **Gehzeit** nach DIN 33466 (`planning/estimate.py`), in der API als geschätzt
   gekennzeichnet (`duration_estimated`).
 - Routen gehören ihrem Owner; fremde Routen antworten mit 404.

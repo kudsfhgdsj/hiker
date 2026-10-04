@@ -51,6 +51,8 @@ in Docker-Volumes:
 | `files/` | Fotos und GPX |
 | `tiles/` | Kartenkacheln (Zwischenspeicher) |
 | `web-sessions/` | Anmeldungen des Web-Frontends |
+| `caddy/` | Zertifizierungsstelle und Zertifikate des Proxys im Stack |
+| `brouter/segments/` | Wegdaten für die Routenplanung (neu ladbar) |
 
 **Kein Container läuft als root.** Alle Dienste laufen als `HIKER_UID:HIKER_GID` (Standard
 1000:1000, also der erste Benutzer des Systems), ohne Linux-Capabilities, ohne Möglichkeit, neue
@@ -131,6 +133,35 @@ installiert ist – auch auf dem Android-Telefon, sonst verbindet sich die App n
 
 Firewall: nur 22, 80 und 443 öffnen (`ufw`). Die Ports 8010 und 8011 sind von außen nicht
 erreichbar und sollen es nicht sein.
+
+## Routenplanung mit BRouter
+
+Damit geplante Routen den Wanderwegen folgen, läuft BRouter als eigener Dienst im Stack. Ohne
+ihn lassen sich nur Luftlinien planen.
+
+1. Wegdaten holen (Standard: Alpenraum, rund 1 GB; einzelne Kacheln als Argument):
+
+   ```sh
+   deploy/brouter-segments.sh            # E5_N45 E10_N45 E15_N45 E5_N40 E10_N40
+   deploy/brouter-segments.sh E5_N45     # nur Schweiz, Westösterreich, Süddeutschland
+   ```
+
+   Eine Kachel umfasst 5° × 5° und heißt nach ihrer südwestlichen Ecke. Die Dateien liegen
+   unter `DATA_DIR/brouter/segments`. Ein erneuter Aufruf lädt nur Geändertes; die Daten
+   werden etwa wöchentlich neu erzeugt, ein monatlicher Aufruf (cron) genügt.
+
+2. In der `.env` das Profil einschalten und der API den Dienst nennen:
+
+   ```sh
+   COMPOSE_PROFILES=proxy,routing     # oder nur "routing" ohne den Caddy des Stacks
+   BROUTER_URL=http://brouter:17777
+   ```
+
+3. `docker compose up -d --build`
+
+BRouter hat keinen Port nach außen; nur die API spricht mit ihm. Die Wegdaten stammen aus
+OpenStreetMap (ODbL) und lassen sich jederzeit neu holen, gehören also nicht in die Sicherung.
+Punkte außerhalb der geladenen Kacheln ergeben beim Planen „kein Weg gefunden“.
 
 ## Sicherung
 

@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     # Routing along paths for planned routes: the BRouter of the own server.
     # Empty: only straight lines can be planned.
     brouter_url: str = ""
-    brouter_profile_hiking: str = "hiking-mountain"
+    brouter_profile_hiking: str = "hiker-hiking"
 
     # Map tiles are cached on this server (module maps); empty disables fetching new ones.
     tile_source_url: str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"

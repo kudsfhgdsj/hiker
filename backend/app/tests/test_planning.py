@@ -335,7 +335,7 @@ def test_gpx_download_contains_the_line(client, anna):
 def brouter(handler) -> BRouterEngine:
     return BRouterEngine(
         "http://brouter:17777/",
-        {"hiking": "hiking-mountain"},
+        {"hiking": "hiker-hiking"},
         transport=httpx2.MockTransport(handler),
     )
 
@@ -348,12 +348,17 @@ def test_brouter_adapter_asks_with_lon_lat_and_reads_the_line():
         geometry = {"coordinates": [[9.0, 47.0, 1500.5], [9.001, 47.005], [9.0, 47.01, 1700]]}
         return httpx2.Response(200, json={"features": [{"geometry": geometry}]})
 
-    line = brouter(handler).route([(47.0, 9.0), (47.01, 9.0)], "hiking", RouteOptions())
+    options = RouteOptions(max_difficulty=4, via_ferrata=True)
+    line = brouter(handler).route([(47.0, 9.0), (47.01, 9.0)], "hiking", options)
 
     assert seen[0].path == "/brouter"
     assert seen[0].params["lonlats"] == "9.000000,47.000000|9.000000,47.010000"
-    assert seen[0].params["profile"] == "hiking-mountain"
+    assert seen[0].params["profile"] == "hiker-hiking"
     assert seen[0].params["format"] == "geojson"
+    # Nothing harder than T4, demanding paths up to it preferred, via ferratas allowed.
+    assert seen[0].params["profile:SAC_scale_limit"] == "4"
+    assert seen[0].params["profile:SAC_scale_preferred"] == "4"
+    assert seen[0].params["profile:allow_via_ferrata"] == "1"
     assert [(point.lat, point.lon, point.ele) for point in line] == [
         (47.0, 9.0, 1500.5),
         (47.005, 9.001, None),
@@ -363,13 +368,18 @@ def test_brouter_adapter_asks_with_lon_lat_and_reads_the_line():
 
 def test_brouter_adapter_tells_no_route_from_an_unreachable_engine():
     def no_path(_request):
-        return httpx2.Response(
-            400, text="from-position not mapped in existing datafile\n", headers={}
-        )
+        # BRouter answers 400 with the reason as plain text.
+        return httpx2.Response(400, text="target island detected for section 0\n")
 
     with pytest.raises(UnprocessableError) as error:
         brouter(no_path).route([(47.0, 9.0), (47.01, 9.0)], "hiking", RouteOptions())
-    assert error.value.code == "no_route" and "not mapped" in error.value.message
+    assert error.value.code == "no_route" and "target island" in error.value.message
+
+    def broken(_request):
+        return httpx2.Response(500, text="OutOfMemoryError")
+
+    with pytest.raises(RoutingUnavailableError):
+        brouter(broken).route([(47.0, 9.0), (47.01, 9.0)], "hiking", RouteOptions())
 
     def down(_request):
         raise httpx2.ConnectError("refused")

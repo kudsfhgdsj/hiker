@@ -90,21 +90,22 @@ class BRouterEngine:
     def route(
         self, points: list[tuple[float, float]], profile: str, options: RouteOptions
     ) -> list[RoutedPoint]:
-        # TODO(phase 2, step 2): hand `options` to the BRouter profile once the container
-        # with the own profile (SAC scale, via ferrata) exists; until then they are ignored.
         params = {
             "lonlats": "|".join(f"{lon:.6f},{lat:.6f}" for lat, lon in points),
             "profile": self._profiles[profile],
             "alternativeidx": "0",
             "format": "geojson",
+            # Parameters of the profile hiker-hiking: nothing harder than the limit, and
+            # demanding paths up to the limit are preferred slightly.
+            "profile:SAC_scale_limit": str(options.max_difficulty),
+            "profile:SAC_scale_preferred": str(options.max_difficulty),
+            "profile:allow_via_ferrata": "1" if options.via_ferrata else "0",
         }
         try:
             response = self._client.get(self._url, params=params)
         except httpx2.HTTPError as exc:
             raise RoutingUnavailableError("The routing engine cannot be reached") from exc
-        if response.status_code >= 500 and "text/plain" not in response.headers.get(
-            "content-type", ""
-        ):
+        if response.status_code >= 500:
             raise RoutingUnavailableError("The routing engine answered with an error")
         if response.status_code != 200:
             # BRouter explains in plain text why there is no route, e.g. a point far from

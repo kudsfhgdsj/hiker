@@ -5,7 +5,8 @@
 #
 # Alle Daten liegen als normale Dateien unter DATA_DIR (Standard ./data), nicht in
 # Docker-Volumes: db/ (PostgreSQL), files/ (Fotos, GPX), tiles/ (Kartenkacheln),
-# web-sessions/ (Anmeldungen des Web-Frontends), caddy/ (Zertifikate des Proxys).
+# web-sessions/ (Anmeldungen des Web-Frontends), caddy/ (Zertifikate des Proxys),
+# brouter/segments/ (Wegdaten für die Routenplanung).
 name: hiker
 
 # Kein Container läuft als root: alle Prozesse gehören HIKER_UID:HIKER_GID, haben keine
@@ -29,7 +30,8 @@ services:
       - sh
       - -c
       - |
-        if ! mkdir -p /data/db /data/files /data/tiles /data/web-sessions /data/caddy; then
+        if ! mkdir -p /data/db /data/files /data/tiles /data/web-sessions /data/caddy \
+            /data/brouter/segments; then
           echo "DATA_DIR muss existieren und dem Benutzer $$(id -u):$$(id -g) gehören." >&2
           exit 1
         fi
@@ -91,7 +93,7 @@ services:
       TILE_CACHE_MAX_MB: ${TILE_CACHE_MAX_MB:-2000}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-15}
       BROUTER_URL: ${BROUTER_URL:-}
-      BROUTER_PROFILE_HIKING: ${BROUTER_PROFILE_HIKING:-hiking-mountain}
+      BROUTER_PROFILE_HIKING: ${BROUTER_PROFILE_HIKING:-hiker-hiking}
     volumes:
       - ${DATA_DIR:-./data}/files:/data/files
       - ${DATA_DIR:-./data}/tiles:/data/tiles
@@ -138,6 +140,31 @@ services:
       start_period: 10s
     cpus: 0.5
     mem_limit: 256m
+
+  # Wegführung für die Routenplanung (BRouter). Nur mit dem Profil "routing" aktiv; die API
+  # erreicht ihn über BROUTER_URL=http://brouter:17777. Kein Port nach außen: Wegpunkte
+  # gehen nur innerhalb des Stacks an diesen Dienst. Die Wegdaten holt
+  # deploy/brouter-segments.sh nach DATA_DIR/brouter/segments.
+  brouter:
+    build: ./deploy/brouter
+    profiles: ["routing"]
+    restart: unless-stopped
+    <<: *unprivileged
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    tmpfs:
+      - /tmp
+    volumes:
+      - ${DATA_DIR:-./data}/brouter/segments:/segments:ro
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "17777"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    cpus: 1.0
+    mem_limit: 640m
 
   # Reverse Proxy mit selbst ausgestelltem Zertifikat. Nur mit dem Profil "proxy" aktiv
   # (COMPOSE_PROFILES=proxy in der .env), damit der Stack auf einem Server mit eigenem

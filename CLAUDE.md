@@ -55,6 +55,7 @@ Android-App (Flutter, nur Android), Web-Frontend (Python Flask) und eigenes Back
 
 ## Betrieb
 - Der Stack läuft auf einem bereits genutzten Server und belegt von sich aus keine Ports 80/443; API und Web-Frontend nur auf `127.0.0.1`. Der mitgelieferte Reverse Proxy (Caddy mit eigener CA) ist ein abschaltbares Compose-Profil (`proxy`) mit einstellbarem Port. Proxy-Beispiele für einen vorhandenen Proxy und Backup-Skripte liegen in `deploy/`.
+- BRouter (Compose-Profil `routing`) hat keinen Port nach außen; seine Wegdaten liegen unter `DATA_DIR/brouter/segments` und werden nur mit `deploy/brouter-segments.sh` geholt.
 - Container-Ressourcen begrenzen.
 - Kein Container läuft als root: Dienste laufen als `HIKER_UID`, ohne Capabilities, mit schreibgeschütztem Dateisystem.
 - Daten liegen als normale Ordner unter `DATA_DIR` (Bind-Mounts), nicht in Docker-Volumes.
