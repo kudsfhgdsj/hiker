@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     open_meteo_forecast_url: str = "https://api.open-meteo.com/v1/forecast"
     open_meteo_archive_url: str = "https://archive-api.open-meteo.com/v1/archive"
 
+    # Routing along paths for planned routes: the BRouter of the own server.
+    # Empty: only straight lines can be planned.
+    brouter_url: str = ""
+    brouter_profile_hiking: str = "hiking-mountain"
+
     # Map tiles are cached on this server (module maps); empty disables fetching new ones.
     tile_source_url: str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
     tile_cache_path: str = "./data/tiles"

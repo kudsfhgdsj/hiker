@@ -120,6 +120,7 @@ def test_app_loads_modules_from_settings(client):
         "protocols",
         "sync",
         "maps",
+        "planning",
     ]
 
 

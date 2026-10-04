@@ -558,20 +558,28 @@ Entschieden am 04.10.2026: Phase 2 beginnt mit der Routenplanung; Kartenstile un
 - **BRouter** (MIT-Lizenz), selbst gehostet als eigener Container; die API erreicht ihn über `BROUTER_URL`. Die Wegpunkte gehen nur an den eigenen Server, nie an einen fremden Dienst. BRouter rechnet auf OSM-Wegdaten (ODbL, Quelle wird genannt), die je Region als Dateien unter `DATA_DIR` liegen, und liefert die Höhen mit.
 - **Luftlinie** (`direct`): gerade Verbindung, immer verfügbar; für wegloses Gelände, Skitouren und als Rückfall, wenn BRouter nicht eingerichtet ist. Die Höhen kommen dann vom Höhen-Adapter (Open-Meteo).
 - Jeder Wegpunkt kann festlegen, dass der Abschnitt zu ihm hin als Luftlinie verläuft (`direct`), auch wenn der Rest dem Wegenetz folgt.
-- Profile: `hiking` (Wandern, BRouter-Profil einstellbar über `BROUTER_PROFILE_HIKING`) und `direct`; weitere (Rad, Skitour) später.
+- Profile: `hiking` (Wandern, BRouter-Profil einstellbar über `BROUTER_PROFILE_HIKING`) und `direct`; weitere (Rad, Skitour) später. Das Profil gilt für alle Abschnitte; einzelne Abschnitte lassen sich davon abweichend als Luftlinie festlegen.
+- **Schwierigkeit** (Vorgabe vom 04.10.2026): Für die Wegführung wird die höchste erlaubte Stufe der SAC-Wanderskala gewählt (`max_difficulty` 1–6 = T1 Wanderung, T2 anspruchsvolle Bergwanderung, T3 Bergtour, T4 schwere Bergtour, T5 sehr schwere Bergtour, T6 äußerst schwierige Bergtour; Standard T3). Leichtere Stufen sind eingeschlossen, schwerere Wege werden nicht benutzt; wo möglich bevorzugt die Wegführung anspruchsvolle Wege bis zur gewählten Stufe. **Klettersteige** sind eine eigene Kategorie (`via_ferrata`) und werden nur benutzt, wenn sie zusätzlich angekreuzt sind. Grundlage sind die OSM-Angaben `sac_scale` und `highway=via_ferrata`; Wege ohne Angabe gelten als T1. Umgesetzt wird das in einem eigenen BRouter-Profil (Schritt 2); bis dahin nimmt die API die Angaben an und speichert sie, die Wegführung berücksichtigt sie aber noch nicht.
 - Fehler: kein Weg gefunden → 422 `no_route`; BRouter nicht erreichbar oder nicht eingerichtet → 502 `routing_unavailable`.
 
-**Datenmodell** `planned_route`: id, owner_id, title, description, planned_date, profile, waypoints (JSON: `lat`, `lon`, `name`, `direct`), series (JSON wie bei Tracks: `distance_m`, `lat`, `lon`, `elevation_m`), engine, distance_m, ascent_m, descent_m, min_elevation_m, max_elevation_m, duration_s (geschätzt), version, created_at, updated_at, deleted_at. Der Server berechnet Linie und Eckdaten beim Speichern selbst aus den Wegpunkten; der Client schickt keine Geometrie. Konfliktschutz über `version` wie bei Touren (409).
+**Datenmodell** `planned_route`: id, owner_id, title, description, planned_date, profile, max_difficulty, via_ferrata, waypoints (JSON: `lat`, `lon`, `name`, `direct`), series (JSON wie bei Tracks: `distance_m`, `lat`, `lon`, `elevation_m`), engine, distance_m, ascent_m, descent_m, min_elevation_m, max_elevation_m, duration_s (geschätzt), version, created_at, updated_at, deleted_at. Der Server berechnet Linie und Eckdaten beim Speichern selbst aus den Wegpunkten; der Client schickt keine Geometrie. Konfliktschutz über `version` wie bei Touren (409).
 
 **Gehzeit** (immer als `estimated` gekennzeichnet), nach DIN 33466: waagrecht 4 km/h, Aufstieg 300 Hm/h, Abstieg 500 Hm/h. Aus der Zeit für die Strecke und der Zeit für die Höhenmeter zählt der größere Wert ganz, der kleinere zur Hälfte. Pausen sind nicht enthalten. Ohne Höhen zählt nur die Strecke.
 
 **Rechte**: Routen gehören ihrem Owner; fremde Routen antworten mit 404. Teilen von Routen ist nicht vorgesehen, bis es gewünscht wird.
 
 **API** (`/api/v1/planning`):
-- `GET /planning/info` – verfügbare Profile, ob die Wegführung eingerichtet ist, Quellenangabe
+- `GET /planning/info` – verfügbare Profile, Schwierigkeitsstufen, ob die Wegführung eingerichtet ist, Quellenangabe
 - `POST /planning/preview` – Wegpunkte und Profil → Linie, Eckdaten, Gehzeit (nichts wird gespeichert)
 - `GET /planning/routes`, `POST /planning/routes`, `GET|PUT|DELETE /planning/routes/{id}`
 - `GET /planning/routes/{id}/gpx` – Route als GPX-Datei (Track und Wegpunkte)
+
+**Karte beim Planen** (Vorgaben vom 04.10.2026):
+- Grundlage ist OpenStreetMap.
+- **Darstellung wählbar**: Stile Sommer, Winter, Satellit und eine topografische Karte; Ebenen Hangneigung, Wetter, Schnee, Lawinenlage (Schritte 6 und 7).
+- **Gewünschte Karten von Bergfex, Kompass, Outdooractive und Alpenverein**: Das sind kommerzielle Karten. Ihre Kacheln dürfen nur mit einem Vertrag oder Schlüssel des jeweiligen Anbieters eingebunden werden; ohne diesen bindet hiker sie nicht ein. Die Layer-Provider-Schnittstelle sieht deshalb Quellen vor, die der Betreiber mit eigener Adresse und eigenem Schlüssel in der Konfiguration einträgt. Welche dieser Anbieter eine solche Nutzung überhaupt anbieten und zu welchen Bedingungen, wird in Schritt 6 je Anbieter geklärt und hier festgehalten. Als freie topografische Karten kommen OpenTopoMap sowie swisstopo, basemap.at und die Karten der Bayerischen Vermessungsverwaltung in Frage.
+- **2D und 3D** umschaltbar: Geländedarstellung mit MapLibre (Höhenkacheln aus offenen Daten, vom eigenen Server zwischengespeichert), Schritt 6.
+- **Schnelle Karte**: Verschieben und Drehen müssen flüssig sein. Dafür bleibt es bei MapLibre (GPU-Darstellung) in Web und App; Drehen wird in der App freigegeben; die eigene Karte aus OSM-Daten (Schritt 8) liefert Vektorkacheln, die schneller und in jeder Drehung scharf sind. Kacheln kommen weiterhin vom eigenen Server mit langer Cache-Dauer.
 
 **Regionen** (entschieden am 04.10.2026): Schweiz, Österreich, Deutschland (Alpen/Bayern), Italien und der übrige Alpenraum. Daraus folgt für die Schritte 6 und 7: länderspezifische Quellen, wo sie frei sind (swisstopo, basemap.at, Bayerische Vermessungsverwaltung), sonst weltweite (OpenStreetMap, OpenTopoMap, Sentinel-2); jede Quelle nur über die Layer-Provider-Schnittstelle und mit dokumentierter Lizenz. Die Wegdaten für BRouter decken diese Länder ab.
 
@@ -628,11 +636,11 @@ Ziel: Ubuntu 26.04, Domain `hiker.lacasa.internal`, läuft auf dem bereits genut
 
 **Phase 2 – Planung (aktuell)**; Einzelheiten in Abschnitt 9b
 1. Backend-Modul `planning`: geplante Routen (CRUD, Vorschau, Eckdaten, Gehzeit-Schätzung, GPX-Export), Wegführung hinter einem Adapter, Luftlinie als Rückfall
-2. BRouter als eigener Container (Compose-Profil `routing`), Skript für die Wegdaten der Regionen
+2. BRouter als eigener Container (Compose-Profil `routing`), Skript für die Wegdaten der Regionen, eigenes Profil für Schwierigkeit (T1–T6) und Klettersteige
 3. Web-Frontend: Routenliste und Planer (Punkte setzen, verschieben, Höhenprofil, speichern, GPX)
 4. App: Routenliste, Detail, Planer, Offline-Abgleich
 5. Verknüpfung zu Protokollen: aus einer Route eine Tour anlegen, Plan und tatsächlichen Track vergleichen; GPX-Import als Route
-6. Layer-Provider-Schnittstelle im Modul `maps`; Kartenstile je Region (Sommer, Winter, Luftbild), Lizenzen je Quelle dokumentiert
+6. Layer-Provider-Schnittstelle im Modul `maps`; Kartenstile je Region (Sommer, Winter, Luftbild, Topo), vom Betreiber eintragbare lizenzierte Quellen, Umschaltung 2D/3D, Lizenzen je Quelle dokumentiert
 7. Ebenen: Hangneigung, Wetter, Schnee, Lawinenlage
 8. Eigene Karte aus OSM-Rohdaten (Regionsauszug, regelmäßig neu gebaut)
 9. Optional: FIT-Import

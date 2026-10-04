@@ -6,7 +6,7 @@ os.environ.update(
         "SECRET_KEY": "test-secret-key-not-for-production-0123456789",
         "DATABASE_URL": "sqlite://",
         "PUBLIC_BASE_URL": "http://testserver",
-        "ENABLED_MODULES": "auth,gear,nutrition,protocols,sync,maps",
+        "ENABLED_MODULES": "auth,gear,nutrition,protocols,sync,maps,planning",
         # Most tests sign in with a password only; test_auth_security.py switches it on.
         "MFA_REQUIRED": "false",
         "REGISTRATION_MODE": "open",
@@ -35,6 +35,12 @@ from app.main import create_app  # noqa: E402
 from app.modules.auth import service as auth_service  # noqa: E402
 from app.modules.nutrition.deps import get_food_source  # noqa: E402
 from app.modules.nutrition.sources import FoodData, FoodSourceError  # noqa: E402
+from app.modules.planning.routing import (  # noqa: E402
+    RoutedPoint,
+    RoutingUnavailableError,
+    get_routing_engine,
+    no_route,
+)
 from app.modules.protocols.elevation import (  # noqa: E402
     ElevationSourceError,
     get_elevation_source,
@@ -81,13 +87,22 @@ def db(session_factory):
 
 
 @pytest.fixture
-def client(session_factory, storage, food_source, elevation_source, weather_source, place_source):
+def client(
+    session_factory,
+    storage,
+    food_source,
+    elevation_source,
+    weather_source,
+    place_source,
+    routing_engine,
+):
     app = create_app()
     app.dependency_overrides[get_storage] = lambda: storage
     app.dependency_overrides[get_food_source] = lambda: food_source
     app.dependency_overrides[get_elevation_source] = lambda: elevation_source
     app.dependency_overrides[get_weather_source] = lambda: weather_source
     app.dependency_overrides[get_place_source] = lambda: place_source
+    app.dependency_overrides[get_routing_engine] = lambda: routing_engine
 
     def _get_db():
         with session_factory() as session:
@@ -180,6 +195,41 @@ class FakePlaceSource:
 @pytest.fixture
 def place_source():
     return FakePlaceSource()
+
+
+class FakeRoutingEngine:
+    """Stands in for BRouter; tests never touch the network."""
+
+    name = "brouter"
+
+    def __init__(self):
+        self.calls: list[tuple] = []
+        self.options: list = []
+        self.available = True
+        self.fail = False
+        self.no_route = False
+
+    def route(self, points, profile, options):
+        self.calls.append((points, profile))
+        self.options.append(options)
+        if not self.available or self.fail:
+            raise RoutingUnavailableError("unreachable")
+        if self.no_route:
+            raise no_route("No route found: target island detected")
+        # A path with a bend between two points, with elevations of its own.
+        line = []
+        for (lat1, lon1), (lat2, lon2) in zip(points, points[1:], strict=False):
+            middle = ((lat1 + lat2) / 2, (lon1 + lon2) / 2 + 0.002)
+            for lat, lon in ((lat1, lon1), middle):
+                line.append(RoutedPoint(lat, lon, round(1500 + (lat - 47) * 20_000, 1)))
+        lat, lon = points[-1]
+        line.append(RoutedPoint(lat, lon, round(1500 + (lat - 47) * 20_000, 1)))
+        return line
+
+
+@pytest.fixture
+def routing_engine():
+    return FakeRoutingEngine()
 
 
 @pytest.fixture

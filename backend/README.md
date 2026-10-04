@@ -103,3 +103,20 @@ Automatisch erzeugte Skripte vor dem Commit prüfen: `app.core.db.UTCDateTime` d
 `TILE_CACHE_DAYS` fragt der Server mit dem gespeicherten ETag nach einer neuen Fassung. Ist die
 Quelle nicht erreichbar, wird die gespeicherte Kachel weiter ausgeliefert. Es wird nichts auf
 Vorrat geladen. Quelle nennen: © OpenStreetMap-Mitwirkende (ODbL).
+
+## Modul planning (Routenplanung)
+
+Geplante Routen bestehen aus Wegpunkten; Linie, Eckdaten und Gehzeit berechnet der Server
+(`planning/service.py`). Einzelheiten und Entscheidungen stehen in `DESIGN.md`, Abschnitt 9b.
+
+- **Wegführung** liegt hinter dem Adapter `RoutingEngine` (`planning/routing.py`). Mit
+  `BROUTER_URL` nutzt die API den BRouter des eigenen Servers; ohne ihn lassen sich nur
+  Luftlinien planen (Profil `direct`), und `GET /planning/info` meldet das.
+- **Luftlinien** bekommen etwa alle 50 m einen Punkt; ihre Höhen kommen vom Höhen-Adapter
+  (`OPEN_METEO_ELEVATION_URL`). Fällt er aus, bleibt die Route ohne Höhen.
+- **Schwierigkeit**: `max_difficulty` (1–6 für T1–T6) und `via_ferrata` werden angenommen und
+  gespeichert und an den Adapter gereicht. Der BRouter-Adapter wertet sie erst aus, sobald
+  das eigene BRouter-Profil eingerichtet ist (Phase 2, Schritt 2).
+- **Gehzeit** nach DIN 33466 (`planning/estimate.py`), in der API als geschätzt
+  gekennzeichnet (`duration_estimated`).
+- Routen gehören ihrem Owner; fremde Routen antworten mit 404.
