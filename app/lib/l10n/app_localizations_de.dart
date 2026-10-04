@@ -1431,4 +1431,80 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get errorVersionConflict =>
       'Der Eintrag wurde inzwischen geändert. Bitte neu laden.';
+
+  @override
+  String get planGpx => 'Als GPX speichern';
+
+  @override
+  String get planGpxSaved => 'GPX-Datei gespeichert.';
+
+  @override
+  String get planOnDevice =>
+      'Ohne Verbindung auf dem Gerät berechnet. Der Server rechnet beim Abgleich neu; Luftlinien bekommen erst dann ihre Höhen.';
+
+  @override
+  String get planOfflineNoData =>
+      'Für dieses Gebiet sind keine Wegdaten auf dem Gerät. Unter Planung → Offline-Wegdaten laden oder den Abschnitt als Luftlinie planen.';
+
+  @override
+  String get offlineTitle => 'Offline-Wegdaten';
+
+  @override
+  String get offlineIntro =>
+      'Mit den Wegdaten eines Gebiets plant die App Routen auch ohne Verbindung. Die Daten kommen von deinem Server und stammen aus OpenStreetMap (ODbL).';
+
+  @override
+  String get offlineMapNote =>
+      'Die Karte selbst zeigt ohne Verbindung nur Ausschnitte, die du vorher schon angesehen hast.';
+
+  @override
+  String get offlineNone => 'Dieser Server bietet keine Wegdaten an.';
+
+  @override
+  String get offlineDownload => 'Laden';
+
+  @override
+  String get offlineUpdate => 'Neu laden';
+
+  @override
+  String get offlineRemove => 'Vom Gerät entfernen';
+
+  @override
+  String offlineLoaded(String date) {
+    return 'geladen am $date';
+  }
+
+  @override
+  String offlineLoading(String percent) {
+    return 'Lädt … $percent %';
+  }
+
+  @override
+  String get offlineEast => 'Ost';
+
+  @override
+  String get offlineWest => 'West';
+
+  @override
+  String get offlineNorth => 'Nord';
+
+  @override
+  String get offlineSouth => 'Süd';
+
+  @override
+  String get offlineRegionE5N45 =>
+      'Schweiz, Vorarlberg, Süddeutschland, Nordwestitalien';
+
+  @override
+  String get offlineRegionE10N45 =>
+      'Österreich West und Mitte, Bayern, Südtirol, Dolomiten';
+
+  @override
+  String get offlineRegionE15N45 => 'Österreich Ost, Slowenien';
+
+  @override
+  String get offlineRegionE5N40 => 'Seealpen, Ligurien, Korsika';
+
+  @override
+  String get offlineRegionE10N40 => 'Mittelitalien';
 }

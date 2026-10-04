@@ -7,6 +7,7 @@ import '../../l10n/app_localizations.dart';
 import '../db/app_database.dart';
 import '../sync/sync_service.dart';
 import '../theme/app_theme.dart';
+import 'error_text.dart';
 
 /// State of the offline sync: what waits for a connection, what needs a
 /// decision, and a button to sync now.
@@ -79,7 +80,9 @@ class SyncSection extends ConsumerWidget {
             for (final change in status.failed) ...[
               const Divider(),
               Text(_label(l10n, change), style: theme.textTheme.titleSmall),
-              Text('${l10n.syncFailed} (${change.error})'),
+              Text(
+                '${l10n.syncFailed}: ${describeErrorCode(l10n, change.error!)}',
+              ),
               Align(
                 alignment: Alignment.centerLeft,
                 child: OutlinedButton(

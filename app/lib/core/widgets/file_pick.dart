@@ -41,3 +41,25 @@ Future<List<PickedFile>> _pick({
 final filePickerProvider = Provider<PickFiles>((ref) => _pick);
 
 const imageExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+
+typedef SaveFile = Future<bool> Function({
+  required String name,
+  required Uint8List bytes,
+  required String mimeType,
+});
+
+Future<bool> _save({
+  required String name,
+  required Uint8List bytes,
+  required String mimeType,
+}) async =>
+    await FilePicker.saveFile(
+      fileName: name,
+      bytes: bytes,
+      mimeType: mimeType,
+    ) !=
+    null;
+
+/// Lets the user choose where to store a file; false if they cancelled.
+/// Replaced in tests.
+final fileSaverProvider = Provider<SaveFile>((ref) => _save);

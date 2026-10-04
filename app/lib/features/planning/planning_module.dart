@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/modules/feature_module.dart';
+import 'presentation/offline_data_screen.dart';
 import 'presentation/route_list_screen.dart';
 import 'presentation/route_plan_screen.dart';
 
@@ -18,6 +19,10 @@ final planningModule = FeatureModule(
         GoRoute(
           path: 'new',
           builder: (context, state) => const RoutePlanScreen(),
+        ),
+        GoRoute(
+          path: 'offline',
+          builder: (context, state) => const OfflineDataScreen(),
         ),
         GoRoute(
           path: 'route/:id',

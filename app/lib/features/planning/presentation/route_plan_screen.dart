@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,7 +12,9 @@ import '../../../core/map/map_view.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/error_text.dart';
+import '../../../core/widgets/file_pick.dart';
 import '../../../l10n/app_localizations.dart';
+import '../data/offline_routing.dart';
 import '../data/route_models.dart';
 import '../data/route_repository.dart';
 
@@ -224,7 +229,7 @@ class _RoutePlanScreenState extends ConsumerState<RoutePlanScreen> {
     try {
       final saved = await ref
           .read(routeRepositoryProvider)
-          .save(_draft, existing: _existing);
+          .save(_draft, existing: _existing, computed: _result);
       ref.invalidate(routeListProvider);
       if (!mounted) return;
       setState(() {
@@ -243,6 +248,30 @@ class _RoutePlanScreenState extends ConsumerState<RoutePlanScreen> {
       if (!mounted) return;
       showError(context, error);
       setState(() => _busy = false);
+    }
+  }
+
+  /// Writes the line shown as a GPX file; works without network too.
+  Future<void> _exportGpx() async {
+    final result = _result;
+    if (result == null) return;
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final title = _title.text.trim().isEmpty
+        ? l10n.planNew
+        : _title.text.trim();
+    final name = title.replaceAll(RegExp(r'[^\w\-äöüÄÖÜß ]'), '').trim();
+    try {
+      final saved = await ref.read(fileSaverProvider)(
+        name: '${name.isEmpty ? 'route' : name}.gpx',
+        bytes: Uint8List.fromList(utf8.encode(routeGpx(title, result))),
+        mimeType: 'application/gpx+xml',
+      );
+      if (saved) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.planGpxSaved)));
+      }
+    } catch (error) {
+      if (mounted) showError(context, error);
     }
   }
 
@@ -265,6 +294,7 @@ class _RoutePlanScreenState extends ConsumerState<RoutePlanScreen> {
   String _problemText(AppLocalizations l10n, String code) => switch (code) {
     'no_route' => l10n.errorNoRoute,
     'routing_unavailable' => l10n.errorRoutingUnavailable,
+    offlineNoData => l10n.planOfflineNoData,
     ApiException.network => l10n.planOffline,
     _ => l10n.planFailed,
   };
@@ -315,6 +345,7 @@ class _RoutePlanScreenState extends ConsumerState<RoutePlanScreen> {
           ),
           TextButton(onPressed: canSave ? _save : null, child: Text(l10n.save)),
           PopupMenuButton<VoidCallback>(
+            key: const ValueKey('plan-menu'),
             onSelected: (action) => action(),
             itemBuilder: (context) => [
               PopupMenuItem(
@@ -329,6 +360,11 @@ class _RoutePlanScreenState extends ConsumerState<RoutePlanScreen> {
                   _moving = null;
                 }),
                 child: Text(l10n.planClear),
+              ),
+              PopupMenuItem(
+                enabled: _result != null,
+                value: _exportGpx,
+                child: Text(l10n.planGpx),
               ),
               if (_existing != null)
                 PopupMenuItem(value: _delete, child: Text(l10n.delete)),
@@ -392,6 +428,14 @@ class _RoutePlanScreenState extends ConsumerState<RoutePlanScreen> {
                 if (result != null) ...[
                   const SizedBox(height: AppSpacing.s),
                   _Figures(result: result),
+                  if (result.onDevice)
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.xs),
+                      child: Text(
+                        l10n.planOnDevice,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
                 ],
               ],
             ),

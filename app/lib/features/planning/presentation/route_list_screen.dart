@@ -40,7 +40,16 @@ class _RouteListScreenState extends ConsumerState<RouteListScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.planTitle)),
+      appBar: AppBar(
+        title: Text(l10n.planTitle),
+        actions: [
+          IconButton(
+            tooltip: l10n.offlineTitle,
+            icon: const Icon(Icons.download_for_offline_outlined),
+            onPressed: () => context.push('/planning/offline'),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/planning/new'),
         icon: const Icon(Icons.add),

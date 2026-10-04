@@ -53,6 +53,10 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName(if (hasReleaseKey) "release" else "debug")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
@@ -65,4 +69,9 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Routing on the device for planning without network; see libs/README.md.
+    implementation(files("libs/brouter-1.7.10-ro.jar"))
 }

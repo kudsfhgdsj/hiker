@@ -70,6 +70,10 @@ class RouteResult {
   double? get ascentM => (json['ascent_m'] as num?)?.toDouble();
   double? get descentM => (json['descent_m'] as num?)?.toDouble();
 
+  /// Computed on the device without network; the server computes it again
+  /// when the route is synced.
+  bool get onDevice => json['on_device'] == true;
+
   /// Estimated walking time without breaks (DIN 33466).
   int get durationS => (json['duration_s'] as num).round();
 

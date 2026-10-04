@@ -7,17 +7,28 @@ import '../../../core/loaded.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/sync/sync_service.dart' hide Json;
+import 'offline_routing.dart';
 import 'route_models.dart';
 
 /// Planned routes. The server computes every line; without network a route
 /// is kept on the device as a draft of its waypoints and gets its line with
 /// the next sync.
 class RouteRepository {
-  const RouteRepository(this._dio, this._db, this._sync);
+  const RouteRepository(
+    this._dio,
+    this._db,
+    this._sync,
+    this._router,
+    this._segments,
+  );
 
   final Dio _dio;
   final AppDatabase _db;
   final SyncService _sync;
+
+  /// Routing on the device, for planning without network.
+  final DeviceRouter? _router;
+  final SegmentStore _segments;
 
   /// Whole routes: synced, opened or drafted on this device.
   static const _routes = 'routes';
@@ -118,19 +129,32 @@ class RouteRepository {
     }
   }
 
-  /// Line and key figures for a draft; nothing is stored. Throws an
-  /// [ApiException] with `no_route`, `routing_unavailable` or `network`.
+  /// Line and key figures for a draft; nothing is stored. Without network
+  /// the line is computed on the device from the path data loaded there.
+  /// Throws an [ApiException] with `no_route`, `routing_unavailable` or, on
+  /// the device, `offline_no_data`.
   Future<RouteResult> preview(RouteDraft draft) async {
-    final response = await apiCall(
-      () => _dio.post<Json>('/planning/preview', data: draft.courseJson()),
-    );
-    return RouteResult(response.data!);
+    try {
+      final response = await apiCall(
+        () => _dio.post<Json>('/planning/preview', data: draft.courseJson()),
+      );
+      return RouteResult(response.data!);
+    } on ApiException catch (error) {
+      if (error.code != ApiException.network) rethrow;
+      return computeOnDevice(draft, router: _router, hasSegment: _segments.has);
+    }
   }
 
   /// Saves on the server. Without network the draft is kept on the device
   /// and sent with the next sync, which also computes its line.
   /// Throws `version_conflict` if the route was changed elsewhere meanwhile.
-  Future<PlannedRoute> save(RouteDraft draft, {PlannedRoute? existing}) async {
+  /// [computed] is the line shown in the planner; a draft kept on the device
+  /// takes it along, so that it has figures until the server answers.
+  Future<PlannedRoute> save(
+    RouteDraft draft, {
+    PlannedRoute? existing,
+    RouteResult? computed,
+  }) async {
     final document = draft.toJson();
     try {
       final saved = await _stored(
@@ -151,7 +175,7 @@ class RouteRepository {
           _course.every((key) => '${before[key]}' == '${document[key]}');
       final local = <String, dynamic>{
         // The old line and figures only stay if the course did not change.
-        if (sameCourse) ...before,
+        if (sameCourse) ...before else ...?computed?.json,
         ...document,
         'id': id,
         'version': existing?.version ?? 0,
@@ -185,6 +209,8 @@ final routeRepositoryProvider = Provider<RouteRepository>(
     ref.watch(dioProvider),
     ref.watch(appDatabaseProvider),
     ref.read(syncProvider.notifier),
+    ref.watch(deviceRouterProvider),
+    ref.watch(segmentStoreProvider),
   ),
 );
 

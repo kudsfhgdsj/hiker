@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -15,6 +16,7 @@ import 'package:hiker/core/map/tile_proxy.dart';
 import 'package:hiker/core/network/api_client.dart';
 import 'package:hiker/core/network/trusted_certificates.dart';
 import 'package:hiker/core/storage/key_value_store.dart';
+import 'package:hiker/features/planning/data/offline_routing.dart';
 
 typedef FakeResponse = ({int status, Object? body});
 typedef FakeHandler = FakeResponse Function(
@@ -115,6 +117,7 @@ ProviderContainer createContainer({
   List<Override> overrides = const [],
   List<FeatureModule>? modules,
   CertificateProbe? certificateProbe,
+  DeviceRouter? deviceRouter,
 }) {
   final container = ProviderContainer(
     // Riverpod retries failed providers with a delay; tests want the first answer.
@@ -129,6 +132,11 @@ ProviderContainer createContainer({
         certificateProbe ?? (_) async => null,
       ),
       httpClientAdapterProvider.overrideWithValue(api),
+      // No platform in tests: no router on the device, files in a temporary folder.
+      deviceRouterProvider.overrideWithValue(deviceRouter),
+      routingDirectoryProvider.overrideWith(
+        (ref) => Directory.systemTemp.createTemp('hiker-routing'),
+      ),
       keyValueStoreProvider.overrideWithValue(store ?? MemoryKeyValueStore()),
       appDatabaseProvider.overrideWith((ref) {
         final database = AppDatabase(NativeDatabase.memory());
@@ -151,6 +159,7 @@ Future<ProviderContainer> pumpApp(
   List<FeatureModule>? modules,
   Size size = const Size(400, 800),
   CertificateProbe? certificateProbe,
+  DeviceRouter? deviceRouter,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -161,6 +170,7 @@ Future<ProviderContainer> pumpApp(
     overrides: overrides,
     modules: modules,
     certificateProbe: certificateProbe,
+    deviceRouter: deviceRouter,
   );
   await tester.pumpWidget(
     UncontrolledProviderScope(container: container, child: const HikerApp()),

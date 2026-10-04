@@ -2691,6 +2691,138 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Der Eintrag wurde inzwischen geändert. Bitte neu laden.'**
   String get errorVersionConflict;
+
+  /// No description provided for @planGpx.
+  ///
+  /// In de, this message translates to:
+  /// **'Als GPX speichern'**
+  String get planGpx;
+
+  /// No description provided for @planGpxSaved.
+  ///
+  /// In de, this message translates to:
+  /// **'GPX-Datei gespeichert.'**
+  String get planGpxSaved;
+
+  /// No description provided for @planOnDevice.
+  ///
+  /// In de, this message translates to:
+  /// **'Ohne Verbindung auf dem Gerät berechnet. Der Server rechnet beim Abgleich neu; Luftlinien bekommen erst dann ihre Höhen.'**
+  String get planOnDevice;
+
+  /// No description provided for @planOfflineNoData.
+  ///
+  /// In de, this message translates to:
+  /// **'Für dieses Gebiet sind keine Wegdaten auf dem Gerät. Unter Planung → Offline-Wegdaten laden oder den Abschnitt als Luftlinie planen.'**
+  String get planOfflineNoData;
+
+  /// No description provided for @offlineTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Offline-Wegdaten'**
+  String get offlineTitle;
+
+  /// No description provided for @offlineIntro.
+  ///
+  /// In de, this message translates to:
+  /// **'Mit den Wegdaten eines Gebiets plant die App Routen auch ohne Verbindung. Die Daten kommen von deinem Server und stammen aus OpenStreetMap (ODbL).'**
+  String get offlineIntro;
+
+  /// No description provided for @offlineMapNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Karte selbst zeigt ohne Verbindung nur Ausschnitte, die du vorher schon angesehen hast.'**
+  String get offlineMapNote;
+
+  /// No description provided for @offlineNone.
+  ///
+  /// In de, this message translates to:
+  /// **'Dieser Server bietet keine Wegdaten an.'**
+  String get offlineNone;
+
+  /// No description provided for @offlineDownload.
+  ///
+  /// In de, this message translates to:
+  /// **'Laden'**
+  String get offlineDownload;
+
+  /// No description provided for @offlineUpdate.
+  ///
+  /// In de, this message translates to:
+  /// **'Neu laden'**
+  String get offlineUpdate;
+
+  /// No description provided for @offlineRemove.
+  ///
+  /// In de, this message translates to:
+  /// **'Vom Gerät entfernen'**
+  String get offlineRemove;
+
+  /// No description provided for @offlineLoaded.
+  ///
+  /// In de, this message translates to:
+  /// **'geladen am {date}'**
+  String offlineLoaded(String date);
+
+  /// No description provided for @offlineLoading.
+  ///
+  /// In de, this message translates to:
+  /// **'Lädt … {percent} %'**
+  String offlineLoading(String percent);
+
+  /// No description provided for @offlineEast.
+  ///
+  /// In de, this message translates to:
+  /// **'Ost'**
+  String get offlineEast;
+
+  /// No description provided for @offlineWest.
+  ///
+  /// In de, this message translates to:
+  /// **'West'**
+  String get offlineWest;
+
+  /// No description provided for @offlineNorth.
+  ///
+  /// In de, this message translates to:
+  /// **'Nord'**
+  String get offlineNorth;
+
+  /// No description provided for @offlineSouth.
+  ///
+  /// In de, this message translates to:
+  /// **'Süd'**
+  String get offlineSouth;
+
+  /// No description provided for @offlineRegionE5N45.
+  ///
+  /// In de, this message translates to:
+  /// **'Schweiz, Vorarlberg, Süddeutschland, Nordwestitalien'**
+  String get offlineRegionE5N45;
+
+  /// No description provided for @offlineRegionE10N45.
+  ///
+  /// In de, this message translates to:
+  /// **'Österreich West und Mitte, Bayern, Südtirol, Dolomiten'**
+  String get offlineRegionE10N45;
+
+  /// No description provided for @offlineRegionE15N45.
+  ///
+  /// In de, this message translates to:
+  /// **'Österreich Ost, Slowenien'**
+  String get offlineRegionE15N45;
+
+  /// No description provided for @offlineRegionE5N40.
+  ///
+  /// In de, this message translates to:
+  /// **'Seealpen, Ligurien, Korsika'**
+  String get offlineRegionE5N40;
+
+  /// No description provided for @offlineRegionE10N40.
+  ///
+  /// In de, this message translates to:
+  /// **'Mittelitalien'**
+  String get offlineRegionE10N40;
 }
 
 class _AppLocalizationsDelegate

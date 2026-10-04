@@ -38,6 +38,7 @@ String describeError(AppLocalizations l10n, Object error) {
     'no_duration' => l10n.tourNoEstimateDuration,
     'source_unavailable' => l10n.foodSourceUnavailable,
     'no_route' => l10n.errorNoRoute,
+    'not_found' => l10n.errorNotFound,
     'routing_unavailable' => l10n.errorRoutingUnavailable,
     'version_conflict' => l10n.errorVersionConflict,
     _ => switch (error.statusCode) {
@@ -49,6 +50,13 @@ String describeError(AppLocalizations l10n, Object error) {
       _ => l10n.errorUnknown,
     },
   };
+}
+
+/// German text for the error code of a change the sync could not apply.
+String describeErrorCode(AppLocalizations l10n, String code) {
+  final text = describeError(l10n, ApiException(code: code, message: code));
+  // An unknown code is still worth showing: it helps to find the cause.
+  return text == l10n.errorUnknown ? '$text ($code)' : text;
 }
 
 /// Error message inside a form.
