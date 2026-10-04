@@ -1,9 +1,14 @@
+import re
+from datetime import UTC, datetime
+from pathlib import Path as FilePath
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, Path, Query, Response, status
+from fastapi.responses import FileResponse
 
+from app.core.config import get_settings
 from app.core.deps import DbSession
-from app.core.errors import error_responses
+from app.core.errors import NotFoundError, error_responses
 from app.core.pagination import Page, Paging
 from app.core.ratelimit import rate_limit
 from app.modules.auth.deps import CurrentUser
@@ -22,6 +27,7 @@ from app.modules.planning.schemas import (
     RoutePreviewOut,
     RouteSummary,
     RouteUpdate,
+    SegmentInfo,
 )
 from app.modules.protocols.elevation import Elevations
 
@@ -129,3 +135,46 @@ def download_gpx(route: OwnedRoute):
         media_type=GPX_MIME,
         headers={"Content-Disposition": f'attachment; filename="route-{route.id}.gpx"'},
     )
+
+
+# --- Path data for planning without network (the app routes on the device) ---
+
+SEGMENT_NAME = r"^[EW]\d{1,3}_[NS]\d{1,2}$"
+
+
+def _segment_files() -> dict[str, FilePath]:
+    folder = get_settings().brouter_segments_path
+    if not folder or not FilePath(folder).is_dir():
+        return {}
+    return {
+        file.stem: file
+        for file in sorted(FilePath(folder).glob("*.rd5"))
+        if re.match(SEGMENT_NAME, file.stem) and file.is_file()
+    }
+
+
+@router.get("/segments", response_model=list[SegmentInfo])
+def list_segments(_user: CurrentUser):
+    """The path data this server offers for download; empty if none is installed."""
+    return [
+        SegmentInfo(
+            name=name,
+            size_bytes=file.stat().st_size,
+            modified=datetime.fromtimestamp(file.stat().st_mtime, UTC),
+        )
+        for name, file in _segment_files().items()
+    ]
+
+
+@router.get(
+    "/segments/{name}",
+    response_class=FileResponse,
+    responses={200: {"content": {"application/octet-stream": {}}}, **error_responses(404, 429)},
+    dependencies=[Depends(rate_limit("segments", limit=30))],
+)
+def download_segment(name: Annotated[str, Path(pattern=SEGMENT_NAME)], _user: CurrentUser):
+    """One tile of path data (100 to 300 MB). Supports range requests to resume a download."""
+    file = _segment_files().get(name)
+    if file is None:
+        raise NotFoundError("No such path data")
+    return FileResponse(file, media_type="application/octet-stream", filename=f"{name}.rd5")

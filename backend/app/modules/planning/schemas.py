@@ -117,6 +117,14 @@ class RouteOut(RouteSummary):
     series: RouteSeries
 
 
+class SegmentInfo(BaseModel):
+    """Path data of one tile of 5° x 5°, named after its south-west corner (e.g. E5_N45)."""
+
+    name: str
+    size_bytes: int
+    modified: datetime
+
+
 class ProfileInfo(BaseModel):
     id: str
     available: bool

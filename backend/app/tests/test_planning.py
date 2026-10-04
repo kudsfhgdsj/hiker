@@ -4,6 +4,7 @@ from xml.etree import ElementTree
 import httpx2
 import pytest
 
+from app.core.config import get_settings
 from app.core.errors import UnprocessableError
 from app.modules.planning.estimate import walking_time_s
 from app.modules.planning.routing import BRouterEngine, RouteOptions, RoutingUnavailableError
@@ -327,6 +328,36 @@ def test_gpx_download_contains_the_line(client, anna):
     assert len(points) == 5 and points[0].get("lat") == "47.0000000"
     assert root.find(".//gpx:trk/gpx:name", namespace).text == "Auf den Gipfel"
     assert points[-1].find("gpx:ele", namespace).text == "1900.0"
+
+
+# --- Path data for the app ---
+
+
+def test_path_data_is_listed_and_downloaded_in_parts(client, anna, tmp_path, monkeypatch):
+    assert client.get("/api/v1/planning/segments", headers=anna).json() == []
+
+    (tmp_path / "E5_N45.rd5").write_bytes(b"0123456789")
+    (tmp_path / "notes.txt").write_text("not path data")
+    (tmp_path / "bad name.rd5").write_bytes(b"x")
+    monkeypatch.setenv("BROUTER_SEGMENTS_PATH", str(tmp_path))
+    get_settings.cache_clear()
+
+    listed = client.get("/api/v1/planning/segments", headers=anna).json()
+    assert [(item["name"], item["size_bytes"]) for item in listed] == [("E5_N45", 10)]
+
+    whole = client.get("/api/v1/planning/segments/E5_N45", headers=anna)
+    assert whole.status_code == 200 and whole.content == b"0123456789"
+    # An interrupted download continues where it stopped.
+    rest = client.get("/api/v1/planning/segments/E5_N45", headers=anna | {"Range": "bytes=4-"})
+    assert rest.status_code == 206 and rest.content == b"456789"
+
+    assert client.get("/api/v1/planning/segments/E10_N45", headers=anna).status_code == 404
+    assert client.get("/api/v1/planning/segments/..%2Fnotes", headers=anna).status_code in (
+        404,
+        422,
+    )
+    assert client.get("/api/v1/planning/segments/notes.txt", headers=anna).status_code == 422
+    assert client.get("/api/v1/planning/segments/E5_N45").status_code == 401
 
 
 # --- Offline sync ---

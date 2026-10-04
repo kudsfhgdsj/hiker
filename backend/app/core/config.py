@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     # Empty: only straight lines can be planned.
     brouter_url: str = ""
     brouter_profile_hiking: str = "hiker-hiking"
+    # Folder with BRouter's path data (*.rd5). The app downloads it from here to plan
+    # routes without network. Empty: no path data is offered.
+    brouter_segments_path: str = ""
 
     # Map tiles are cached on this server (module maps); empty disables fetching new ones.
     tile_source_url: str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
