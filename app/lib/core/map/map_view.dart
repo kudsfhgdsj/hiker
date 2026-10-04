@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../config/app_config.dart';
+import '../modules/feature_module.dart';
+import '../session/session.dart';
 import 'geo.dart';
 import 'maplibre_map_view.dart';
 
@@ -53,11 +56,24 @@ class MapContent {
 
 typedef MapViewBuilder = Widget Function(MapContent content);
 
+/// Where the map gets its tiles from: the user's own server, which keeps a
+/// copy of every tile it was asked for. Only a server without the module
+/// `maps` sends the app to the tile source directly.
+final mapTileUrlProvider = Provider<String>((ref) {
+  if (AppConfig.mapTileUrl.isNotEmpty) return AppConfig.mapTileUrl;
+  final baseUrl = ref.watch(sessionProvider.select((s) => s.baseUrl));
+  // No answer yet or no network: asData is null; then the server is tried.
+  final modules = ref.watch(backendModulesProvider).asData?.value;
+  final serverHasTiles = modules == null || modules.contains('maps');
+  if (baseUrl.isEmpty || !serverHasTiles) return AppConfig.fallbackTileUrl;
+  return '$baseUrl${AppConfig.serverTilePath}';
+});
+
 /// Builds the map. Tests replace it, because the real map needs the platform.
-final mapViewBuilderProvider = Provider<MapViewBuilder>(
-  (ref) =>
-      (content) => MapLibreMapView(content: content),
-);
+final mapViewBuilderProvider = Provider<MapViewBuilder>((ref) {
+  final tileUrl = ref.watch(mapTileUrlProvider);
+  return (content) => MapLibreMapView(content: content, tileUrl: tileUrl);
+});
 
 /// The map of the app: track, markers and an optional highlighted point.
 class HikerMap extends ConsumerWidget {

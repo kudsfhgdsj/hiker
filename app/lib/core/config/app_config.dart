@@ -9,11 +9,16 @@ class AppConfig {
 
   static const apiPrefix = '/api/v1';
 
-  /// Tile source of the map; replaceable until the licences are settled.
-  static const mapTileUrl = String.fromEnvironment(
-    'MAP_TILE_URL',
-    defaultValue: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-  );
+  /// Optional fixed tile source of the map (`--dart-define=MAP_TILE_URL=...`).
+  /// Empty: the tiles come from the user's server (module `maps`).
+  static const mapTileUrl = String.fromEnvironment('MAP_TILE_URL');
+
+  /// Tiles the server keeps a copy of, below its address.
+  static const serverTilePath = '$apiPrefix/maps/tiles/{z}/{x}/{y}.png';
+
+  /// Used only if the server has no module `maps`.
+  static const fallbackTileUrl =
+      'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 }
 
 /// Returns the address without trailing slash, or null if it is not usable.

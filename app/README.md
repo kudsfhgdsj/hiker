@@ -71,3 +71,9 @@ Navigation). Angezeigt wird es nur, wenn der Server das gleichnamige Modul melde
 Die Tests brauchen weder Server noch Netz: `test/helpers.dart` ersetzt den HTTP-Adapter durch
 `FakeApi`, den Keystore durch einen Speicher im Arbeitsspeicher und die Datenbank durch SQLite
 im Arbeitsspeicher.
+
+## Karte
+
+Die Kartenkacheln kommen vom eigenen Server (`/api/v1/maps/tiles/…`, Modul `maps`), der sie
+zwischenspeichert. Hat der Server das Modul nicht, lädt die App direkt von OpenStreetMap. Eine
+feste Quelle lässt sich beim Bauen setzen: `--dart-define=MAP_TILE_URL=https://…/{z}/{x}/{y}.png`.

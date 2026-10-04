@@ -5,16 +5,22 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
-import '../config/app_config.dart';
 import 'geo.dart';
 import 'map_view.dart';
 
 /// The map drawn by MapLibre. The track is a line layer of the map; markers are
 /// Flutter widgets laid over it and moved along with the camera.
 class MapLibreMapView extends StatefulWidget {
-  const MapLibreMapView({super.key, required this.content});
+  const MapLibreMapView({
+    super.key,
+    required this.content,
+    required this.tileUrl,
+  });
 
   final MapContent content;
+
+  /// URL template of the raster tiles.
+  final String tileUrl;
 
   @override
   State<MapLibreMapView> createState() => _MapLibreMapViewState();
@@ -29,13 +35,13 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
   bool _styleLoaded = false;
   Map<String, math.Point<double>> _positions = const {};
 
-  /// Raster tiles from the configured source; replaceable until Phase 2.
-  static final _style = jsonEncode({
+  /// A map of raster tiles only; styles and layers follow in Phase 2.
+  late final String _style = jsonEncode({
     'version': 8,
     'sources': {
       'tiles': {
         'type': 'raster',
-        'tiles': [AppConfig.mapTileUrl],
+        'tiles': [widget.tileUrl],
         'tileSize': 256,
         'attribution': '© OpenStreetMap contributors',
       },

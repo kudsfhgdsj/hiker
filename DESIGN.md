@@ -582,6 +582,6 @@ Stehen in der separaten Datei `CLAUDE.md` im Repository-Hauptverzeichnis.
 
 1. Backup-Ziel außerhalb des Servers (z. B. zweiter Server, externer Speicher).
 2. Welcher Webserver bzw. Reverse Proxy läuft auf dem Server bereits? Beispiele für nginx und Caddy liegen in `deploy/`; für Apache gibt es noch keines.
-3. Kartenquellen und Lizenzen (bis Phase 2). Die Android-App holt ihre Kacheln noch direkt von der Kachelquelle (`MAP_TILE_URL` beim Bauen) und nicht über das Modul `maps`.
+3. Kartenquellen und Lizenzen (bis Phase 2). Die Android-App holt ihre Kacheln vom eigenen Server (Modul `maps`); nur ein Server ohne dieses Modul schickt sie direkt zur Kachelquelle. `--dart-define=MAP_TILE_URL=…` legt eine feste Quelle fest.
 4. Das Rate-Limit liegt im Arbeitsspeicher eines API-Prozesses. Läuft die API später in mehreren Prozessen, muss es in den Proxy oder einen gemeinsamen Speicher wandern.
 5. Genauer Wunsch zur Foto-Darstellung nach Sichtung der wanderer-Demo (Abschnitt 9), falls etwas anders sein soll.
