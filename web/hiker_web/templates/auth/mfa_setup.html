@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "macros.html" import field, csrf %}
+{% block title %}{{ t('mfa.title') }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<section class="narrow">
+  <h1>{{ t('mfa.title') }}</h1>
+  {% if forced %}<p class="flash">{{ t('mfa.forced') }}</p>{% endif %}
+  <ol>
+    <li>{{ t('mfa.step_app') }}</li>
+    <li>{{ t('mfa.step_scan') }}
+      <div class="qr">{{ qr }}</div>
+      <p class="meta">{{ t('mfa.manual') }}<br><code>{{ secret }}</code></p></li>
+    <li>{{ t('mfa.step_code') }}</li>
+  </ol>
+  <form method="post" class="stack">
+    {{ csrf() }}
+    {{ field('code', t('auth.code'), required=True, attrs='autocomplete="one-time-code" inputmode="numeric" maxlength="8" autofocus') }}
+    <button class="primary">{{ t('mfa.enable') }}</button>
+  </form>
+</section>
+{% endblock %}

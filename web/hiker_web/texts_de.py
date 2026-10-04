@@ -25,7 +25,71 @@ TEXTS = {
     "auth.register": "Konto anlegen",
     "auth.email": "E-Mail",
     "auth.password": "Passwort",
-    "auth.password_hint": "Mindestens 10 Zeichen",
+    "auth.password_hint": (
+        "Mindestens 8 Zeichen mit Groß- und Kleinbuchstaben, Ziffern und Sonderzeichen "
+        "(drei der vier Arten genügen, wenn der zweite Faktor Pflicht ist) – oder "
+        "mindestens 20 Zeichen mit zwei Arten, z. B. mehrere Wörter."
+    ),
+    "auth.password_repeat": "Passwort wiederholen",
+    "auth.passwords_differ": "Die beiden Passwörter stimmen nicht überein.",
+    "auth.password_change": "Passwort ändern",
+    "auth.password_current": "Bisheriges Passwort",
+    "auth.password_new": "Neues Passwort",
+    "auth.password_changed": "Das Passwort ist geändert.",
+    "auth.password_forced": "Dein Passwort wurde zurückgesetzt. Bitte wähle jetzt ein neues.",
+    "auth.password_sessions": "Andere Geräte werden dabei abgemeldet.",
+    "auth.code": "Code der Authenticator-App",
+    "auth.code_hint": "Sechs Ziffern – nur nötig, wenn der zweite Faktor eingerichtet ist.",
+    "auth.sso": "Mit {name} anmelden",
+    "auth.security": "Sicherheit",
+    "mfa.title": "Zweiten Faktor einrichten",
+    "mfa.renew": "Zweiten Faktor neu einrichten",
+    "mfa.forced": ("Auf diesem Server ist ein zweiter Faktor Pflicht. Erst danach geht es weiter."),
+    "mfa.step_app": (
+        "Eine Authenticator-App öffnen, z. B. Aegis, FreeOTP+ oder den Passwortmanager."
+    ),
+    "mfa.step_scan": "Diesen Code mit der App scannen:",
+    "mfa.manual": "Oder den Schlüssel von Hand eintragen (zeitbasiert, 6 Ziffern):",
+    "mfa.step_code": "Den sechsstelligen Code eingeben, den die App anzeigt.",
+    "mfa.enable": "Einrichten",
+    "mfa.recovery_title": "Wiederherstellungscodes",
+    "mfa.recovery_intro": (
+        "Mit jedem dieser Codes kannst du dich einmal anmelden, falls die App nicht zur Hand "
+        "ist. Gib ihn dann statt des sechsstelligen Codes ein."
+    ),
+    "mfa.recovery_once": (
+        "Die Codes werden nur dieses eine Mal angezeigt. Bitte jetzt sicher aufbewahren."
+    ),
+    "mfa.recovery_done": "Ich habe die Codes gesichert",
+    "mfa.recovery_new": "Neue Wiederherstellungscodes",
+    "mfa.recovery_new_hint": "Die bisherigen Codes werden dabei ungültig.",
+    "nav.admin": "Verwaltung",
+    "admin.users": "Nutzer",
+    "admin.security": "Sicherheit",
+    "admin.last_login": "Letzte Anmeldung",
+    "admin.mfa_on": "2. Faktor aktiv",
+    "admin.mfa_off": "kein 2. Faktor",
+    "admin.must_change": "muss Passwort ändern",
+    "admin.reset_password": "Passwort zurücksetzen",
+    "admin.reset_password_confirm": "Passwort von {name} zurücksetzen? Alle Sitzungen enden.",
+    "admin.reset_mfa": "2. Faktor zurücksetzen",
+    "admin.reset_mfa_confirm": "Zweiten Faktor von {name} entfernen?",
+    "admin.mfa_reset": (
+        "Der zweite Faktor wurde entfernt und wird beim nächsten Login neu eingerichtet."
+    ),
+    "admin.delete": "Entfernen",
+    "admin.delete_confirm": (
+        "{name} wirklich entfernen? Touren, Ausrüstung, Lebensmittel und Dateien werden gelöscht."
+    ),
+    "admin.delete_hint": (
+        "Beim Entfernen werden alle Touren, Ausrüstung, Lebensmittel und Dateien des Nutzers "
+        "gelöscht. Freigegebene Katalogeinträge bleiben."
+    ),
+    "admin.user_deleted": "Der Nutzer wurde entfernt.",
+    "admin.temporary_password": "Vorläufiges Passwort – bitte dem Nutzer auf sicherem Weg geben:",
+    "admin.temporary_password_hint": (
+        "Es wird nur jetzt angezeigt. Beim nächsten Login muss ein neues Passwort gewählt werden."
+    ),
     "auth.display_name": "Anzeigename",
     "auth.to_register": "Noch kein Konto? Konto anlegen",
     "auth.to_login": "Schon ein Konto? Anmelden",
@@ -429,6 +493,28 @@ TEXTS = {
     "error.network": "Der Server ist gerade nicht erreichbar. Bitte später erneut versuchen.",
     "error.validation": "Die Eingaben wurden nicht angenommen. Bitte prüfen.",
     "error.invalid_credentials": "E-Mail oder Passwort ist falsch.",
+    "error.mfa_required": "Bitte auch den Code der Authenticator-App eingeben.",
+    "error.invalid_mfa_code": "Der Code stimmt nicht oder wurde schon benutzt.",
+    "error.mfa_mandatory": "Der zweite Faktor ist auf diesem Server Pflicht.",
+    "error.wrong_password": "Das bisherige Passwort stimmt nicht.",
+    "error.weak_password": "Das Passwort erfüllt die Regeln nicht.",
+    "error.weak_password.too_short": "Das Passwort braucht mindestens 8 Zeichen.",
+    "error.weak_password.too_long": "Das Passwort darf höchstens 128 Zeichen haben.",
+    "error.weak_password.too_simple": (
+        "Zu einfach: Bitte Groß- und Kleinbuchstaben, Ziffern und Sonderzeichen mischen – "
+        "oder mindestens 20 Zeichen verwenden."
+    ),
+    "error.weak_password.contains_personal_data": (
+        "Das Passwort darf weder den Namen noch die E-Mail-Adresse enthalten."
+    ),
+    "error.weak_password.too_common": "Dieses Passwort ist zu leicht zu erraten.",
+    "error.cannot_delete_self": "Das eigene Konto lässt sich hier nicht entfernen.",
+    "error.oidc_failed": "Die Anmeldung beim Anbieter hat nicht geklappt. Bitte erneut versuchen.",
+    "error.oidc_state_invalid": "Die Anmeldung ist abgelaufen. Bitte erneut starten.",
+    "error.oidc_email_unverified": (
+        "Der Anbieter hat keine bestätigte E-Mail-Adresse geliefert; damit lässt sich kein "
+        "Konto zuordnen."
+    ),
     "error.email_taken": "Diese E-Mail-Adresse ist schon registriert.",
     "error.registration_closed": "Auf diesem Server können keine neuen Konten angelegt werden.",
     "error.rate_limited": "Zu viele Versuche. Bitte kurz warten.",

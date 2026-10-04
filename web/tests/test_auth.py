@@ -31,7 +31,11 @@ def test_login_keeps_the_tokens_on_the_server(browser, fake_api, app):
     response = browser.login()
 
     assert response.headers["location"] == "/"
-    assert fake_api.body(0) == {"email": "anna@example.org", "password": "secret-password"}
+    assert fake_api.body(0) == {
+        "email": "anna@example.org",
+        "password": "secret-password",
+        "code": None,
+    }
     cookie = response.headers["set-cookie"]
     assert "HttpOnly" in cookie and "SameSite=Lax" in cookie
     # The browser only gets a session id; the tokens stay in a file on the server.
@@ -88,11 +92,17 @@ def test_registration_signs_in(browser, fake_api):
 
     response = browser.post(
         "/register",
-        {"email": "anna@example.org", "display_name": "Anna", "password": "correct-horse-battery"},
+        {
+            "email": "anna@example.org",
+            "display_name": "Anna",
+            "password": "Correct-Horse-7",
+            "password_repeat": "Correct-Horse-7",
+        },
     )
 
     assert response.status_code == 302
     assert fake_api.body(0)["display_name"] == "Anna"
+    assert "password_repeat" not in fake_api.body(0)
     assert browser.get("/profile").status_code != 302
 
 
@@ -100,7 +110,8 @@ def test_closed_registration_is_explained(browser, fake_api):
     fake_api.route("POST", "/auth/register", lambda r: error(403, "registration_closed"))
 
     response = browser.post(
-        "/register", {"email": "a@b.ch", "display_name": "A", "password": "x" * 10}
+        "/register",
+        {"email": "a@b.ch", "display_name": "A", "password": "x" * 10, "password_repeat": "x" * 10},
     )
 
     assert "keine neuen Konten" in text(response)

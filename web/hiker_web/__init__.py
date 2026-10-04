@@ -9,7 +9,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from hiker_web import formatting
 from hiker_web.api import ApiError, api
 from hiker_web.config import load_config
-from hiker_web.security import check_csrf, csrf_token, install_log_redaction
+from hiker_web.security import check_csrf, csrf_token, install_log_redaction, pending_step
 from hiker_web.sessions import SessionStore
 from hiker_web.texts_de import TEXTS, label, t
 
@@ -25,9 +25,10 @@ NAVIGATION = (
 
 def error_text(error: ApiError) -> str:
     """German text for an error of the API; the API only sends codes."""
-    key = f"error.{error.code}"
-    if key in TEXTS:
-        return t(key)
+    reason = error.body.get("reason")
+    for key in (f"error.{error.code}.{reason}", f"error.{error.code}"):
+        if key in TEXTS:
+            return t(key)
     by_status = {
         403: "error.forbidden",
         404: "error.not_found",
@@ -86,6 +87,7 @@ def create_app(config: dict | None = None) -> Flask:
             "t": t,
             "csrf_token": csrf_token,
             "current_user": (data or {}).get("user"),
+            "session_ready": bool(data) and pending_step(data) is None,
             "navigation": [
                 (endpoint, t(label))
                 for module, endpoint, label in NAVIGATION
@@ -100,6 +102,13 @@ def create_app(config: dict | None = None) -> Flask:
             return redirect(url_for("auth.login"))
         if error.status == 404:
             return render_template("error.html", message=t("error.not_found")), 404
+        # The API says the sign-in is not complete: go to the page that completes it.
+        if error.code == "mfa_setup_required":
+            api().remember(mfa_setup_required=True)
+            return redirect(url_for("auth.mfa_setup"))
+        if error.code == "password_change_required":
+            api().remember(password_change_required=True)
+            return redirect(url_for("auth.password"))
         # Back to where the user came from, with the reason.
         flash(error_text(error), "error")
         target = request.referrer if request.method != "GET" and request.referrer else None
@@ -149,9 +158,10 @@ def create_app(config: dict | None = None) -> Flask:
         )
         return response
 
-    from hiker_web.views import auth, gear, nutrition, protocols, public
+    from hiker_web.views import admin, auth, gear, nutrition, protocols, public
 
     app.register_blueprint(auth.blueprint)
+    app.register_blueprint(admin.blueprint)
     app.register_blueprint(gear.blueprint)
     app.register_blueprint(nutrition.blueprint)
     app.register_blueprint(protocols.blueprint)
@@ -162,6 +172,8 @@ def create_app(config: dict | None = None) -> Flask:
         data = api().data
         if data is None:
             return redirect(url_for("auth.login"))
+        if pending_step(data):
+            return redirect(url_for(pending_step(data)))
         for module, endpoint, _label in NAVIGATION:
             if module in data.get("modules", []) and endpoint in app.view_functions:
                 return redirect(url_for(endpoint))

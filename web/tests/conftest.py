@@ -29,6 +29,7 @@ class FakeApi:
         self.offline = False
         self.valid_tokens = {"access-1"}
         self.route("POST", "/auth/login", lambda r: httpx2.Response(200, json=self.auth()))
+        self.route("GET", "/auth/oidc", {"enabled": False, "name": "SSO"})
         self.route(
             "GET",
             "/modules",
@@ -110,10 +111,9 @@ class Browser:
         return self.client.get(path, **kwargs)
 
     def csrf(self) -> str:
-        # Any page with a form creates the token; read it from the session.
-        self.client.get("/login")
+        # A real browser gets the token with the form; the tests put it into the session.
         with self.client.session_transaction() as session:
-            return session["csrf"]
+            return session.setdefault("csrf", "test-csrf-token")
 
     def post(self, path, data=None, **kwargs):
         data = {**(data or {}), "csrf_token": self.csrf()}

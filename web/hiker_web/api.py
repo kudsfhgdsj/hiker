@@ -56,10 +56,19 @@ class Api:
             "refresh": auth["refresh_token"],
             "user": auth["user"],
             "modules": modules,
+            # While one of these is set, only the pages that resolve it are reachable.
+            "mfa_setup_required": bool(auth.get("mfa_setup_required")),
+            "password_change_required": bool(auth.get("password_change_required")),
         }
         self._store.delete(self.session_id)
         session.clear()
         session["sid"] = self._store.create(data)
+        g.session_data = data
+
+    def remember(self, **values) -> None:
+        """Keep values in the server-side session, e.g. a setup that is under way."""
+        data = {**self.data, **values}
+        self._store.save(self.session_id, data)
         g.session_data = data
 
     def sign_out(self) -> None:

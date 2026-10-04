@@ -11,6 +11,7 @@ dependencies = [
     "flask>=3.1",       # BSD-3 – server-rendered pages
     "httpx2>=2.13",     # BSD-3 – HTTP client for the hiker API
     "gunicorn>=23",     # MIT – WSGI server in the container
+    "segno>=1.6",       # BSD-3 – QR code for setting up the second factor, no dependencies
 ]
 
 [project.optional-dependencies]

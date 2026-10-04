@@ -28,11 +28,34 @@ def check_csrf() -> None:
         abort(400, "csrf")
 
 
-def login_required(view):
+def signed_in(view):
+    """For the pages that finish a sign-in: a session is enough."""
+
     @functools.wraps(view)
     def wrapped(*args, **kwargs):
         if api().data is None:
             return redirect(url_for("auth.login", next=request.full_path.rstrip("?")))
+        return view(*args, **kwargs)
+
+    return wrapped
+
+
+def pending_step(data: dict) -> str | None:
+    """The page a session has to visit before it can be used, if any."""
+    if data.get("password_change_required"):
+        return "auth.password"
+    if data.get("mfa_setup_required"):
+        return "auth.mfa_setup"
+    return None
+
+
+def login_required(view):
+    @functools.wraps(view)
+    @signed_in
+    def wrapped(*args, **kwargs):
+        step = pending_step(api().data)
+        if step:
+            return redirect(url_for(step))
         return view(*args, **kwargs)
 
     return wrapped
