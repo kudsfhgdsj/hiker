@@ -207,7 +207,7 @@ class _ProfilePainter extends CustomPainter {
     final lowest = known.reduce(math.min);
     final highest = known.reduce(math.max);
     // The scale runs between round values, so that the labels are easy to read.
-    final stepY = niceStep(math.max(highest - lowest, 10), 3);
+    final stepY = niceStep(math.max(highest - lowest, 10), 4);
     final low = (lowest / stepY).floor() * stepY;
     final high = math.max((highest / stepY).ceil() * stepY, low + stepY);
     final span = high - low;
