@@ -48,6 +48,7 @@ class MapContent {
     this.onClusterTap,
     this.onPlace,
     this.controls = const [],
+    this.coveredBottom = 0,
     this.interactive = true,
   });
 
@@ -70,6 +71,10 @@ class MapContent {
 
   /// Further fields next to "Ebenen" and "Darstellung" at the top of the map.
   final List<MapControl> controls;
+
+  /// How much of the map's lower edge a sheet covers, in logical pixels; the
+  /// content is fitted into what stays visible.
+  final double coveredBottom;
   final bool interactive;
 }
 

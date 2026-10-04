@@ -201,9 +201,14 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
                   northeast: _latLng(bounds.northEast),
                 ),
                 left: 40,
-                top: 40,
+                // Below the fields at the top, above what covers the bottom.
+                top: 70,
                 right: 40,
-                bottom: 40,
+                // The map counts in physical pixels.
+                bottom:
+                    40 +
+                    widget.content.coveredBottom *
+                        MediaQuery.devicePixelRatioOf(context),
               ),
       );
     }
@@ -615,6 +620,12 @@ class _MapFields extends StatelessWidget {
                   onTap: () => showModalBottomSheet<void>(
                     context: context,
                     isScrollControlled: true,
+                    useSafeArea: true,
+                    // The map stays visible above the sheet: what is switched
+                    // there shows at once.
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.sizeOf(context).height * 0.7,
+                    ),
                     builder: field.builder,
                   ),
                   child: Padding(

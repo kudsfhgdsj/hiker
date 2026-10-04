@@ -424,6 +424,8 @@ class _RoutePlanScreenState extends ConsumerState<RoutePlanScreen> {
                 track: line,
                 highlight: highlight,
                 onTap: _tapMap,
+                // The sheet below starts at three tenths of the height.
+                coveredBottom: MediaQuery.sizeOf(context).height * 0.25,
                 controls: [
                   MapControl(
                     label: l10n.planDifficultyField,
