@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 
+import 'core/map/tile_proxy.dart';
 import 'core/modules/feature_module.dart';
 import 'core/network/trusted_certificates.dart';
 import 'core/router/app_router.dart';
@@ -56,6 +57,13 @@ class HikerApp extends ConsumerStatefulWidget {
 
 class _HikerAppState extends ConsumerState<HikerApp>
     with WidgetsBindingObserver {
+  /// The map needs the tile proxy as soon as a certificate is trusted by hand.
+  void _startTileProxyIfNeeded() {
+    if (!ref.read(tileProxyEnabledProvider)) return;
+    if (ref.read(trustedCertificatesProvider).isEmpty) return;
+    ref.read(tileProxyProvider.notifier).start();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -63,6 +71,7 @@ class _HikerAppState extends ConsumerState<HikerApp>
     // Load the stored session; the router leaves the splash screen afterwards.
     Future.microtask(() async {
       await ref.read(trustedCertificatesProvider.notifier).load();
+      _startTileProxyIfNeeded();
       await ref.read(sessionProvider.notifier).restore();
       await ref.read(syncProvider.notifier).load();
       _sync();
@@ -92,6 +101,10 @@ class _HikerAppState extends ConsumerState<HikerApp>
     ref.listen(sessionProvider.select((s) => s.isSignedIn), (_, signedIn) {
       if (signedIn) _sync();
     });
+    ref.listen(
+      trustedCertificatesProvider,
+      (_, _) => _startTileProxyIfNeeded(),
+    );
     return MaterialApp.router(
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       theme: AppTheme.light(),

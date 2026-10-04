@@ -11,6 +11,7 @@ import 'package:hiker/app.dart';
 import 'package:hiker/core/db/app_database.dart';
 import 'package:hiker/core/map/map_view.dart';
 import 'package:hiker/core/modules/feature_module.dart';
+import 'package:hiker/core/map/tile_proxy.dart';
 import 'package:hiker/core/network/api_client.dart';
 import 'package:hiker/core/network/trusted_certificates.dart';
 import 'package:hiker/core/storage/key_value_store.dart';
@@ -122,6 +123,7 @@ ProviderContainer createContainer({
       ...appOverrides(modules: modules),
       // Tests trigger the sync themselves, so that it does not add requests.
       autoSyncProvider.overrideWithValue(false),
+      tileProxyEnabledProvider.overrideWithValue(false),
       // No network in tests: nothing to look at.
       certificateProbeProvider.overrideWithValue(
         certificateProbe ?? (_) async => null,

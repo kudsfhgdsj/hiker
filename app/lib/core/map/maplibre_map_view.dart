@@ -47,6 +47,12 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
       },
     },
     'layers': [
+      // Shown while tiles load or if they cannot be loaded.
+      {
+        'id': 'background',
+        'type': 'background',
+        'paint': {'background-color': '#E4E9E6'},
+      },
       {'id': 'tiles', 'type': 'raster', 'source': 'tiles'},
     ],
   });

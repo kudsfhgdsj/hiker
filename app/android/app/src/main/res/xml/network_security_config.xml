@@ -9,4 +9,8 @@
             <certificates src="user" />
         </trust-anchors>
     </base-config>
+    <!-- Only to the app itself: it hands map tiles to the map (TileProxy). -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
 </network-security-config>

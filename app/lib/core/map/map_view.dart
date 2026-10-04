@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/app_config.dart';
 import '../modules/feature_module.dart';
+import '../network/trusted_certificates.dart';
 import '../session/session.dart';
 import 'geo.dart';
 import 'maplibre_map_view.dart';
+import 'tile_proxy.dart';
 
 /// A marker on the map, drawn as a Flutter widget.
 class MapMarker {
@@ -66,6 +68,17 @@ final mapTileUrlProvider = Provider<String>((ref) {
   final modules = ref.watch(backendModulesProvider).asData?.value;
   final serverHasTiles = modules == null || modules.contains('maps');
   if (baseUrl.isEmpty || !serverHasTiles) return AppConfig.fallbackTileUrl;
+  // The server shows a certificate the user trusted by hand: the map cannot
+  // check it, so the tiles go through the app (see TileProxy).
+  final server = Uri.tryParse(baseUrl);
+  final port = ref.watch(tileProxyProvider);
+  final trusted = ref.watch(trustedCertificatesProvider);
+  if (server != null && port != null) {
+    final endpoint = '${server.host}:${server.hasPort ? server.port : 443}';
+    if (trusted.containsKey(endpoint)) {
+      return 'http://127.0.0.1:$port/{z}/{x}/{y}.png';
+    }
+  }
   return '$baseUrl${AppConfig.serverTilePath}';
 });
 
