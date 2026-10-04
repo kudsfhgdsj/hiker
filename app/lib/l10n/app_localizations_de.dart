@@ -1394,8 +1394,123 @@ class AppLocalizationsDe extends AppLocalizations {
   String get planDuration => 'Gehzeit';
 
   @override
-  String get planDurationNote =>
-      'Gehzeit geschätzt nach DIN 33466, ohne Pausen.';
+  String planDurationNote(String ascent, String descent, String distance) {
+    return 'Gehzeit geschätzt, ohne Pausen: $ascent Hm/h auf, $descent Hm/h ab, $distance km/h.';
+  }
+
+  @override
+  String get planDifficultyField => 'Schwierigkeit';
+
+  @override
+  String get planPace => 'Gehzeit rechnen nach';
+
+  @override
+  String planPacePreset(String preset) {
+    String _temp0 = intl.Intl.selectLogic(preset, {
+      'dav': 'DAV: 300 Hm auf, 500 ab, 4 km/h',
+      'sac': 'SAC: 400 Hm auf, 800 ab, 4 km/h',
+      'other': 'Profi: 600 Hm auf, 1000 ab, 6 km/h',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get planPaceCustom => 'Individuell';
+
+  @override
+  String get planPaceAscent => 'Hm/h auf';
+
+  @override
+  String get planPaceDescent => 'Hm/h ab';
+
+  @override
+  String get planPaceDistance => 'km/h';
+
+  @override
+  String get planPaceName => 'Name für eigene Vorgabe';
+
+  @override
+  String get planPaceNameMissing =>
+      'Bitte einen Namen und gültige Werte eingeben.';
+
+  @override
+  String planPaceDelete(String name) {
+    return '„$name“ löschen';
+  }
+
+  @override
+  String get planPaceNote =>
+      'Eigene Vorgaben siehst nur du. Pausen sind in der Gehzeit nicht enthalten.';
+
+  @override
+  String get planTags => 'Tags';
+
+  @override
+  String get planTagsHint => 'Durch Komma getrennt, z. B. Sommer, Gipfel';
+
+  @override
+  String get planStart => 'Start (Datum und Uhrzeit)';
+
+  @override
+  String get planStartHint =>
+      'Noch offen. Mit einem Start siehst du, wie die Sonne zur Tour steht.';
+
+  @override
+  String planTimeHere(String time) {
+    return 'An dieser Stelle um $time';
+  }
+
+  @override
+  String get planSunrise => 'Sonnenaufgang';
+
+  @override
+  String get planSunset => 'Sonnenuntergang';
+
+  @override
+  String get planEnd => 'Ende der Tour';
+
+  @override
+  String planSummit(String elevation) {
+    return 'Höchster Punkt ($elevation)';
+  }
+
+  @override
+  String planSunAtSummit(String height, String direction) {
+    return 'Sonne $height° hoch im $direction';
+  }
+
+  @override
+  String compassDirection(String index) {
+    String _temp0 = intl.Intl.selectLogic(index, {
+      '0': 'Norden',
+      '1': 'Nordosten',
+      '2': 'Osten',
+      '3': 'Südosten',
+      '4': 'Süden',
+      '5': 'Südwesten',
+      '6': 'Westen',
+      'other': 'Nordwesten',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String planDaylightLeft(String time) {
+    return 'Nach dem Ende bleiben $time bis Sonnenuntergang.';
+  }
+
+  @override
+  String planAfterSunset(String time) {
+    return 'Die Sonne geht $time vor dem Ende der Tour unter.';
+  }
+
+  @override
+  String get planStartsInDark =>
+      'Der Start liegt vor der Morgendämmerung: Stirnlampe einplanen.';
+
+  @override
+  String get planEndsInDark =>
+      'Das Ende liegt nach der Abenddämmerung: Stirnlampe einplanen.';
 
   @override
   String get planRouteTitle => 'Titel';
@@ -1405,9 +1520,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get planDescription => 'Beschreibung';
-
-  @override
-  String get planDate => 'Geplant für';
 
   @override
   String get planSavedOffline =>
@@ -1524,6 +1636,85 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get mapLayers => 'Ebenen';
+
+  @override
+  String get mapTitle => 'Karte';
+
+  @override
+  String get mapBackToLogin => 'Zur Anmeldung';
+
+  @override
+  String get mapOpenWithoutLogin => 'Karte ohne Anmeldung ansehen';
+
+  @override
+  String get mapViaFerrata => 'Klettersteig';
+
+  @override
+  String mapSacScale(String scale) {
+    String _temp0 = intl.Intl.selectLogic(scale, {
+      'hiking': 'T1 – Wanderung',
+      'mountain_hiking': 'T2 – Anspruchsvolle Bergwanderung',
+      'demanding_mountain_hiking': 'T3 – Bergtour',
+      'alpine_hiking': 'T4 – Schwere Bergtour',
+      'demanding_alpine_hiking': 'T5 – Sehr schwere Bergtour',
+      'difficult_alpine_hiking': 'T6 – Äußerst schwierige Bergtour',
+      'other': 'Wanderweg',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String mapSunTimes(String date, String rise, String set) {
+    return '$date: Sonnenaufgang $rise, Sonnenuntergang $set';
+  }
+
+  @override
+  String mapSunSummit(String rise, String set) {
+    return 'Bei freiem Horizont vom Gipfel: frühestens $rise, spätestens $set.';
+  }
+
+  @override
+  String mapSunLight(String dawn, String dusk) {
+    return 'Hell von $dawn bis $dusk. Berge am Horizont sind nicht eingerechnet.';
+  }
+
+  @override
+  String get mapSunNone =>
+      'An diesem Tag geht die Sonne hier nicht auf oder nicht unter.';
+
+  @override
+  String get mapLooks => 'Darstellung';
+
+  @override
+  String get mapSlopeOpen => 'senkrecht';
+
+  @override
+  String mapSlopeRange(String low, String high) {
+    return 'Eingefärbt von $low bis $high';
+  }
+
+  @override
+  String get mapHistory => 'Stand vom';
+
+  @override
+  String get mapHistoryNote =>
+      'Heute. Lawinengefahr, Schnee und Wetter gibt es auch für einen Tag im letzten Jahr.';
+
+  @override
+  String get mapHistoryToday => 'Heute';
+
+  @override
+  String get mapRadarRain => 'Regenradar';
+
+  @override
+  String get mapRadarClouds => 'Wolken (Satellit)';
+
+  @override
+  String get mapRadarNote =>
+      'Die letzten zwei Stunden mit Zeitregler unten in der Karte.';
+
+  @override
+  String get mapRadarPlay => 'Zeitverlauf abspielen';
 
   @override
   String get mapBaseMap => 'Karte';

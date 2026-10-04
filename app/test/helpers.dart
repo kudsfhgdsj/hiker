@@ -200,6 +200,18 @@ class FakeMap {
     return Wrap(
       children: [
         const Text('MAP'),
+        // The fields at the top of the map, e.g. "Schwierigkeit" in the planner.
+        for (final control in content.controls)
+          Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                builder: control.builder,
+              ),
+              child: Text(control.label),
+            ),
+          ),
         for (final marker in content.markers)
           GestureDetector(
             key: ValueKey('marker-${marker.id}'),

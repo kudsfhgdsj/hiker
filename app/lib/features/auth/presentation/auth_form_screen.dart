@@ -276,6 +276,13 @@ class _AuthFormScreenState extends ConsumerState<AuthFormScreen> {
                   widget.register ? l10n.goToLogin : l10n.goToRegister,
                 ),
               ),
+              // The map needs no account.
+              if (!widget.register)
+                TextButton.icon(
+                  icon: const Icon(Icons.map_outlined),
+                  label: Text(l10n.mapOpenWithoutLogin),
+                  onPressed: _busy ? null : () => context.go(AppRoutes.openMap),
+                ),
             ],
           ),
         ),

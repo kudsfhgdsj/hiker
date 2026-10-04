@@ -24,6 +24,10 @@ class AuthScreens {
   final WidgetBuilder passwordChange;
 }
 
+/// The map shown before signing in; belongs to a feature, set in `app.dart`.
+/// Null: the app has no such screen.
+final openMapScreenProvider = Provider<WidgetBuilder?>((ref) => null);
+
 final authScreensProvider = Provider<AuthScreens>(
   (ref) => throw UnimplementedError('authScreensProvider must be overridden'),
 );
@@ -34,6 +38,9 @@ class AppRoutes {
   static const splash = '/';
   static const login = '/login';
   static const register = '/register';
+
+  /// The map on its own; reachable without signing in.
+  static const openMap = '/open-map';
   static const mfaSetup = '/account/mfa';
   static const passwordChange = '/account/password';
   static const profile = AppShell.profilePath;
@@ -46,8 +53,11 @@ String? redirectFor(
   String home, {
   SessionPending pending = SessionPending.none,
 }) {
+  // Signing in, registering and looking at the map need no session.
   final onAuthScreen =
-      location == AppRoutes.login || location == AppRoutes.register;
+      location == AppRoutes.login ||
+      location == AppRoutes.register ||
+      location == AppRoutes.openMap;
   switch (status) {
     case SessionStatus.unknown:
       return location == AppRoutes.splash ? null : AppRoutes.splash;
@@ -67,6 +77,7 @@ String? redirectFor(
 
 final routerProvider = Provider<GoRouter>((ref) {
   final screens = ref.watch(authScreensProvider);
+  final openMap = ref.watch(openMapScreenProvider);
   final modules = ref.watch(featureModulesProvider);
   final refresh = ValueNotifier<int>(0);
   ref.listen(
@@ -108,6 +119,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           path: path,
           builder: (context, state) =>
               MountainBackground(child: screen(context)),
+        ),
+      if (openMap != null)
+        GoRoute(
+          path: AppRoutes.openMap,
+          builder: (context, state) => openMap(context),
         ),
       ShellRoute(
         builder: (context, state, child) =>

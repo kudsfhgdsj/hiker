@@ -17,6 +17,8 @@ import 'package:hiker/features/planning/data/route_models.dart';
 import 'package:hiker/features/planning/data/route_repository.dart';
 import 'package:hiker/features/planning/planning_module.dart';
 
+import 'package:hiker/features/planning/data/route_schedule.dart';
+
 import '../../helpers.dart';
 
 const routeId = '55555555-5555-4555-8555-555555555555';
@@ -44,10 +46,18 @@ const route = {
   'id': routeId,
   'title': 'Auf den Gipfel',
   'description': 'Über die Hütte',
-  'planned_date': '2026-07-18',
+  'tags': ['Sommer', 'Gipfel'],
+  'start_time': '2026-07-18T05:30:00Z',
   'profile': 'hiking',
   'max_difficulty': 4,
   'via_ferrata': false,
+  'pace': {
+    'preset': 'sac',
+    'name': null,
+    'ascent_m_per_h': 400,
+    'descent_m_per_h': 800,
+    'distance_km_per_h': 4,
+  },
   'version': 3,
   'waypoints': [start, hut],
   ...result,
@@ -60,12 +70,30 @@ Map<String, dynamic> page(List<Map<String, dynamic>> items) => {
   'offset': 0,
 };
 
+const savedPace = {
+  'id': '66666666-6666-4666-8666-666666666666',
+  'name': 'Mit Kindern',
+  'ascent_m_per_h': 250,
+  'descent_m_per_h': 400,
+  'distance_km_per_h': 3,
+};
+
 FakeApi planApi({
   List<Object?>? previews,
   List<Object?>? saved,
+  List<Object?>? paces,
   bool routing = true,
   FakeResponse? preview,
 }) => FakeApi({
+  'GET /planning/paces': (_, _) => ok([savedPace]),
+  'POST /planning/paces': (_, body) {
+    paces?.add(body);
+    return ok(body, 201);
+  },
+  'DELETE /planning/paces/${savedPace['id']}': (_, _) {
+    paces?.add('deleted');
+    return ok(null, 204);
+  },
   'GET /modules': (_, _) => ok([
     {'name': 'planning', 'version': '0.1.0'},
   ]),
@@ -168,10 +196,53 @@ void main() {
       expect(File('assets/brouter/lookups.dat').existsSync(), isTrue);
     });
 
-    test('walking time follows DIN 33466', () {
-      expect(walkingTimeS(8000, 600, 0), 3 * 3600);
-      expect(walkingTimeS(4000, 900, 500), 4.5 * 3600);
-      expect(walkingTimeS(6000, null, null), 1.5 * 3600);
+    test('walking time follows the pace', () {
+      // DAV (DIN 33466): the larger time in full, the smaller by half.
+      expect(Pace.dav.walkingTimeS(8000, 600, 0), 3 * 3600);
+      expect(Pace.dav.walkingTimeS(4000, 900, 500), 4.5 * 3600);
+      expect(Pace.dav.walkingTimeS(6000, null, null), 1.5 * 3600);
+      // SAC and "Profi" are faster; own values count as given.
+      expect(Pace.sac.walkingTimeS(4000, 800, 800), 3.5 * 3600);
+      expect(Pace.pro.walkingTimeS(6000, 600, 1000), 2.5 * 3600);
+      const own = Pace.custom(
+        name: 'Mit Kindern',
+        ascentMPerH: 250,
+        descentMPerH: 400,
+        distanceKmPerH: 3,
+      );
+      expect(own.walkingTimeS(3000, 500, 0), 2.5 * 3600);
+      expect(own.toJson()['preset'], 'custom');
+      expect(Pace.fromJson(own.toJson()), own);
+      expect(Pace.sac.toJson(), {'preset': 'sac'});
+      expect(Pace.fromJson(null), Pace.dav);
+    });
+
+    test('times along the line and the sun follow pace and start', () {
+      const line = RouteResult(result);
+      final times = timesAlong(line, Pace.dav);
+      // Evenly rising: half of the walking time at half of the way.
+      expect(times.first, 0);
+      expect(times.last, Pace.dav.walkingTimeS(1200, 100, 0));
+      expect(times[1], closeTo(times.last / 2, 1));
+
+      expect(sunReport(line, null, Pace.dav), isNull);
+      final start = DateTime.utc(2026, 7, 18, 5, 30);
+      final report = sunReport(line, start, Pace.dav)!;
+      expect(report.end, start.add(Duration(seconds: times.last)));
+      expect(report.startsInDark, isFalse);
+      expect(report.endsInDark, isFalse);
+      expect(report.daylightLeft!.inHours, greaterThan(12));
+      // The highest point is the end of this line; the sun stands in the east.
+      expect(report.summit!.elevationM, 1100);
+      expect(report.summit!.time, report.end);
+      expect(report.summit!.sunDirectionDeg, inInclusiveRange(70, 110));
+
+      // Setting out in the evening: the tour ends in the dark.
+      final late = sunReport(line, DateTime.utc(2026, 7, 18, 20), Pace.dav)!;
+      expect(late.endsInDark, isTrue);
+      expect(late.daylightLeft!.isNegative, isTrue);
+      final early = sunReport(line, DateTime.utc(2026, 7, 18, 1), Pace.dav)!;
+      expect(early.startsInDark, isTrue);
     });
 
     test('a route along paths gets line, figures and walking time', () async {
@@ -200,7 +271,7 @@ void main() {
       expect(line.descentM, 0);
       // The path bends: longer than the straight 1112 m.
       expect(line.distanceM, greaterThan(1112));
-      expect(line.durationS, walkingTimeS(line.distanceM, 100, 0));
+      expect(line.durationS, Pace.dav.walkingTimeS(line.distanceM, 100, 0));
     });
 
     test('straight legs need neither router nor path data', () async {
@@ -222,7 +293,7 @@ void main() {
       expect(line.points.length, 23);
       expect(line.elevations, isNull);
       expect(line.ascentM, isNull);
-      expect(line.durationS, walkingTimeS(1112, null, null));
+      expect(line.durationS, Pace.dav.walkingTimeS(1112, null, null));
     });
 
     test('single straight legs split the request to the router', () async {
@@ -329,6 +400,7 @@ void main() {
         'profile': 'hiking',
         'max_difficulty': 3,
         'via_ferrata': false,
+        'pace': {'preset': 'dav'},
         'waypoints': [
           start,
           {...hut, 'direct': true},
@@ -413,7 +485,6 @@ void main() {
         RouteDraft(
           title: 'Neuer Name',
           description: existing.draft.description,
-          plannedDate: existing.draft.plannedDate,
           maxDifficulty: 4,
           waypoints: existing.draft.waypoints,
         ),
@@ -452,6 +523,7 @@ void main() {
 
       expect(find.text('Auf den Gipfel'), findsOneWidget);
       expect(find.textContaining('18.07.2026'), findsOneWidget);
+      expect(find.textContaining('Sommer · Gipfel'), findsOneWidget);
       expect(find.textContaining('1,2 km · ↑ 100 m · 35 min'), findsOneWidget);
     });
 
@@ -479,8 +551,11 @@ void main() {
       expect(map.content!.track.length, 3);
       expect(map.content!.markers.length, 2);
       expect(find.text('1,2 km'), findsOneWidget);
-      expect(find.text('35 min'), findsOneWidget);
-      expect(find.textContaining('geschätzt'), findsOneWidget);
+      // DAV: 100 m up count in full (20 min), 1.2 km by half (9 min).
+      expect(find.text('29 min'), findsOneWidget);
+      expect(find.textContaining('300 Hm/h auf, 500 Hm/h ab'), findsOneWidget);
+      // No start yet: nothing about the sun.
+      expect(find.textContaining('Sonnenaufgang'), findsNothing);
       expect(find.byType(ElevationProfile), findsOneWidget);
       expect(find.text('Wegführung: BRouter (ODbL)'), findsOneWidget);
 
@@ -499,7 +574,7 @@ void main() {
       expect(((course['waypoints'] as List)[1] as Map)['direct'], isTrue);
 
       // Saving needs a title.
-      await tester.tap(find.widgetWithText(FilledButton, 'Speichern'));
+      await tester.tap(find.widgetWithText(TextButton, 'Speichern'));
       await tester.pumpAndSettle();
       expect(saved, isEmpty);
       expect(find.text('Bitte einen Titel eingeben.'), findsOneWidget);
@@ -508,9 +583,17 @@ void main() {
         find.widgetWithText(TextField, 'Titel'),
         'Hüttenweg',
       );
-      await tester.tap(find.widgetWithText(FilledButton, 'Speichern'));
+      await tester.enterText(
+        find.byKey(const ValueKey('plan-tags')),
+        'Herbst, Hütte, ',
+      );
+      await tester.tap(find.widgetWithText(TextButton, 'Speichern'));
       await tester.pumpAndSettle();
       final body = saved.single! as Map<String, dynamic>;
+      expect(body['tags'], ['Herbst', 'Hütte']);
+      expect(body['start_time'], isNull);
+      expect(body['pace'], {'preset': 'dav'});
+      expect(body.containsKey('planned_date'), isFalse);
       expect(body['title'], 'Hüttenweg');
       expect(body['max_difficulty'], 3);
       expect((body['waypoints'] as List).length, 2);
@@ -532,8 +615,34 @@ void main() {
         // The stored line is shown without asking the server again.
         expect(previews, isEmpty);
         expect(map.content!.track.length, 3);
-        expect(find.text('T4 – Schwere Bergtour'), findsOneWidget);
         expect(find.text('Parkplatz'), findsOneWidget);
+        // SAC pace of the route: 1.2 km in full (18 min), 100 m up by half.
+        expect(find.text('26 min'), findsOneWidget);
+        expect(
+          find.textContaining('400 Hm/h auf, 800 Hm/h ab'),
+          findsOneWidget,
+        );
+        // With its start the route shows how it lies in the day.
+        expect(find.textContaining('Sonnenaufgang: '), findsOneWidget);
+        expect(find.textContaining('Sonnenuntergang: '), findsOneWidget);
+        expect(find.textContaining('Höchster Punkt (1.100 m)'), findsOneWidget);
+        expect(find.textContaining('bis Sonnenuntergang'), findsOneWidget);
+        expect(find.textContaining('Stirnlampe'), findsNothing);
+        expect(
+          tester
+              .widget<TextField>(find.byKey(const ValueKey('plan-tags')))
+              .controller!
+              .text,
+          'Sommer, Gipfel',
+        );
+
+        // Paths and pace live in the field "Schwierigkeit" on the map.
+        await tester.tap(find.text('Schwierigkeit'));
+        await tester.pumpAndSettle();
+        expect(find.text('T4 – Schwere Bergtour'), findsOneWidget);
+        expect(find.textContaining('SAC: 400 Hm auf'), findsOneWidget);
+        Navigator.of(tester.element(find.text('Klettersteige benutzen'))).pop();
+        await tester.pumpAndSettle();
 
         // Choosing a point and tapping the map moves it.
         await tester.tap(find.byKey(const ValueKey('marker-waypoint-1')));
@@ -546,11 +655,64 @@ void main() {
         expect(((course['waypoints'] as List)[1] as Map)['lat'], 47.02);
         expect(course['max_difficulty'], 4);
 
-        await tester.tap(find.widgetWithText(FilledButton, 'Speichern'));
+        await tester.tap(find.widgetWithText(TextButton, 'Speichern'));
         await tester.pumpAndSettle();
         expect((saved.single! as Map)['version'], 3);
+        expect((saved.single! as Map)['pace'], {'preset': 'sac'});
+        expect((saved.single! as Map)['tags'], ['Sommer', 'Gipfel']);
+        expect(
+          (saved.single! as Map)['start_time'],
+          '2026-07-18T05:30:00.000Z',
+        );
       },
     );
+
+    testWidgets('the pace is chosen, typed in and saved under a name', (
+      tester,
+    ) async {
+      final previews = <Object?>[];
+      final paces = <Object?>[];
+      await openPlanning(tester, planApi(previews: previews, paces: paces));
+      await tester.tap(find.text('Auf den Gipfel'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Schwierigkeit'));
+      await tester.pumpAndSettle();
+
+      // A saved pace of the user brings its values.
+      await tester.tap(find.textContaining('SAC: 400 Hm auf'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Mit Kindern').last);
+      await tester.pumpAndSettle();
+      expect((previews.last! as Map)['pace'], {
+        'preset': 'custom',
+        'name': 'Mit Kindern',
+        'ascent_m_per_h': 250.0,
+        'descent_m_per_h': 400.0,
+        'distance_km_per_h': 3.0,
+      });
+      expect(find.text('„Mit Kindern“ löschen'), findsOneWidget);
+
+      // Own values under a new name.
+      await tester.tap(find.text('Mit Kindern').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Individuell').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.widgetWithText(TextField, 'Hm/h auf'), '350');
+      await tester.pumpAndSettle();
+      expect(((previews.last! as Map)['pace'] as Map)['ascent_m_per_h'], 350.0);
+      expect(((previews.last! as Map)['pace'] as Map)['name'], isNull);
+      await tester.enterText(
+        find.byKey(const ValueKey('plan-pace-name')),
+        'Gemütlich',
+      );
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Speichern'));
+      await tester.pumpAndSettle();
+      final stored = paces.single! as Map<String, dynamic>;
+      expect(stored['name'], 'Gemütlich');
+      expect(stored['ascent_m_per_h'], 350.0);
+      expect(stored['descent_m_per_h'], 400.0);
+      expect(((previews.last! as Map)['pace'] as Map)['name'], 'Gemütlich');
+    });
 
     testWidgets('no route and no routing are explained', (tester) async {
       final map = await openPlanning(

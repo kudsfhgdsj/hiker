@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -34,8 +36,8 @@ class MapLibreMapView extends StatefulWidget {
   final Map<String, dynamic>? layerOptions;
   final MapLayerChoice layerChoice;
 
-  /// Builds the sheet for choosing layers; null hides the button.
-  final WidgetBuilder? layerSheet;
+  /// Builds the sheets for choosing layers and looks; null hides the fields.
+  final Widget Function(BuildContext context, MapSheetPart part)? layerSheet;
 
   @override
   State<MapLibreMapView> createState() => _MapLibreMapViewState();
@@ -50,29 +52,38 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
   bool _styleLoaded = false;
   Map<String, math.Point<double>> _positions = const {};
 
+  /// The view is fitted to the content once, not after every change of style.
+  bool _fitted = false;
+
+  /// Rain radar and clouds: the times that have an image, and the one shown.
+  ({List<int> rain, List<int> clouds, List<int> times})? _frames;
+  int _frame = 0;
+  Timer? _player;
+  final Set<String> _radarShown = {};
+
   /// The own vector map, or else a map of raster tiles only.
-  late final String _style =
-      widget.styleJson ??
-      jsonEncode({
-        'version': 8,
-        'sources': {
-          'tiles': {
-            'type': 'raster',
-            'tiles': [widget.tileUrl],
-            'tileSize': 256,
-            'attribution': '© OpenStreetMap contributors',
-          },
-        },
-        'layers': [
-          // Shown while tiles load or if they cannot be loaded.
-          {
-            'id': 'background',
-            'type': 'background',
-            'paint': {'background-color': '#E4E9E6'},
-          },
-          {'id': 'tiles', 'type': 'raster', 'source': 'tiles'},
-        ],
-      });
+  String get _style => widget.styleJson ?? _rasterStyle;
+
+  late final String _rasterStyle = jsonEncode({
+    'version': 8,
+    'sources': {
+      'tiles': {
+        'type': 'raster',
+        'tiles': [widget.tileUrl],
+        'tileSize': 256,
+        'attribution': '© OpenStreetMap contributors',
+      },
+    },
+    'layers': [
+      // Shown while tiles load or if they cannot be loaded.
+      {
+        'id': 'background',
+        'type': 'background',
+        'paint': {'background-color': '#E4E9E6'},
+      },
+      {'id': 'tiles', 'type': 'raster', 'source': 'tiles'},
+    ],
+  });
 
   static LatLng _latLng(GeoPoint point) => LatLng(point.lat, point.lon);
 
@@ -144,7 +155,17 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
   void didUpdateWidget(MapLibreMapView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!_styleLoaded) return;
-    if (oldWidget.layerChoice != widget.layerChoice) _applyLayerChoice();
+    if (oldWidget.styleJson != widget.styleJson) {
+      // The map loads the new style and reports it; until then nothing of
+      // the old one may be touched.
+      _styleLoaded = false;
+      _radarShown.clear();
+      return;
+    }
+    if (oldWidget.layerChoice != widget.layerChoice) {
+      _applyLayerChoice();
+      _applyRadar();
+    }
     if (!listEquals(oldWidget.content.track, widget.content.track)) {
       _controller?.setGeoJsonSource(_source, _trackGeoJson());
     }
@@ -167,7 +188,9 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
     );
     _styleLoaded = true;
     await _applyLayerChoice();
-    final bounds = GeoBounds.around(_everything);
+    await _applyRadar();
+    final bounds = _fitted ? null : GeoBounds.around(_everything);
+    _fitted = true;
     if (bounds != null) {
       await controller.moveCamera(
         bounds.southWest == bounds.northEast
@@ -185,6 +208,164 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
       );
     }
     await _updatePositions();
+  }
+
+  Map<String, dynamic>? get _radar =>
+      widget.layerOptions?['radar'] as Map<String, dynamic>?;
+
+  /// Asks which times have a radar or cloud image.
+  Future<void> _loadFrames() async {
+    final address = _radar?['frames'] as String?;
+    if (address == null) return;
+    final client = HttpClient();
+    try {
+      final response = await (await client.getUrl(Uri.parse(address))).close();
+      final body =
+          jsonDecode(await utf8.decodeStream(response)) as Map<String, dynamic>;
+      List<int> times(String key) => [
+        for (final time in body[key] as List<dynamic>? ?? const [])
+          (time as num).toInt(),
+      ];
+      final rain = times('rain'), clouds = times('clouds');
+      final all = {...rain, ...clouds}.toList()..sort();
+      if (!mounted) return;
+      setState(() {
+        _frames = (rain: rain, clouds: clouds, times: all);
+        _frame = all.isEmpty ? 0 : all.length - 1;
+      });
+    } on Object {
+      // No network or no radar right now: the map stays as it is.
+      if (mounted) {
+        setState(() => _frames = (rain: [], clouds: [], times: []));
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  /// Lays the radar and cloud image of the chosen time over the map.
+  Future<void> _applyRadar() async {
+    final controller = _controller;
+    final radar = _radar;
+    if (controller == null || radar == null || !_styleLoaded) return;
+    final chosen = widget.layerChoice.radar;
+    if (chosen.isEmpty) {
+      _player?.cancel();
+      _player = null;
+    } else if (_frames == null) {
+      await _loadFrames();
+    }
+    final frames = _frames;
+    for (final kind in const ['clouds', 'rain']) {
+      final id = 'radar-$kind';
+      if (_radarShown.remove(id)) {
+        try {
+          await controller.removeLayer(id);
+          await controller.removeSource(id);
+        } on Exception {
+          // Already gone with the style.
+        }
+      }
+      if (!chosen.contains(kind) || frames == null || frames.times.isEmpty) {
+        continue;
+      }
+      // The image of that kind closest before the chosen time.
+      final time = frames.times[_frame.clamp(0, frames.times.length - 1)];
+      final known = (kind == 'rain' ? frames.rain : frames.clouds).where(
+        (frame) => frame <= time,
+      );
+      if (known.isEmpty) continue;
+      try {
+        await controller.addSource(
+          id,
+          RasterSourceProperties(
+            tiles: [
+              (radar[kind] as String).replaceFirst('{time}', '${known.last}'),
+            ],
+            tileSize: 256,
+            maxzoom: (radar['${kind}_max_zoom'] as num?)?.toDouble() ?? 7,
+          ),
+        );
+        await controller.addRasterLayer(
+          id,
+          id,
+          RasterLayerProperties(
+            rasterOpacity: kind == 'rain' ? 0.75 : 0.55,
+            rasterFadeDuration: 0,
+          ),
+          belowLayerId: 'track-line',
+        );
+        _radarShown.add(id);
+      } on Exception {
+        // The image of this time cannot be shown; the next one may.
+      }
+    }
+  }
+
+  void _showFrame(int index) {
+    setState(() => _frame = index);
+    _applyRadar();
+  }
+
+  void _togglePlay() {
+    if (_player != null) {
+      _player!.cancel();
+      setState(() => _player = null);
+      return;
+    }
+    setState(() {
+      _player = Timer.periodic(const Duration(milliseconds: 900), (_) {
+        final count = _frames?.times.length ?? 0;
+        if (count > 0) _showFrame((_frame + 1) % count);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _player?.cancel();
+    super.dispose();
+  }
+
+  /// A tap for looking things up: what the map draws around the finger.
+  Future<void> _lookUp(math.Point<double> point, LatLng coordinates) async {
+    final onPlace = widget.content.onPlace;
+    final controller = _controller;
+    if (onPlace == null || controller == null) return;
+    final features = <({String layer, Map<String, dynamic> properties})>[];
+    try {
+      final found = await controller.queryRenderedFeaturesInRect(
+        Rect.fromCircle(center: Offset(point.x, point.y), radius: 22),
+        const [],
+        null,
+      );
+      for (final feature in found) {
+        final json = feature is String ? jsonDecode(feature) : feature;
+        if (json is! Map) continue;
+        final properties = json['properties'];
+        final layer = json['sourceLayer'] ?? json['source-layer'];
+        if (properties is Map) {
+          features.add((
+            layer: '${layer ?? properties['layer'] ?? ''}',
+            properties: properties.cast<String, dynamic>(),
+          ));
+        }
+      }
+    } on Exception {
+      // The place is still worth showing without what lies there.
+    }
+    onPlace(
+      MapPlace(
+        position: GeoPoint(coordinates.latitude, coordinates.longitude),
+        features: features,
+      ),
+    );
+  }
+
+  String _clock(int seconds) {
+    final time = DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${two(time.hour)}:${two(time.minute)}';
   }
 
   /// Where the markers and the highlight are on screen right now.
@@ -323,26 +504,131 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
             onStyleLoadedCallback: _onStyleLoaded,
             onCameraMove: (_) => _updatePositions(),
             onCameraIdle: _updatePositions,
-            onMapClick: (_, coordinates) => widget.content.onTap?.call(
-              GeoPoint(coordinates.latitude, coordinates.longitude),
-            ),
+            onMapClick: (point, coordinates) {
+              if (widget.content.onPlace != null) {
+                _lookUp(point, coordinates);
+                return;
+              }
+              widget.content.onTap?.call(
+                GeoPoint(coordinates.latitude, coordinates.longitude),
+              );
+            },
           ),
           ..._overlay(),
-          if (widget.layerSheet != null && widget.content.interactive)
+          if (widget.content.interactive &&
+              (widget.layerSheet != null || widget.content.controls.isNotEmpty))
             Positioned(
               left: 8,
               top: 8,
+              // The compass of the map sits in the right corner.
+              right: 56,
+              child: _MapFields(
+                fields: [
+                  if (widget.layerSheet case final sheet?) ...[
+                    MapControl(
+                      label: AppLocalizations.of(context).mapLayers,
+                      builder: (context) => sheet(context, MapSheetPart.layers),
+                    ),
+                    MapControl(
+                      label: AppLocalizations.of(context).mapLooks,
+                      builder: (context) => sheet(context, MapSheetPart.looks),
+                    ),
+                  ],
+                  ...widget.content.controls,
+                ],
+              ),
+            ),
+          if (widget.layerChoice.radar.isNotEmpty &&
+              (_frames?.times.isNotEmpty ?? false))
+            Positioned(
+              left: 8,
+              right: 8,
+              bottom: 8,
               child: Material(
                 color: Theme.of(context).colorScheme.surface,
-                shape: const CircleBorder(),
+                borderRadius: BorderRadius.circular(24),
                 elevation: 2,
-                child: IconButton(
-                  tooltip: AppLocalizations.of(context).mapLayers,
-                  icon: const Icon(Icons.layers_outlined),
-                  onPressed: () => showModalBottomSheet<void>(
+                child: Row(
+                  children: [
+                    IconButton(
+                      tooltip: AppLocalizations.of(context).mapRadarPlay,
+                      icon: Icon(
+                        _player == null ? Icons.play_arrow : Icons.pause,
+                      ),
+                      onPressed: _togglePlay,
+                    ),
+                    Expanded(
+                      child: Slider(
+                        max: (_frames!.times.length - 1).toDouble(),
+                        divisions: math.max(1, _frames!.times.length - 1),
+                        value: _frame
+                            .clamp(0, _frames!.times.length - 1)
+                            .toDouble(),
+                        onChanged: _frames!.times.length < 2
+                            ? null
+                            : (value) => _showFrame(value.round()),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 16),
+                      child: Text(
+                        _clock(
+                          _frames!.times[_frame.clamp(
+                            0,
+                            _frames!.times.length - 1,
+                          )],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The fields at the top edge of the map; each opens a sheet.
+class _MapFields extends StatelessWidget {
+  const _MapFields({required this.fields});
+
+  final List<MapControl> fields;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (final field in fields)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: Material(
+                color: scheme.surface,
+                borderRadius: BorderRadius.circular(18),
+                elevation: 2,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => showModalBottomSheet<void>(
                     context: context,
                     isScrollControlled: true,
-                    builder: widget.layerSheet!,
+                    builder: field.builder,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          field.label,
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                        const Icon(Icons.arrow_drop_down, size: 20),
+                      ],
+                    ),
                   ),
                 ),
               ),

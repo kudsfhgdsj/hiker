@@ -2629,8 +2629,164 @@ abstract class AppLocalizations {
   /// No description provided for @planDurationNote.
   ///
   /// In de, this message translates to:
-  /// **'Gehzeit geschätzt nach DIN 33466, ohne Pausen.'**
-  String get planDurationNote;
+  /// **'Gehzeit geschätzt, ohne Pausen: {ascent} Hm/h auf, {descent} Hm/h ab, {distance} km/h.'**
+  String planDurationNote(String ascent, String descent, String distance);
+
+  /// No description provided for @planDifficultyField.
+  ///
+  /// In de, this message translates to:
+  /// **'Schwierigkeit'**
+  String get planDifficultyField;
+
+  /// No description provided for @planPace.
+  ///
+  /// In de, this message translates to:
+  /// **'Gehzeit rechnen nach'**
+  String get planPace;
+
+  /// No description provided for @planPacePreset.
+  ///
+  /// In de, this message translates to:
+  /// **'{preset, select, dav{DAV: 300 Hm auf, 500 ab, 4 km/h} sac{SAC: 400 Hm auf, 800 ab, 4 km/h} other{Profi: 600 Hm auf, 1000 ab, 6 km/h}}'**
+  String planPacePreset(String preset);
+
+  /// No description provided for @planPaceCustom.
+  ///
+  /// In de, this message translates to:
+  /// **'Individuell'**
+  String get planPaceCustom;
+
+  /// No description provided for @planPaceAscent.
+  ///
+  /// In de, this message translates to:
+  /// **'Hm/h auf'**
+  String get planPaceAscent;
+
+  /// No description provided for @planPaceDescent.
+  ///
+  /// In de, this message translates to:
+  /// **'Hm/h ab'**
+  String get planPaceDescent;
+
+  /// No description provided for @planPaceDistance.
+  ///
+  /// In de, this message translates to:
+  /// **'km/h'**
+  String get planPaceDistance;
+
+  /// No description provided for @planPaceName.
+  ///
+  /// In de, this message translates to:
+  /// **'Name für eigene Vorgabe'**
+  String get planPaceName;
+
+  /// No description provided for @planPaceNameMissing.
+  ///
+  /// In de, this message translates to:
+  /// **'Bitte einen Namen und gültige Werte eingeben.'**
+  String get planPaceNameMissing;
+
+  /// No description provided for @planPaceDelete.
+  ///
+  /// In de, this message translates to:
+  /// **'„{name}“ löschen'**
+  String planPaceDelete(String name);
+
+  /// No description provided for @planPaceNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Eigene Vorgaben siehst nur du. Pausen sind in der Gehzeit nicht enthalten.'**
+  String get planPaceNote;
+
+  /// No description provided for @planTags.
+  ///
+  /// In de, this message translates to:
+  /// **'Tags'**
+  String get planTags;
+
+  /// No description provided for @planTagsHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Durch Komma getrennt, z. B. Sommer, Gipfel'**
+  String get planTagsHint;
+
+  /// No description provided for @planStart.
+  ///
+  /// In de, this message translates to:
+  /// **'Start (Datum und Uhrzeit)'**
+  String get planStart;
+
+  /// No description provided for @planStartHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch offen. Mit einem Start siehst du, wie die Sonne zur Tour steht.'**
+  String get planStartHint;
+
+  /// No description provided for @planTimeHere.
+  ///
+  /// In de, this message translates to:
+  /// **'An dieser Stelle um {time}'**
+  String planTimeHere(String time);
+
+  /// No description provided for @planSunrise.
+  ///
+  /// In de, this message translates to:
+  /// **'Sonnenaufgang'**
+  String get planSunrise;
+
+  /// No description provided for @planSunset.
+  ///
+  /// In de, this message translates to:
+  /// **'Sonnenuntergang'**
+  String get planSunset;
+
+  /// No description provided for @planEnd.
+  ///
+  /// In de, this message translates to:
+  /// **'Ende der Tour'**
+  String get planEnd;
+
+  /// No description provided for @planSummit.
+  ///
+  /// In de, this message translates to:
+  /// **'Höchster Punkt ({elevation})'**
+  String planSummit(String elevation);
+
+  /// No description provided for @planSunAtSummit.
+  ///
+  /// In de, this message translates to:
+  /// **'Sonne {height}° hoch im {direction}'**
+  String planSunAtSummit(String height, String direction);
+
+  /// No description provided for @compassDirection.
+  ///
+  /// In de, this message translates to:
+  /// **'{index, select, 0{Norden} 1{Nordosten} 2{Osten} 3{Südosten} 4{Süden} 5{Südwesten} 6{Westen} other{Nordwesten}}'**
+  String compassDirection(String index);
+
+  /// No description provided for @planDaylightLeft.
+  ///
+  /// In de, this message translates to:
+  /// **'Nach dem Ende bleiben {time} bis Sonnenuntergang.'**
+  String planDaylightLeft(String time);
+
+  /// No description provided for @planAfterSunset.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Sonne geht {time} vor dem Ende der Tour unter.'**
+  String planAfterSunset(String time);
+
+  /// No description provided for @planStartsInDark.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Start liegt vor der Morgendämmerung: Stirnlampe einplanen.'**
+  String get planStartsInDark;
+
+  /// No description provided for @planEndsInDark.
+  ///
+  /// In de, this message translates to:
+  /// **'Das Ende liegt nach der Abenddämmerung: Stirnlampe einplanen.'**
+  String get planEndsInDark;
 
   /// No description provided for @planRouteTitle.
   ///
@@ -2649,12 +2805,6 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Beschreibung'**
   String get planDescription;
-
-  /// No description provided for @planDate.
-  ///
-  /// In de, this message translates to:
-  /// **'Geplant für'**
-  String get planDate;
 
   /// No description provided for @planSavedOffline.
   ///
@@ -2853,6 +3003,120 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Ebenen'**
   String get mapLayers;
+
+  /// No description provided for @mapTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Karte'**
+  String get mapTitle;
+
+  /// No description provided for @mapBackToLogin.
+  ///
+  /// In de, this message translates to:
+  /// **'Zur Anmeldung'**
+  String get mapBackToLogin;
+
+  /// No description provided for @mapOpenWithoutLogin.
+  ///
+  /// In de, this message translates to:
+  /// **'Karte ohne Anmeldung ansehen'**
+  String get mapOpenWithoutLogin;
+
+  /// No description provided for @mapViaFerrata.
+  ///
+  /// In de, this message translates to:
+  /// **'Klettersteig'**
+  String get mapViaFerrata;
+
+  /// No description provided for @mapSacScale.
+  ///
+  /// In de, this message translates to:
+  /// **'{scale, select, hiking{T1 – Wanderung} mountain_hiking{T2 – Anspruchsvolle Bergwanderung} demanding_mountain_hiking{T3 – Bergtour} alpine_hiking{T4 – Schwere Bergtour} demanding_alpine_hiking{T5 – Sehr schwere Bergtour} difficult_alpine_hiking{T6 – Äußerst schwierige Bergtour} other{Wanderweg}}'**
+  String mapSacScale(String scale);
+
+  /// No description provided for @mapSunTimes.
+  ///
+  /// In de, this message translates to:
+  /// **'{date}: Sonnenaufgang {rise}, Sonnenuntergang {set}'**
+  String mapSunTimes(String date, String rise, String set);
+
+  /// No description provided for @mapSunSummit.
+  ///
+  /// In de, this message translates to:
+  /// **'Bei freiem Horizont vom Gipfel: frühestens {rise}, spätestens {set}.'**
+  String mapSunSummit(String rise, String set);
+
+  /// No description provided for @mapSunLight.
+  ///
+  /// In de, this message translates to:
+  /// **'Hell von {dawn} bis {dusk}. Berge am Horizont sind nicht eingerechnet.'**
+  String mapSunLight(String dawn, String dusk);
+
+  /// No description provided for @mapSunNone.
+  ///
+  /// In de, this message translates to:
+  /// **'An diesem Tag geht die Sonne hier nicht auf oder nicht unter.'**
+  String get mapSunNone;
+
+  /// No description provided for @mapLooks.
+  ///
+  /// In de, this message translates to:
+  /// **'Darstellung'**
+  String get mapLooks;
+
+  /// No description provided for @mapSlopeOpen.
+  ///
+  /// In de, this message translates to:
+  /// **'senkrecht'**
+  String get mapSlopeOpen;
+
+  /// No description provided for @mapSlopeRange.
+  ///
+  /// In de, this message translates to:
+  /// **'Eingefärbt von {low} bis {high}'**
+  String mapSlopeRange(String low, String high);
+
+  /// No description provided for @mapHistory.
+  ///
+  /// In de, this message translates to:
+  /// **'Stand vom'**
+  String get mapHistory;
+
+  /// No description provided for @mapHistoryNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Heute. Lawinengefahr, Schnee und Wetter gibt es auch für einen Tag im letzten Jahr.'**
+  String get mapHistoryNote;
+
+  /// No description provided for @mapHistoryToday.
+  ///
+  /// In de, this message translates to:
+  /// **'Heute'**
+  String get mapHistoryToday;
+
+  /// No description provided for @mapRadarRain.
+  ///
+  /// In de, this message translates to:
+  /// **'Regenradar'**
+  String get mapRadarRain;
+
+  /// No description provided for @mapRadarClouds.
+  ///
+  /// In de, this message translates to:
+  /// **'Wolken (Satellit)'**
+  String get mapRadarClouds;
+
+  /// No description provided for @mapRadarNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Die letzten zwei Stunden mit Zeitregler unten in der Karte.'**
+  String get mapRadarNote;
+
+  /// No description provided for @mapRadarPlay.
+  ///
+  /// In de, this message translates to:
+  /// **'Zeitverlauf abspielen'**
+  String get mapRadarPlay;
 
   /// No description provided for @mapBaseMap.
   ///

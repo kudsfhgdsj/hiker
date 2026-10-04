@@ -278,7 +278,9 @@ void main() {
       final upstream = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       final asked = <String>[];
       upstream.listen((request) async {
-        asked.add(request.uri.path);
+        asked.add(
+          '${request.uri.path}${request.uri.hasQuery ? '?${request.uri.query}' : ''}',
+        );
         if (request.uri.path.endsWith('/vector/10/538/360.pbf')) {
           request.response.headers.contentType = ContentType(
             'application',
@@ -287,6 +289,7 @@ void main() {
           request.response.headers.set('content-encoding', 'gzip');
           request.response.add([31, 139, 9, 9]);
         } else if (request.uri.path.contains('/raster/') ||
+            request.uri.path.contains('/radar/') ||
             request.uri.path.contains('/slope/')) {
           request.response.add([1, 2, 3]);
         } else if (request.uri.path.contains('/fonts/')) {
@@ -363,6 +366,25 @@ void main() {
       ]);
       asked.removeRange(3, asked.length);
 
+      // Chosen angles, a day in the past and the radar are passed on and kept
+      // apart from the usual tiles.
+      expect((await get('/slope/12/2153/1436.png?low=35&high=50')).$2, [
+        1,
+        2,
+        3,
+      ]);
+      expect((await get('/raster/snow/7/67/44?date=2026-02-01')).$2, [1, 2, 3]);
+      expect((await get('/raster/snow/7/67/44?date=evil')).$2, [1, 2, 3]);
+      expect((await get('/radar/rain/1790000000/7/67/44.png')).$2, [1, 2, 3]);
+      expect((await get('/radar/other/1790000000/7/67/44.png')).$1, 404);
+      expect(asked.sublist(3), [
+        '/api/v1/maps/slope/12/2153/1436.png?low=35&high=50',
+        '/api/v1/maps/raster/snow/7/67/44?date=2026-02-01',
+        '/api/v1/maps/raster/snow/7/67/44',
+        '/api/v1/maps/radar/rain/1790000000/7/67/44.png',
+      ]);
+      asked.removeRange(3, asked.length);
+
       // What was seen stays without network, also "nothing there".
       await upstream.close(force: true);
       expect((await get('/vector/10/538/360.pbf')).$2, [31, 139, 9, 9]);
@@ -430,6 +452,28 @@ void main() {
       notifier.setOverlay('slope', on: false);
       expect(container.read(mapLayerChoiceProvider).overlays, isEmpty);
       expect(container.read(mapLayerChoiceProvider).base, 'satellite');
+
+      // Angles, day and radar keep what was chosen before.
+      notifier.setSlope(35, 50);
+      notifier.setDay('2026-02-01');
+      notifier.setRadar('rain', on: true);
+      expect(
+        container.read(mapLayerChoiceProvider),
+        const MapLayerChoice(
+          base: 'satellite',
+          slopeLow: 35,
+          slopeHigh: 50,
+          day: '2026-02-01',
+          radar: {'rain'},
+        ),
+      );
+      notifier.setSlope(null, null);
+      notifier.setDay(null);
+      notifier.setRadar('rain', on: false);
+      expect(
+        container.read(mapLayerChoiceProvider),
+        const MapLayerChoice(base: 'satellite'),
+      );
     });
   });
 }

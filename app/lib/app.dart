@@ -17,6 +17,8 @@ import 'features/auth/presentation/account_security_screens.dart';
 import 'features/auth/presentation/auth_form_screen.dart';
 import 'features/auth/presentation/profile_screen.dart';
 import 'features/gear/gear_module.dart';
+import 'features/map/map_module.dart';
+import 'features/map/presentation/map_screen.dart';
 import 'features/nutrition/nutrition_module.dart';
 import 'features/planning/planning_module.dart';
 import 'features/protocols/data/tour_repository.dart';
@@ -27,6 +29,7 @@ import 'l10n/app_localizations.dart';
 final List<FeatureModule> builtInModules = [
   protocolsModule,
   planningModule,
+  mapModule,
   gearModule,
   nutritionModule,
 ];
@@ -42,6 +45,9 @@ List<Override> appOverrides({List<FeatureModule>? modules}) => [
       mfaSetup: (_) => const MfaSetupScreen(),
       passwordChange: (_) => const PasswordChangeScreen(),
     ),
+  ),
+  openMapScreenProvider.overrideWithValue(
+    (_) => const MapScreen(standalone: true),
   ),
   // Offline sync: tours merge field by field; files go through the tour API.
   conflictResolversProvider.overrideWithValue({'tours': resolveTourConflict}),

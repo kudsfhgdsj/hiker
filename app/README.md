@@ -124,11 +124,32 @@ auf 127.0.0.1): Er antwortet aus einer Kartendatei auf dem Gerät, sonst vom eig
 und hebt auf, was er ausgeliefert hat. Kartengebiete lädt man unter Planung → „Offline-Daten“
 (`core/map/map_regions.dart`).
 
+## Karte ansehen
+
+Unter „Karte“ liegt die Karte ohne Planung; sie ist vom Anmeldebildschirm aus auch **ohne
+Anmeldung** erreichbar („Karte ohne Anmeldung ansehen“, braucht nur die Server-Adresse oder
+ein geladenes Kartengebiet). Ein Tipp nennt Gipfel, Hütte oder Weg mit Schwierigkeit und die
+Sonnenzeiten des Tages dort – auf dem Gerät gerechnet (`core/sun.dart`, dieselben Formeln wie
+`backend/app/core/sun.py`), für Gipfel zusätzlich bei freiem Horizont.
+
+Oben in jeder Karte liegen die Felder „Ebenen“ und „Darstellung“ (im Planer zusätzlich
+„Schwierigkeit“). Unter „Ebenen“: Hangneigung mit einem Regler für beide Enden, ein Tag im
+letzten Jahr für Lawinengefahr, Schnee und Wetter, Regenradar und Wolken mit Zeitregler. Die
+gewählten Winkel und der Tag stehen in den Adressen, die die Karte beim Kartenserver der App
+abfragt (`styleWithChoice`). Ein 3D-Gelände kann die Kartenbibliothek der App nicht zeigen;
+das gibt es nur im Web.
+
 ## Planung
 
 Unter „Planung“ liegen die Routenliste und der Planer: Punkte auf der Karte setzen und
 versetzen, den Wegen folgen oder Luftlinie (für alle oder einzelne Abschnitte), Schwierigkeit
 T1–T6, Klettersteige, Höhenprofil, als GPX speichern. Linie und Eckdaten kommen vom Server.
+Die Karte füllt den Bildschirm; Eckdaten, Profil, Wegpunkte und Angaben liegen in einem Blatt,
+das man darüber hochzieht. Gehzeit nach DAV, SAC, „Profi“ oder eigenen Werten, die sich unter
+einem Namen speichern lassen (Abgleich über die Sammlung `paces`). Tags statt Datum; mit einem
+Startzeitpunkt zeigt der Planer Sonnenauf- und -untergang, die Uhrzeit am gewählten Punkt des
+Profils und warnt, wenn die Tour ins Dunkle reicht (`features/planning/data/route_schedule.dart`,
+ohne Netz gerechnet).
 
 **Ohne Netz** rechnet die App selbst: Der Routing-Kern von BRouter ist eingebunden
 (`android/app/libs/`, Herkunft und Prüfsumme in der README dort; Aufruf in `MainActivity.kt`,

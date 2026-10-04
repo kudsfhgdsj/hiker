@@ -21,7 +21,12 @@ import 'map_regions.dart';
 /// - `/fonts/{font}/{range}.pbf`: the glyphs for the labels,
 /// - `/raster/{layer}/{z}/{x}/{y}` and `/slope/{z}/{x}/{y}.png`: elevation,
 ///   aerial images, snow, precipitation and the slope layer of the user's
-///   server, and `/avalanche.geojson`, the avalanche danger of today.
+///   server, and `/avalanche.geojson`, the avalanche danger of today,
+/// - `/radar/frames` and `/radar/{kind}/{time}/{z}/{x}/{y}.png`: rain radar
+///   and cloud images with their times.
+///
+/// `?low=&high=` chooses the angles of the slope layer, `?date=` a day in the
+/// past for snow, precipitation, weather and avalanche danger.
 ///
 /// What comes from the server goes over the connection the app trusts (also
 /// with a certificate the user confirmed by hand) and is kept as a file. A
@@ -46,6 +51,10 @@ class TileProxy extends Notifier<int?> {
     r'^/raster/(terrain|satellite|snow|precipitation)/(\d{1,2})/(\d{1,7})/(\d{1,7})$',
   );
   static final _slope = RegExp(r'^/slope/(\d{1,2})/(\d{1,7})/(\d{1,7})\.png$');
+  static final _radar = RegExp(
+    r'^/radar/(rain|clouds)/(\d{1,12})/(\d{1,2})/(\d{1,7})/(\d{1,7})\.png$',
+  );
+  static final _day = RegExp(r'^\d{4}-\d{2}-\d{2}$');
   static const _freshFor = Duration(days: 7);
 
   /// Above this size the files not used for the longest time are removed.
@@ -229,6 +238,12 @@ class TileProxy extends Notifier<int?> {
   Future<void> _answer(HttpRequest request) async {
     final response = request.response;
     final path = request.uri.path;
+    final query = request.uri.queryParameters;
+    // A day in the past, for the layers that have a history. Such a day does
+    // not change any more, so its files stay fresh.
+    final day = _day.hasMatch(query['date'] ?? '') ? query['date'] : null;
+    final dated = day == null ? '' : '?date=$day';
+    final dayFolder = day == null ? '' : '@$day/';
     try {
       if (request.method != 'GET') {
         response.statusCode = HttpStatus.notFound;
@@ -296,24 +311,24 @@ class TileProxy extends Notifier<int?> {
         }
         await _fromServer(
           response,
-          apiPath: '/api/v1/maps/raster/${layer[1]}/$tile',
-          cacheName: 'raster/${layer[1]}/$tile',
+          apiPath: '/api/v1/maps/raster/${layer[1]}/$tile$dated',
+          cacheName: 'raster/${layer[1]}/$dayFolder$tile',
           type: layer[1] == 'satellite' ? ContentType('image', 'jpeg') : _png,
-          // Snow and precipitation change within hours.
+          // Snow and precipitation of today change within hours.
           freshFor: switch (layer[1]) {
-            'snow' => const Duration(hours: 6),
-            'precipitation' => const Duration(minutes: 30),
+            'snow' when day == null => const Duration(hours: 6),
+            'precipitation' when day == null => const Duration(minutes: 30),
             _ => _freshFor,
           },
         );
       } else if (path == '/avalanche.geojson') {
         await _fromServer(
           response,
-          apiPath: '/api/v1/maps/avalanche.geojson',
-          cacheName: 'avalanche.geojson',
+          apiPath: '/api/v1/maps/avalanche.geojson$dated',
+          cacheName: '${dayFolder}avalanche.geojson',
           type: ContentType('application', 'geo+json'),
           // The bulletins change during the day; an old one is still shown offline.
-          freshFor: const Duration(minutes: 30),
+          freshFor: day == null ? const Duration(minutes: 30) : _freshFor,
         );
       } else if (_contours.firstMatch(path) case final lines?) {
         final tile = '${lines[1]}/${lines[2]}/${lines[3]}.pbf';
@@ -338,20 +353,42 @@ class TileProxy extends Notifier<int?> {
         final tile = '${forecast[1]}/${forecast[2]}/${forecast[3]}.pbf';
         await _fromServer(
           response,
-          apiPath: '/api/v1/maps/weather/$tile',
-          cacheName: 'weather/$tile',
+          apiPath: '/api/v1/maps/weather/$tile$dated',
+          cacheName: 'weather/$dayFolder$tile',
           type: _protobuf,
           gzipped: true,
           // A forecast ages quickly; without network the last one is still shown.
-          freshFor: const Duration(hours: 1),
+          freshFor: day == null ? const Duration(hours: 1) : _freshFor,
         );
       } else if (_slope.firstMatch(path) case final slope?) {
         final tile = '${slope[1]}/${slope[2]}/${slope[3]}.png';
-        if (await _fromPack(response, 'slope', slope, 1, _png)) return;
+        // Angles chosen by the user: the layer pack only has the usual ones.
+        final low = int.tryParse(query['low'] ?? '');
+        final high = int.tryParse(query['high'] ?? '');
+        final own = low != null && high != null;
+        if (!own && await _fromPack(response, 'slope', slope, 1, _png)) return;
         await _fromServer(
           response,
-          apiPath: '/api/v1/maps/slope/$tile',
-          cacheName: 'slope/$tile',
+          apiPath:
+              '/api/v1/maps/slope/$tile${own ? '?low=$low&high=$high' : ''}',
+          cacheName: 'slope/${own ? '$low-$high/' : ''}$tile',
+          type: _png,
+        );
+      } else if (path == '/radar/frames') {
+        await _fromServer(
+          response,
+          apiPath: '/api/v1/maps/radar/frames',
+          cacheName: 'radar/frames.json',
+          type: ContentType.json,
+          freshFor: const Duration(minutes: 2),
+        );
+      } else if (_radar.firstMatch(path) case final image?) {
+        final tile =
+            '${image[1]}/${image[2]}/${image[3]}/${image[4]}/${image[5]}.png';
+        await _fromServer(
+          response,
+          apiPath: '/api/v1/maps/radar/$tile',
+          cacheName: 'radar/$tile',
           type: _png,
         );
       } else {

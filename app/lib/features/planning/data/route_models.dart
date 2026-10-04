@@ -40,6 +40,127 @@ class RouteWaypoint {
   };
 }
 
+/// How fast the walker is: what they cover in an hour. Of the time for the
+/// distance and the time for the elevation the larger one counts in full and
+/// the smaller one by half; breaks are not included.
+class Pace {
+  const Pace({
+    required this.preset,
+    required this.ascentMPerH,
+    required this.descentMPerH,
+    required this.distanceKmPerH,
+    this.name,
+  });
+
+  const Pace.custom({
+    required this.ascentMPerH,
+    required this.descentMPerH,
+    required this.distanceKmPerH,
+    this.name,
+  }) : preset = customPreset;
+
+  factory Pace.fromJson(Json? json) {
+    if (json == null) return dav;
+    final preset = json['preset'] as String? ?? 'dav';
+    return presets[preset] ??
+        Pace.custom(
+          name: json['name'] as String?,
+          ascentMPerH: (json['ascent_m_per_h'] as num?)?.toDouble() ?? 300,
+          descentMPerH: (json['descent_m_per_h'] as num?)?.toDouble() ?? 500,
+          distanceKmPerH: (json['distance_km_per_h'] as num?)?.toDouble() ?? 4,
+        );
+  }
+
+  static const customPreset = 'custom';
+
+  /// German Alpine Club (DIN 33466).
+  static const dav = Pace(
+    preset: 'dav',
+    ascentMPerH: 300,
+    descentMPerH: 500,
+    distanceKmPerH: 4,
+  );
+
+  /// Swiss Alpine Club.
+  static const sac = Pace(
+    preset: 'sac',
+    ascentMPerH: 400,
+    descentMPerH: 800,
+    distanceKmPerH: 4,
+  );
+
+  /// Well trained.
+  static const pro = Pace(
+    preset: 'pro',
+    ascentMPerH: 600,
+    descentMPerH: 1000,
+    distanceKmPerH: 6,
+  );
+
+  static const presets = {'dav': dav, 'sac': sac, 'pro': pro};
+
+  /// `dav`, `sac`, `pro` or `custom`.
+  final String preset;
+
+  /// Name of the saved pace the values come from, if any.
+  final String? name;
+  final double ascentMPerH;
+  final double descentMPerH;
+  final double distanceKmPerH;
+
+  bool get isCustom => preset == customPreset;
+
+  /// Seconds for a route; without elevation only the distance counts.
+  int walkingTimeS(double distanceM, double? ascentM, double? descentM) {
+    final horizontal = distanceM / (distanceKmPerH * 1000);
+    final vertical =
+        (ascentM ?? 0) / ascentMPerH + (descentM ?? 0) / descentMPerH;
+    final longer = horizontal > vertical ? horizontal : vertical;
+    final shorter = horizontal > vertical ? vertical : horizontal;
+    return ((longer + shorter / 2) * 3600).round();
+  }
+
+  Json toJson() => isCustom
+      ? {
+          'preset': preset,
+          'name': name,
+          'ascent_m_per_h': ascentMPerH,
+          'descent_m_per_h': descentMPerH,
+          'distance_km_per_h': distanceKmPerH,
+        }
+      : {'preset': preset};
+
+  @override
+  bool operator ==(Object other) =>
+      other is Pace &&
+      other.preset == preset &&
+      other.name == name &&
+      other.ascentMPerH == ascentMPerH &&
+      other.descentMPerH == descentMPerH &&
+      other.distanceKmPerH == distanceKmPerH;
+
+  @override
+  int get hashCode =>
+      Object.hash(preset, name, ascentMPerH, descentMPerH, distanceKmPerH);
+}
+
+/// A pace the user saved under a name; only they see it.
+class SavedPace {
+  const SavedPace(this.json);
+
+  final Json json;
+
+  String get id => json['id'] as String;
+  String get name => json['name'] as String? ?? '';
+
+  Pace get pace => Pace.custom(
+    name: name,
+    ascentMPerH: (json['ascent_m_per_h'] as num).toDouble(),
+    descentMPerH: (json['descent_m_per_h'] as num).toDouble(),
+    distanceKmPerH: (json['distance_km_per_h'] as num).toDouble(),
+  );
+}
+
 /// The line the server computed from the waypoints, with its key figures.
 class RouteResult {
   const RouteResult(this.json);
@@ -74,7 +195,7 @@ class RouteResult {
   /// when the route is synced.
   bool get onDevice => json['on_device'] == true;
 
-  /// Estimated walking time without breaks (DIN 33466).
+  /// Estimated walking time without breaks, for the pace it was asked with.
   int get durationS => (json['duration_s'] as num).round();
 
   /// The point of the line closest to a distance along it.
@@ -89,18 +210,22 @@ class RouteDraft {
   const RouteDraft({
     this.title = '',
     this.description,
-    this.plannedDate,
+    this.tags = const [],
+    this.startTime,
     this.profile = 'hiking',
     this.maxDifficulty = 3,
     this.viaFerrata = false,
+    this.pace = Pace.dav,
     this.waypoints = const [],
   });
 
   final String title;
   final String? description;
 
-  /// ISO date, e.g. `2026-07-18`.
-  final String? plannedDate;
+  final List<String> tags;
+
+  /// When the walker sets out; null if not decided yet.
+  final DateTime? startTime;
 
   /// `hiking`: along paths. `direct`: straight lines.
   final String profile;
@@ -108,20 +233,25 @@ class RouteDraft {
   /// Hardest allowed path on the SAC scale, 1 (T1) to 6 (T6).
   final int maxDifficulty;
   final bool viaFerrata;
+
+  /// For the walking time.
+  final Pace pace;
   final List<RouteWaypoint> waypoints;
 
-  /// What the course of the line depends on; the same for preview and saving.
+  /// What line and figures depend on; the same for preview and saving.
   Json courseJson() => {
     'profile': profile,
     'max_difficulty': maxDifficulty,
     'via_ferrata': viaFerrata,
+    'pace': pace.toJson(),
     'waypoints': [for (final point in waypoints) point.toJson()],
   };
 
   Json toJson() => {
     'title': title,
     'description': description,
-    'planned_date': plannedDate,
+    'tags': tags,
+    'start_time': startTime?.toUtc().toIso8601String(),
     ...courseJson(),
   };
 }
@@ -137,8 +267,14 @@ class PlannedRoute {
   int get version => json['version'] as int? ?? 0;
   String get profile => json['profile'] as String? ?? 'hiking';
 
-  DateTime? get plannedDate =>
-      DateTime.tryParse(json['planned_date'] as String? ?? '');
+  DateTime? get startTime =>
+      DateTime.tryParse(json['start_time'] as String? ?? '')?.toUtc();
+
+  List<String> get tags => [
+    for (final tag in json['tags'] as List<dynamic>? ?? const []) tag as String,
+  ];
+
+  Pace get pace => Pace.fromJson(json['pace'] as Json?);
 
   double? get distanceM => (json['distance_m'] as num?)?.toDouble();
   double? get ascentM => (json['ascent_m'] as num?)?.toDouble();
@@ -149,10 +285,12 @@ class PlannedRoute {
   RouteDraft get draft => RouteDraft(
     title: title,
     description: json['description'] as String?,
-    plannedDate: json['planned_date'] as String?,
+    tags: tags,
+    startTime: startTime,
     profile: profile,
     maxDifficulty: json['max_difficulty'] as int? ?? 3,
     viaFerrata: json['via_ferrata'] as bool? ?? false,
+    pace: pace,
     waypoints: [
       for (final point in json['waypoints'] as List<dynamic>? ?? const [])
         RouteWaypoint.fromJson(point as Json),

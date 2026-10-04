@@ -132,7 +132,8 @@ class _RouteCard extends StatelessWidget {
         title: Text(route.title),
         subtitle: Text(
           [
-            if (route.plannedDate != null) Format.date(route.plannedDate!),
+            if (route.startTime != null) Format.dateTime(route.startTime!),
+            if (route.tags.isNotEmpty) route.tags.join(' · '),
             figures,
           ].join('\n'),
           style: theme.textTheme.bodySmall,

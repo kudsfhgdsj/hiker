@@ -280,17 +280,6 @@ double haversineM(double lat1, double lon1, double lat2, double lon2) {
   return 2 * _earthRadiusM * math.asin(math.min(1, math.sqrt(a)));
 }
 
-/// Walking time after DIN 33466: 4 km/h, 300 m up and 500 m down per hour;
-/// the larger of distance and elevation time counts in full, the other by half.
-int walkingTimeS(double distanceM, double? ascentM, double? descentM) {
-  final horizontal = distanceM / 4000;
-  final vertical = (ascentM ?? 0) / 300 + (descentM ?? 0) / 500;
-  return ((math.max(horizontal, vertical) +
-              math.min(horizontal, vertical) / 2) *
-          3600)
-      .round();
-}
-
 List<LinePoint> _straight(LinePoint from, GeoPoint to) {
   final length = haversineM(from.lat, from.lon, to.lat, to.lon);
   final steps = math.max(1, (length / _directStepM).round());
@@ -418,7 +407,7 @@ Future<RouteResult> computeOnDevice(
     'descent_m': descent,
     'min_elevation_m': lowest,
     'max_elevation_m': highest,
-    'duration_s': walkingTimeS(total, ascent, descent),
+    'duration_s': draft.pace.walkingTimeS(total, ascent, descent),
     'duration_estimated': true,
   });
 }

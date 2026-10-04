@@ -26,11 +26,18 @@ for area in "$@"; do
     *[!a-z0-9-]*|"") echo "Ungültiger Gebietsname: $area" >&2; exit 1 ;;
   esac
   echo "== $area =="
+  DATA_DIR="${DATA_DIR:-$(sed -n 's/^DATA_DIR=//p' .env 2>/dev/null | tail -n 1)}"
+  DATA_DIR="${DATA_DIR:-./data}"
   # 1. Grundkarte (OpenMapTiles-Schema); lädt dabei den OSM-Auszug.
   docker compose --profile mapbuild run --rm mapbuild \
     --download --area="$area" --storage=mmap \
     --download-dir=/data/build/sources --tmpdir=/data/build/tmp \
     --output="/data/build/$area.base.mbtiles" --force
+  # Planetiler legt den Auszug mit Unterstrichen ab (nord-est → nord_est.osm.pbf); der
+  # zweite Schritt sucht ihn unter dem Gebietsnamen.
+  extract="$DATA_DIR/maps/build/sources/$(printf %s "$area" | tr - _).osm.pbf"
+  [ "$extract" = "$DATA_DIR/maps/build/sources/$area.osm.pbf" ] \
+    || mv "$extract" "$DATA_DIR/maps/build/sources/$area.osm.pbf"
   # 2. Wege mit ihrer Schwierigkeit (SAC-Skala, Klettersteige) aus demselben Auszug.
   docker compose --profile mapbuild run --rm mapbuild \
     generate-custom --schema=/schema/hiking.yml --area="$area" \
@@ -40,8 +47,6 @@ for area in "$@"; do
   #    eine halbe Karte.
   docker compose --profile mapbuild run --rm mapmerge \
     "/data/build/$area.base.mbtiles" "/data/build/$area.paths.mbtiles" "/data/build/$area.mbtiles"
-  DATA_DIR="${DATA_DIR:-$(sed -n 's/^DATA_DIR=//p' .env 2>/dev/null | tail -n 1)}"
-  DATA_DIR="${DATA_DIR:-./data}"
   mv "$DATA_DIR/maps/build/$area.mbtiles" "$DATA_DIR/maps/$area.mbtiles"
   # Zwischenergebnisse und OSM-Auszug werden nicht mehr gebraucht; die Hilfsdaten bleiben.
   rm -f "$DATA_DIR/maps/build/$area.base.mbtiles" "$DATA_DIR/maps/build/$area.paths.mbtiles" \

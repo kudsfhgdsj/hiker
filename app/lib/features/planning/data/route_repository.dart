@@ -36,6 +36,9 @@ class RouteRepository {
   /// The list as last loaded (without lines).
   static const _list = 'route_list';
   static const _info = 'planning_info';
+
+  /// The paces saved under a name; the sync keeps them too.
+  static const _paces = 'paces';
   static const _pageSize = 200;
 
   /// The fields a line follows from; if they differ the stored line is outdated.
@@ -176,6 +179,13 @@ class RouteRepository {
       final local = <String, dynamic>{
         // The old line and figures only stay if the course did not change.
         if (sameCourse) ...before else ...?computed?.json,
+        // The pace only changes the walking time: that is computed here.
+        if (sameCourse && before['distance_m'] != null)
+          'duration_s': draft.pace.walkingTimeS(
+            (before['distance_m'] as num).toDouble(),
+            (before['ascent_m'] as num?)?.toDouble(),
+            (before['descent_m'] as num?)?.toDouble(),
+          ),
         ...document,
         'id': id,
         'version': existing?.version ?? 0,
@@ -190,6 +200,65 @@ class RouteRepository {
       );
       return PlannedRoute(local);
     }
+  }
+
+  /// The paces the user saved under a name; offline the last known ones.
+  Future<List<SavedPace>> paces() async {
+    List<Json> documents;
+    try {
+      final response = await apiCall(
+        () => _dio.get<List<dynamic>>('/planning/paces'),
+      );
+      documents = response.data!.cast<Json>();
+      await _db.replaceCollection(_paces, documents);
+    } on ApiException catch (error) {
+      if (error.code != ApiException.network) rethrow;
+      documents = await _db.listDocuments(_paces);
+    }
+    return [for (final document in documents) SavedPace(document)]
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  }
+
+  /// Saves a pace under a name. A name stands for one pace: saving it again
+  /// replaces the earlier one. Without network it is sent with the next sync.
+  Future<SavedPace> savePace(String name, Pace pace) async {
+    for (final earlier in await paces()) {
+      if (earlier.name == name) await deletePace(earlier.id);
+    }
+    final document = <String, dynamic>{
+      'id': const Uuid().v4(),
+      'name': name,
+      'ascent_m_per_h': pace.ascentMPerH,
+      'descent_m_per_h': pace.descentMPerH,
+      'distance_km_per_h': pace.distanceKmPerH,
+    };
+    try {
+      final response = await apiCall(
+        () => _dio.post<Json>('/planning/paces', data: document),
+      );
+      await _db.putDocument(
+        _paces,
+        response.data!['id'] as String,
+        response.data!,
+      );
+      return SavedPace(response.data!);
+    } on ApiException catch (error) {
+      if (error.code != ApiException.network) rethrow;
+      final id = document['id'] as String;
+      await _db.putDocument(_paces, id, document);
+      await _sync.enqueue(collection: _paces, id: id, data: document);
+      return SavedPace(document);
+    }
+  }
+
+  Future<void> deletePace(String id) async {
+    try {
+      await apiCall(() => _dio.delete<void>('/planning/paces/$id'));
+    } on ApiException catch (error) {
+      if (error.code != ApiException.network) rethrow;
+      await _sync.enqueue(collection: _paces, id: id);
+    }
+    await _db.deleteDocument(_paces, id);
   }
 
   Future<void> delete(String id) async {
@@ -226,6 +295,11 @@ final plannedRouteProvider = FutureProvider.autoDispose
       ref.watch(syncGenerationProvider);
       return ref.watch(routeRepositoryProvider).get(id);
     });
+
+final savedPacesProvider = FutureProvider.autoDispose<List<SavedPace>>((ref) {
+  ref.watch(syncGenerationProvider);
+  return ref.watch(routeRepositoryProvider).paces();
+});
 
 final planningInfoProvider = FutureProvider.autoDispose<PlanningInfo>(
   (ref) => ref.watch(routeRepositoryProvider).info(),

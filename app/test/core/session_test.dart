@@ -57,6 +57,8 @@ void main() {
     expect(redirectFor(SessionStatus.unknown, '/', home), isNull);
     expect(redirectFor(SessionStatus.signedOut, '/gear', home), '/login');
     expect(redirectFor(SessionStatus.signedOut, '/register', home), isNull);
+    // The map can be looked at without signing in.
+    expect(redirectFor(SessionStatus.signedOut, '/open-map', home), isNull);
     expect(redirectFor(SessionStatus.signedIn, '/login', home), home);
     expect(redirectFor(SessionStatus.signedIn, '/', home), home);
     expect(redirectFor(SessionStatus.signedIn, '/profile', home), isNull);
