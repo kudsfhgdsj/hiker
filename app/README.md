@@ -94,20 +94,38 @@ feste Quelle lässt sich beim Bauen setzen: `--dart-define=MAP_TILE_URL=https://
 - **Eigene Zertifizierungsstelle**: Das Wurzelzertifikat in Android installieren (Einstellungen →
   Sicherheit → Zertifikat installieren). Die App vertraut installierten Stellen.
 - Die Karte lädt ihre Kacheln über eine native Bibliothek, die die Bestätigung in der App nicht
-  kennt. Damit die Karte funktioniert, muss das Zertifikat bzw. die CA in Android installiert sein.
+  kennt. Für einen von Hand bestätigten Server holt deshalb die App selbst die Kacheln und reicht
+  sie der Karte über einen kleinen Server auf `127.0.0.1` weiter (`core/map/tile_proxy.dart`).
 - Unverschlüsseltes HTTP ist nicht erlaubt.
 
-## App testen ohne Telefon am Rechner
+## App testen
 
-Der Android-Emulator braucht Hardware-Virtualisierung (KVM). In einer VM ohne verschachtelte
-Virtualisierung läuft er nicht brauchbar. Wege, die funktionieren:
-
-1. **Echtes Telefon über WLAN** (empfohlen, testet auch Kamera und Karte): am Telefon
-   „Debugging über WLAN“ einschalten, dann `adb pair <ip>:<port>`, `adb connect <ip>:<port>` und
-   `flutter run`. Telefon und Rechner müssen sich im Netz erreichen.
+1. **Echtes Telefon über WLAN** (testet auch Kamera und Dateiauswahl): am Telefon „Debugging über
+   WLAN“ einschalten, dann `adb pair <ip>:<port>`, `adb connect <ip>:<port>` und `flutter run`.
 2. **APK von Hand installieren**: `flutter build apk --debug` und die Datei aufs Telefon kopieren.
-3. **Verschachtelte Virtualisierung** im Hypervisor der VM einschalten; danach funktioniert der
-   normale Emulator aus Android Studio bzw. `sdkmanager`/`avdmanager`.
-4. **Waydroid** (Android als Container, braucht kein KVM): möglich, aber mit Software-Grafik; ob
-   die Karte (OpenGL) darin läuft, ist offen.
+3. **Emulator**: braucht Hardware-Virtualisierung. In einer VM muss dafür die verschachtelte
+   Virtualisierung eingeschaltet sein und der Benutzer zur Gruppe `kvm` gehören
+   (`sudo usermod -aG kvm $USER`, neu anmelden).
 
+### Emulator einrichten und starten
+
+```sh
+export ANDROID_HOME=~/Android/Sdk JAVA_HOME=~/development/jdk
+export ANDROID_AVD_HOME=/mnt/data/android-avd        # braucht einige GB Platz
+SDK=$ANDROID_HOME/cmdline-tools/latest/bin
+$SDK/sdkmanager "emulator" "system-images;android-35;default;x86_64"   # AOSP, ohne Google-Dienste
+echo no | $SDK/avdmanager create avd -n hiker_test -d pixel_6 \
+    -k "system-images;android-35;default;x86_64"
+$ANDROID_HOME/emulator/emulator -avd hiker_test -no-snapshot \
+    -gpu swiftshader_indirect -memory 2048      # ohne Bildschirm zusätzlich: -no-window -no-audio
+$ANDROID_HOME/platform-tools/adb install -r build/app/outputs/flutter-apk/app-debug.apk
+```
+
+Im Emulator ist der Rechner unter `10.0.2.2` erreichbar. Die App erlaubt kein unverschlüsseltes
+HTTP; für einen lokalen Stack braucht es deshalb einen HTTPS-Proxy davor, z. B. nginx mit
+`deploy/nginx-hiker.conf` und einem selbst signierten Zertifikat (`subjectAltName=IP:10.0.2.2`).
+Als Server-Adresse dann `https://10.0.2.2:<Port>` eintragen und den Fingerabdruck bestätigen.
+
+Am 04.10.2026 so geprüft (Android 15): Registrierung, Zertifikatsbestätigung, zweiten Faktor
+einrichten, Ausrüstung mit Favorit und Zusatzfeldern, Tour mit Karte, Kacheln und Höhenprofil,
+Sitzung nach Neustart. Nicht geprüft: Kamera-Scanner, Dateiauswahl, Offline-Sync, Fotos.

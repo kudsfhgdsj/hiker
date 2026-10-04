@@ -173,7 +173,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get certificateAdvice =>
-      'Vertraue ihm nur, wenn der Fingerabdruck mit dem deines Servers übereinstimmt. Die App akzeptiert danach genau dieses Zertifikat. Die Karte braucht zusätzlich ein in Android installiertes Zertifikat.';
+      'Vertraue ihm nur, wenn der Fingerabdruck mit dem deines Servers übereinstimmt. Die App akzeptiert danach genau dieses Zertifikat.';
 
   @override
   String get certificateTrust => 'Vertrauen';

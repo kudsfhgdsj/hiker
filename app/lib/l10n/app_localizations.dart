@@ -397,7 +397,7 @@ abstract class AppLocalizations {
   /// No description provided for @certificateAdvice.
   ///
   /// In de, this message translates to:
-  /// **'Vertraue ihm nur, wenn der Fingerabdruck mit dem deines Servers übereinstimmt. Die App akzeptiert danach genau dieses Zertifikat. Die Karte braucht zusätzlich ein in Android installiertes Zertifikat.'**
+  /// **'Vertraue ihm nur, wenn der Fingerabdruck mit dem deines Servers übereinstimmt. Die App akzeptiert danach genau dieses Zertifikat.'**
   String get certificateAdvice;
 
   /// No description provided for @certificateTrust.

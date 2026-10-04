@@ -50,7 +50,7 @@
   "certificateUnknown": "Das Zertifikat dieses Servers stammt von keiner bekannten Stelle – etwa weil es selbst signiert ist.",
   "certificateChanged": "Achtung: Der Server zeigt ein anderes Zertifikat als das, dem du bisher vertraut hast.",
   "certificateFingerprint": "Fingerabdruck (SHA-256):",
-  "certificateAdvice": "Vertraue ihm nur, wenn der Fingerabdruck mit dem deines Servers übereinstimmt. Die App akzeptiert danach genau dieses Zertifikat. Die Karte braucht zusätzlich ein in Android installiertes Zertifikat.",
+  "certificateAdvice": "Vertraue ihm nur, wenn der Fingerabdruck mit dem deines Servers übereinstimmt. Die App akzeptiert danach genau dieses Zertifikat.",
   "certificateTrust": "Vertrauen",
   "errorMfaRequired": "Bitte auch den Code der Authenticator-App eingeben.",
   "errorInvalidMfaCode": "Der Code stimmt nicht oder wurde schon benutzt.",
