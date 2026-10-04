@@ -375,6 +375,40 @@ void main() {
       expect((await get('/vector/10/2/2.pbf')).$1, 502);
 
       expect((await get('/slope/12/2153/1436.png')).$2, [1, 2, 3]);
+      // A layer pack on the device answers for elevation, slope and contours.
+      final pack = sqlite3.open(
+        '${(await store.directory).path}/switzerland.layers.sqlite',
+      );
+      pack
+        ..execute(
+          'CREATE TABLE layer_tiles '
+          '(layer TEXT, z INTEGER, x INTEGER, y INTEGER, data BLOB)',
+        )
+        ..execute('INSERT INTO layer_tiles VALUES (?, ?, ?, ?, ?)', [
+          'terrain',
+          11,
+          1,
+          2,
+          Uint8List.fromList([4, 4]),
+        ])
+        ..execute('INSERT INTO layer_tiles VALUES (?, ?, ?, ?, ?)', [
+          'contours',
+          12,
+          3,
+          4,
+          Uint8List.fromList([31, 139, 5]),
+        ])
+        ..close();
+      // The store opens packs when it is asked the next time after a change.
+      await store.delete('none');
+      expect((await store.installed()).single.layersSizeBytes, greaterThan(0));
+      expect((await get('/raster/terrain/11/1/2')).$2, [4, 4]);
+      final lines = await get('/contours/12/3/4.pbf');
+      expect(lines.$2, [31, 139, 5]);
+      expect(lines.$3, 'gzip');
+      // Not in the pack and no network: nothing.
+      expect((await get('/slope/12/3/4.png')).$1, 502);
+
       // A removed map no longer answers.
       await store.delete('switzerland');
       expect((await get('/vector/10/538/359.pbf')).$1, 502);

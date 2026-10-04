@@ -2961,6 +2961,18 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Schneehöhe laut Wettermodell, keine Messung.'**
   String get mapSnowDepthNote;
+
+  /// No description provided for @offlineMapOnly.
+  ///
+  /// In de, this message translates to:
+  /// **'Karte (ohne Höhendaten)'**
+  String get offlineMapOnly;
+
+  /// No description provided for @offlineMapWithLayers.
+  ///
+  /// In de, this message translates to:
+  /// **'Karte mit Schummerung, Höhenlinien und Hangneigung'**
+  String get offlineMapWithLayers;
 }
 
 class _AppLocalizationsDelegate

@@ -582,5 +582,7 @@
   "mapOverlayWeather2": "Wetter übermorgen",
   "mapOverlaySnowDepth": "Schneehöhe",
   "mapWeatherNote": "Vorhersage je Ort: Wetter, höchste/tiefste Temperatur, Niederschlag oder Neuschnee. Ab mittlerer Zoomstufe.",
-  "mapSnowDepthNote": "Schneehöhe laut Wettermodell, keine Messung."
+  "mapSnowDepthNote": "Schneehöhe laut Wettermodell, keine Messung.",
+  "offlineMapOnly": "Karte (ohne Höhendaten)",
+  "offlineMapWithLayers": "Karte mit Schummerung, Höhenlinien und Hangneigung"
 }

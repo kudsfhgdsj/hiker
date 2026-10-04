@@ -35,6 +35,9 @@ class VectorRegion:
     bounds: tuple[float, float, float, float]
     min_zoom: int
     max_zoom: int
+    # The layer pack next to the map (elevation, slope, contour lines), if it was built.
+    layers_path: Path | None = None
+    layers_size_bytes: int | None = None
 
 
 def _tile_bounds(z: int, x: int, y: int) -> tuple[float, float, float, float]:
@@ -57,6 +60,7 @@ class VectorMaps:
 
     def _read(self, path: Path) -> VectorRegion | None:
         stat = path.stat()
+        pack = path.with_name(path.stem + ".layers.sqlite")
         try:
             with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as db:
                 meta = dict(db.execute("SELECT name, value FROM metadata"))
@@ -71,6 +75,8 @@ class VectorMaps:
                 bounds=bounds,
                 min_zoom=int(meta.get("minzoom", 0)),
                 max_zoom=int(meta.get("maxzoom", 14)),
+                layers_path=pack if pack.is_file() else None,
+                layers_size_bytes=pack.stat().st_size if pack.is_file() else None,
             )
         except (sqlite3.Error, KeyError, ValueError):
             # Half-written or foreign file: not a map.
@@ -85,7 +91,9 @@ class VectorMaps:
             for path in self._folder.glob("*.mbtiles"):
                 if not re.match(REGION_NAME, path.stem) or not path.is_file():
                     continue
-                modified = path.stat().st_mtime
+                pack = path.with_name(path.stem + ".layers.sqlite")
+                # A pack that appeared or changed makes the region new, too.
+                modified = path.stat().st_mtime + (pack.stat().st_mtime if pack.is_file() else 0)
                 known = self._known.get(path)
                 if known is None or known[0] != modified:
                     region = self._read(path)

@@ -1583,4 +1583,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get mapSnowDepthNote => 'Schneehöhe laut Wettermodell, keine Messung.';
+
+  @override
+  String get offlineMapOnly => 'Karte (ohne Höhendaten)';
+
+  @override
+  String get offlineMapWithLayers =>
+      'Karte mit Schummerung, Höhenlinien und Hangneigung';
 }

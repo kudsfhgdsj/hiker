@@ -52,11 +52,11 @@ class _OfflineDataScreenState extends ConsumerState<OfflineDataScreen> {
     }
   }
 
-  Future<void> _loadMap(String name) =>
-      _load('map:$name', (cancel, progress) async {
+  Future<void> _loadMap(MapRegion region) =>
+      _load('map:${region.name}', (cancel, progress) async {
         await ref
             .read(mapRegionStoreProvider)
-            .download(name, cancel: cancel, onProgress: progress);
+            .download(region, cancel: cancel, onProgress: progress);
         // Style and fonts too, so that the map is complete without network.
         await prepareOfflineMap(ref);
         ref.read(mapRegionGenerationProvider.notifier).bump();
@@ -227,11 +227,16 @@ class _OfflineDataScreenState extends ConsumerState<OfflineDataScreen> {
                     _card(
                       progressKey: 'map:${region.name}',
                       title: region.name,
-                      sizeBytes: region.sizeBytes,
+                      description: region.layersSizeBytes == null
+                          ? l10n.offlineMapOnly
+                          : l10n.offlineMapWithLayers,
+                      sizeBytes: region.totalBytes,
                       loaded: localMaps[region.name]?.modified,
                       isLoaded: localMaps.containsKey(region.name),
                       offered: offered.any((o) => o.name == region.name),
-                      onLoad: () => _loadMap(region.name),
+                      onLoad: () => _loadMap(
+                        offered.firstWhere((o) => o.name == region.name),
+                      ),
                       onRemove: () => _removeMap(region.name),
                     ),
                 ],

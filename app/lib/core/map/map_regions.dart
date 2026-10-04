@@ -14,17 +14,30 @@ import '../network/api_exception.dart';
 /// server or on the device. Unlike tiles of the OpenStreetMap servers these
 /// maps may be taken along: the server builds them from the raw data.
 class MapRegion {
-  const MapRegion({required this.name, required this.sizeBytes, this.modified});
+  const MapRegion({
+    required this.name,
+    required this.sizeBytes,
+    this.modified,
+    this.layersSizeBytes,
+  });
 
   factory MapRegion.fromJson(Map<String, dynamic> json) => MapRegion(
     name: json['name'] as String,
     sizeBytes: json['size_bytes'] as int,
     modified: DateTime.tryParse(json['modified'] as String? ?? ''),
+    layersSizeBytes: json['layers_size_bytes'] as int?,
   );
 
   final String name;
   final int sizeBytes;
   final DateTime? modified;
+
+  /// Size of the layer pack that belongs to the map (elevation, slope and
+  /// contour lines to take along); null if there is none.
+  final int? layersSizeBytes;
+
+  /// Map and layer pack together.
+  int get totalBytes => sizeBytes + (layersSizeBytes ?? 0);
 }
 
 /// Where the app keeps the map files; tests use a temporary folder.
@@ -41,12 +54,19 @@ class MapRegionStore {
   final Future<Directory> _root;
 
   static const _known = 'map_regions';
+  static const _packSuffix = '.layers.sqlite';
+  static const _packQuery =
+      'SELECT data FROM layer_tiles '
+      'WHERE layer = ? AND z = ? AND x = ? AND y = ?';
   static const _query =
       'SELECT tile_data FROM tiles '
       'WHERE zoom_level = ? AND tile_column = ? AND tile_row = ?';
 
   /// Open map files, by path; closed when the files change.
   Map<String, Database>? _open;
+
+  /// Open layer packs, by path.
+  Map<String, Database>? _openPacks;
 
   Future<Directory> get directory async {
     final folder = await _root;
@@ -64,6 +84,12 @@ class MapRegionStore {
           name: file.uri.pathSegments.last.replaceAll('.mbtiles', ''),
           sizeBytes: file.lengthSync(),
           modified: file.lastModifiedSync(),
+          layersSizeBytes: switch (File(
+            file.path.replaceAll('.mbtiles', _packSuffix),
+          )) {
+            final pack when pack.existsSync() => pack.lengthSync(),
+            _ => null,
+          },
         ),
     ]..sort((a, b) => a.name.compareTo(b.name));
   }
@@ -94,41 +120,91 @@ class MapRegionStore {
       database.close();
     }
     _open = null;
+    for (final database in _openPacks?.values ?? const <Database>[]) {
+      database.close();
+    }
+    _openPacks = null;
   }
 
-  /// Downloads a map; [onProgress] gets the share that is done (0 to 1).
-  /// The file only appears when it is complete.
+  /// Downloads a map and, if the server has one, its layer pack;
+  /// [onProgress] gets the share of both that is done (0 to 1). A file only
+  /// appears when it is complete.
   Future<void> download(
-    String name, {
+    MapRegion region, {
     void Function(double share)? onProgress,
     CancelToken? cancel,
   }) async {
-    final target = File('${(await directory).path}/$name.mbtiles');
-    final part = File('${target.path}.part');
-    try {
-      await apiCall(
-        () => _dio.download(
-          '/maps/regions/$name',
-          part.path,
-          cancelToken: cancel,
-          // A map has some hundred megabytes: no limit for the whole download.
-          options: Options(receiveTimeout: Duration.zero),
-          onReceiveProgress: (received, total) {
-            if (total > 0) onProgress?.call(received / total);
-          },
-        ),
-      );
-      _closeAll();
-      await part.rename(target.path);
-    } finally {
-      if (part.existsSync()) part.deleteSync();
+    final folder = (await directory).path;
+    final total = region.totalBytes;
+    var done = 0;
+    Future<void> fetch(String path, String fileName, int size) async {
+      final target = File('$folder/$fileName');
+      final part = File('${target.path}.part');
+      try {
+        await apiCall(
+          () => _dio.download(
+            path,
+            part.path,
+            cancelToken: cancel,
+            // Some hundred megabytes: no limit for the whole download.
+            options: Options(receiveTimeout: Duration.zero),
+            onReceiveProgress: (received, _) {
+              if (total > 0) onProgress?.call((done + received) / total);
+            },
+          ),
+        );
+        _closeAll();
+        await part.rename(target.path);
+        done += size;
+      } finally {
+        if (part.existsSync()) part.deleteSync();
+      }
+    }
+
+    final name = region.name;
+    await fetch('/maps/regions/$name', '$name.mbtiles', region.sizeBytes);
+    final pack = region.layersSizeBytes;
+    if (pack != null) {
+      await fetch('/maps/regions/$name/layers', '$name$_packSuffix', pack);
     }
   }
 
   Future<void> delete(String name) async {
     _closeAll();
-    final file = File('${(await directory).path}/$name.mbtiles');
-    if (file.existsSync()) await file.delete();
+    final folder = (await directory).path;
+    for (final file in [
+      File('$folder/$name.mbtiles'),
+      File('$folder/$name$_packSuffix'),
+    ]) {
+      if (file.existsSync()) await file.delete();
+    }
+  }
+
+  /// A tile of a layer pack on the device: `terrain`, `slope` or `contours`.
+  Future<Uint8List?> layerTile(String layer, int z, int x, int y) async {
+    var open = _openPacks;
+    if (open == null) {
+      open = _openPacks = {};
+      final files = (await directory).listSync().whereType<File>().where(
+        (file) => file.path.endsWith(_packSuffix),
+      );
+      for (final file in files) {
+        try {
+          open[file.path] = sqlite3.open(file.path, mode: OpenMode.readOnly);
+        } on SqliteException {
+          // Not a layer pack: skip it.
+        }
+      }
+    }
+    for (final database in open.values) {
+      try {
+        final rows = database.select(_packQuery, [layer, z, x, y]);
+        if (rows.isNotEmpty) return rows.first['data'] as Uint8List;
+      } on SqliteException {
+        continue;
+      }
+    }
+    return null;
   }
 
   /// The gzip-compressed vector tile from a map on the device, if one has it.

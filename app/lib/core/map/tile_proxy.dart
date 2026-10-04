@@ -197,6 +197,34 @@ class TileProxy extends Notifier<int?> {
     response.statusCode = upstream.statusCode;
   }
 
+  /// Answers from a layer pack on the device, if one has the tile; the zoom
+  /// level is group [first] of the match, followed by column and row.
+  Future<bool> _fromPack(
+    HttpResponse response,
+    String layer,
+    RegExpMatch match,
+    int first,
+    ContentType type, {
+    bool gzipped = false,
+  }) async {
+    final data = await ref
+        .read(mapRegionStoreProvider)
+        .layerTile(
+          layer,
+          int.parse(match[first]!),
+          int.parse(match[first + 1]!),
+          int.parse(match[first + 2]!),
+        );
+    if (data == null) return false;
+    response.statusCode = HttpStatus.ok;
+    response.headers.contentType = type;
+    if (gzipped) {
+      response.headers.set(HttpHeaders.contentEncodingHeader, 'gzip');
+    }
+    response.add(data);
+    return true;
+  }
+
   Future<void> _answer(HttpRequest request) async {
     final response = request.response;
     final path = request.uri.path;
@@ -250,6 +278,10 @@ class TileProxy extends Notifier<int?> {
         );
       } else if (_layer.firstMatch(path) case final layer?) {
         final tile = '${layer[2]}/${layer[3]}/${layer[4]}';
+        if (layer[1] == 'terrain' &&
+            await _fromPack(response, 'terrain', layer, 2, _png)) {
+          return;
+        }
         await _fromServer(
           response,
           apiPath: '/api/v1/maps/raster/${layer[1]}/$tile',
@@ -273,6 +305,16 @@ class TileProxy extends Notifier<int?> {
         );
       } else if (_contours.firstMatch(path) case final lines?) {
         final tile = '${lines[1]}/${lines[2]}/${lines[3]}.pbf';
+        if (await _fromPack(
+          response,
+          'contours',
+          lines,
+          1,
+          _protobuf,
+          gzipped: true,
+        )) {
+          return;
+        }
         await _fromServer(
           response,
           apiPath: '/api/v1/maps/contours/$tile',
@@ -293,6 +335,7 @@ class TileProxy extends Notifier<int?> {
         );
       } else if (_slope.firstMatch(path) case final slope?) {
         final tile = '${slope[1]}/${slope[2]}/${slope[3]}.png';
+        if (await _fromPack(response, 'slope', slope, 1, _png)) return;
         await _fromServer(
           response,
           apiPath: '/api/v1/maps/slope/$tile',

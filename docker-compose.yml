@@ -212,6 +212,21 @@ services:
     cpus: 1.0
     mem_limit: 1g
 
+  # Baut das Ebenen-Paket eines Gebiets (Höhendaten, Hangneigung, Höhenlinien zum Mitnehmen
+  # für die App); holt dafür die offenen Höhenkacheln. Teil von build-map.sh.
+  mappack:
+    build: ./backend
+    profiles: ["mapbuild"]
+    restart: "no"
+    <<: *unprivileged
+    entrypoint: ["python", "-m", "app.modules.maps.pack"]
+    tmpfs:
+      - /tmp
+    volumes:
+      - ${DATA_DIR:-./data}/maps:/data
+    cpus: ${MAP_BUILD_CPUS:-2.0}
+    mem_limit: 1g
+
   # Reverse Proxy mit selbst ausgestelltem Zertifikat. Nur mit dem Profil "proxy" aktiv
   # (COMPOSE_PROFILES=proxy in der .env), damit der Stack auf einem Server mit eigenem
   # Proxy keine Ports belegt. Der Port ist einstellbar (HTTPS_PORT).

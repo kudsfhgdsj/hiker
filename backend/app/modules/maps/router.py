@@ -99,6 +99,9 @@ class RegionInfo(BaseModel):
     bounds: tuple[float, float, float, float] = Field(description="west, south, east, north")
     min_zoom: int
     max_zoom: int
+    layers_size_bytes: int | None = Field(
+        description="Size of the layer pack (elevation, slope, contour lines); null if none"
+    )
 
 
 @router.get("/style.json", responses=error_responses(404))
@@ -302,6 +305,7 @@ def list_regions(_user: CurrentUser, vectors: Vectors):
             bounds=region.bounds,
             min_zoom=region.min_zoom,
             max_zoom=region.max_zoom,
+            layers_size_bytes=region.layers_size_bytes,
         )
         for region in vectors.regions()
     ]
@@ -320,4 +324,23 @@ def download_region(name: str, _user: CurrentUser, vectors: Vectors):
         raise NotFoundError("No such map")
     return FileResponse(
         region.path, media_type="application/octet-stream", filename=f"{name}.mbtiles"
+    )
+
+
+@router.get(
+    "/regions/{name}/layers",
+    response_class=FileResponse,
+    responses={200: {"content": {"application/octet-stream": {}}}, **error_responses(401, 404)},
+    dependencies=[Depends(rate_limit("map-download", limit=30))],
+)
+def download_region_layers(name: str, _user: CurrentUser, vectors: Vectors):
+    """The layer pack of a region: elevation, slope and contour lines for use without
+    network (SQLite: `layer_tiles(layer, z, x, y, data)`). Supports range requests."""
+    region = vectors.region(name) if re.match(REGION_NAME, name) else None
+    if region is None or region.layers_path is None:
+        raise NotFoundError("No such layer pack")
+    return FileResponse(
+        region.layers_path,
+        media_type="application/octet-stream",
+        filename=f"{name}.layers.sqlite",
     )
