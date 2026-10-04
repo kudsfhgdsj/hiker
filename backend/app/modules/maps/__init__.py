@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from app.core.config import API_PREFIX
 from app.core.registry import ModuleInfo
 
-MODULE_INFO = ModuleInfo(name="maps", version="0.1.0")
+MODULE_INFO = ModuleInfo(name="maps", version="0.2.0", depends_on=("auth",))
 
 
 def register(app: FastAPI) -> None:

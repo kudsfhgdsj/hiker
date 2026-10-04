@@ -4,7 +4,6 @@ import json
 
 from flask import (
     Blueprint,
-    current_app,
     flash,
     jsonify,
     redirect,
@@ -15,6 +14,7 @@ from flask import (
 
 from hiker_web import error_text, forms
 from hiker_web.api import ApiError, api
+from hiker_web.maps import map_config
 from hiker_web.security import module_required
 from hiker_web.texts_de import t
 
@@ -68,9 +68,7 @@ def _route_from_form() -> dict:
 def _planner(route: dict, is_new: bool, status: int = 200):
     info = api().get("/planning/info")
     plan_data = {
-        "tileUrl": current_app.config["MAP_TILE_URL"],
-        "workerUrl": url_for("static", filename="vendor/maplibre-gl/maplibre-gl-csp-worker.js"),
-        "attribution": OSM_ATTRIBUTION,
+        **map_config(OSM_ATTRIBUTION),
         "previewUrl": url_for("planning.preview"),
         "routingAvailable": info["routing_available"],
         "maxWaypoints": info["max_waypoints"],

@@ -1,9 +1,10 @@
 """hiker web frontend: server-rendered pages on top of the hiker REST API."""
 
+import re
 from urllib.parse import urlsplit
 
 import httpx2
-from flask import Flask, flash, redirect, render_template, request, url_for
+from flask import Flask, abort, flash, redirect, render_template, request, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from hiker_web import formatting
@@ -158,6 +159,45 @@ def create_app(config: dict | None = None) -> Flask:
             "cache-control", "public, max-age=86400"
         )
         return response
+
+    # --- The own vector map of the API, passed on like the raster tiles. No login. ---
+
+    def _passed_on(upstream, mimetype: str):
+        if upstream.status_code == 204:
+            response = app.response_class(status=204)
+        else:
+            response = app.response_class(upstream.content, mimetype=mimetype)
+        response.headers["Cache-Control"] = upstream.headers.get(
+            "cache-control", "public, max-age=3600"
+        )
+        return response
+
+    @app.get("/map/style.json")
+    def map_style():
+        """The style of the map, with the addresses of this server instead of the API's."""
+        style = api().request("GET", "/maps/style.json", auth=False).json()
+        root = request.url_root.rstrip("/")
+        style["glyphs"] = f"{root}/map/fonts/{{fontstack}}/{{range}}.pbf"
+        for source in style.get("sources", {}).values():
+            if source.get("type") == "vector":
+                source["tiles"] = [f"{root}/map/vector/{{z}}/{{x}}/{{y}}.pbf"]
+        response = app.json.response(style)
+        response.headers["Cache-Control"] = "public, max-age=300"
+        return response
+
+    @app.get("/map/vector/<int:z>/<int:x>/<int:y>.pbf")
+    def map_vector_tile(z, x, y):
+        upstream = api().request("GET", f"/maps/vector/{z}/{x}/{y}.pbf", auth=False)
+        return _passed_on(upstream, "application/x-protobuf")
+
+    @app.get("/map/fonts/<fontstack>/<glyphs>.pbf")
+    def map_glyphs(fontstack, glyphs):
+        if not re.fullmatch(r"[\w ,-]{1,200}", fontstack) or not re.fullmatch(
+            r"\d{1,5}-\d{1,5}", glyphs
+        ):
+            abort(404)
+        upstream = api().request("GET", f"/maps/fonts/{fontstack}/{glyphs}.pbf", auth=False)
+        return _passed_on(upstream, "application/x-protobuf")
 
     from hiker_web.views import admin, auth, gear, nutrition, planning, protocols, public
 

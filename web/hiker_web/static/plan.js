@@ -36,7 +36,8 @@
   const tileUrl = data.tileUrl.startsWith("/") ? window.location.origin + data.tileUrl : data.tileUrl;
   const map = new maplibregl.Map({
     container: mapElement,
-    style: {
+    // The own vector map if the server has one, else the cached raster tiles.
+    style: data.styleUrl || {
       version: 8,
       sources: {
         base: { type: "raster", tiles: [tileUrl], tileSize: 256, attribution: data.attribution },

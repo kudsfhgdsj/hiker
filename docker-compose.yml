@@ -6,7 +6,7 @@
 # Alle Daten liegen als normale Dateien unter DATA_DIR (Standard ./data), nicht in
 # Docker-Volumes: db/ (PostgreSQL), files/ (Fotos, GPX), tiles/ (Kartenkacheln),
 # web-sessions/ (Anmeldungen des Web-Frontends), caddy/ (Zertifikate des Proxys),
-# brouter/segments/ (Wegdaten für die Routenplanung).
+# brouter/segments/ (Wegdaten für die Routenplanung), maps/ (eigene Karte aus OSM-Daten).
 name: hiker
 
 # Kein Container läuft als root: alle Prozesse gehören HIKER_UID:HIKER_GID, haben keine
@@ -31,7 +31,7 @@ services:
       - -c
       - |
         if ! mkdir -p /data/db /data/files /data/tiles /data/web-sessions /data/caddy \
-            /data/brouter/segments; then
+            /data/brouter/segments /data/maps/build/tmp; then
           echo "DATA_DIR muss existieren und dem Benutzer $$(id -u):$$(id -g) gehören." >&2
           exit 1
         fi
@@ -96,10 +96,13 @@ services:
       BROUTER_PROFILE_HIKING: ${BROUTER_PROFILE_HIKING:-hiker-hiking}
       # Wegdaten, die die App für die Planung ohne Netz herunterlädt.
       BROUTER_SEGMENTS_PATH: /data/brouter-segments
+      # Eigene Karte (Vektorkacheln aus OSM-Daten), gebaut von deploy/build-map.sh.
+      MAP_DATA_PATH: /data/maps
     volumes:
       - ${DATA_DIR:-./data}/files:/data/files
       - ${DATA_DIR:-./data}/tiles:/data/tiles
       - ${DATA_DIR:-./data}/brouter/segments:/data/brouter-segments:ro
+      - ${DATA_DIR:-./data}/maps:/data/maps:ro
     ports:
       - "127.0.0.1:${API_PORT:-8010}:8000"
     healthcheck:
@@ -168,6 +171,26 @@ services:
       start_period: 10s
     cpus: 1.0
     mem_limit: 640m
+
+  # Baut die eigene Karte aus OpenStreetMap-Daten (Planetiler, Apache-2.0). Läuft nicht
+  # dauernd, sondern nur auf Zuruf: deploy/build-map.sh <gebiet>. Das Ergebnis liegt unter
+  # DATA_DIR/maps/<gebiet>.mbtiles und wird von der API ausgeliefert.
+  mapbuild:
+    image: ghcr.io/onthegomap/planetiler:0.10.2
+    profiles: ["mapbuild"]
+    restart: "no"
+    <<: *unprivileged
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    environment:
+      # Zwischendateien in den Datenordner: /tmp ist klein und erlaubt kein Ausführen.
+      JAVA_TOOL_OPTIONS: "-Xmx${MAP_BUILD_MEMORY:-3g} -Djava.io.tmpdir=/data/build/tmp"
+    tmpfs:
+      - /tmp
+    volumes:
+      - ${DATA_DIR:-./data}/maps:/data
+    cpus: ${MAP_BUILD_CPUS:-2.0}
 
   # Reverse Proxy mit selbst ausgestelltem Zertifikat. Nur mit dem Profil "proxy" aktiv
   # (COMPOSE_PROFILES=proxy in der .env), damit der Stack auf einem Server mit eigenem

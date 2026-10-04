@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     # After this many days the source is asked whether a tile changed (at least 7: OSM policy).
     tile_cache_days: int = Field(default=14, ge=7)
     tile_cache_max_mb: int = Field(default=2000, gt=0)
+    # The own map: folder with vector maps (<region>.mbtiles) built from OpenStreetMap
+    # data by deploy/build-map.sh. Without files there the cached raster tiles are used.
+    map_data_path: str = "./data/maps"
 
     @property
     def module_names(self) -> list[str]:

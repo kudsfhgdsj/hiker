@@ -4,7 +4,6 @@ from datetime import datetime
 from flask import (
     Blueprint,
     abort,
-    current_app,
     flash,
     jsonify,
     redirect,
@@ -15,6 +14,7 @@ from flask import (
 
 from hiker_web import error_text, forms
 from hiker_web.api import ApiError, api
+from hiker_web.maps import map_config
 from hiker_web.security import module_required
 from hiker_web.texts_de import t
 
@@ -76,9 +76,7 @@ def map_data(tour: dict, photos: list[dict], waypoints: list[dict], urls) -> dic
     """What the map and the elevation profile need; `urls` builds the addresses."""
     return {
         "trackUrl": urls("track") if tour["track_source"] != "none" else None,
-        "tileUrl": current_app.config["MAP_TILE_URL"],
-        "workerUrl": url_for("static", filename="vendor/maplibre-gl/maplibre-gl-csp-worker.js"),
-        "attribution": OSM_ATTRIBUTION,
+        **map_config(OSM_ATTRIBUTION),
         "start": tour.get("start_point"),
         "end": tour.get("end_point"),
         "photos": [
