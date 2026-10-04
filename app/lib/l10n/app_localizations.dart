@@ -370,6 +370,42 @@ abstract class AppLocalizations {
   /// **'Kopiert'**
   String get copied;
 
+  /// No description provided for @certificateTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Unbekanntes Zertifikat'**
+  String get certificateTitle;
+
+  /// No description provided for @certificateUnknown.
+  ///
+  /// In de, this message translates to:
+  /// **'Das Zertifikat dieses Servers stammt von keiner bekannten Stelle – etwa weil es selbst signiert ist.'**
+  String get certificateUnknown;
+
+  /// No description provided for @certificateChanged.
+  ///
+  /// In de, this message translates to:
+  /// **'Achtung: Der Server zeigt ein anderes Zertifikat als das, dem du bisher vertraut hast.'**
+  String get certificateChanged;
+
+  /// No description provided for @certificateFingerprint.
+  ///
+  /// In de, this message translates to:
+  /// **'Fingerabdruck (SHA-256):'**
+  String get certificateFingerprint;
+
+  /// No description provided for @certificateAdvice.
+  ///
+  /// In de, this message translates to:
+  /// **'Vertraue ihm nur, wenn der Fingerabdruck mit dem deines Servers übereinstimmt. Die App akzeptiert danach genau dieses Zertifikat. Die Karte braucht zusätzlich ein in Android installiertes Zertifikat.'**
+  String get certificateAdvice;
+
+  /// No description provided for @certificateTrust.
+  ///
+  /// In de, this message translates to:
+  /// **'Vertrauen'**
+  String get certificateTrust;
+
   /// No description provided for @errorMfaRequired.
   ///
   /// In de, this message translates to:

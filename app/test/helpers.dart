@@ -12,6 +12,7 @@ import 'package:hiker/core/db/app_database.dart';
 import 'package:hiker/core/map/map_view.dart';
 import 'package:hiker/core/modules/feature_module.dart';
 import 'package:hiker/core/network/api_client.dart';
+import 'package:hiker/core/network/trusted_certificates.dart';
 import 'package:hiker/core/storage/key_value_store.dart';
 
 typedef FakeResponse = ({int status, Object? body});
@@ -112,6 +113,7 @@ ProviderContainer createContainer({
   MemoryKeyValueStore? store,
   List<Override> overrides = const [],
   List<FeatureModule>? modules,
+  CertificateProbe? certificateProbe,
 }) {
   final container = ProviderContainer(
     // Riverpod retries failed providers with a delay; tests want the first answer.
@@ -120,6 +122,10 @@ ProviderContainer createContainer({
       ...appOverrides(modules: modules),
       // Tests trigger the sync themselves, so that it does not add requests.
       autoSyncProvider.overrideWithValue(false),
+      // No network in tests: nothing to look at.
+      certificateProbeProvider.overrideWithValue(
+        certificateProbe ?? (_) async => null,
+      ),
       httpClientAdapterProvider.overrideWithValue(api),
       keyValueStoreProvider.overrideWithValue(store ?? MemoryKeyValueStore()),
       appDatabaseProvider.overrideWith((ref) {
@@ -142,6 +148,7 @@ Future<ProviderContainer> pumpApp(
   List<Override> overrides = const [],
   List<FeatureModule>? modules,
   Size size = const Size(400, 800),
+  CertificateProbe? certificateProbe,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -151,6 +158,7 @@ Future<ProviderContainer> pumpApp(
     store: store,
     overrides: overrides,
     modules: modules,
+    certificateProbe: certificateProbe,
   );
   await tester.pumpWidget(
     UncontrolledProviderScope(container: container, child: const HikerApp()),

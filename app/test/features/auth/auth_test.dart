@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiker/core/network/api_exception.dart';
+import 'package:hiker/core/network/trusted_certificates.dart';
 import 'package:hiker/core/router/app_router.dart';
 import 'package:hiker/core/session/session.dart';
 import 'package:hiker/core/storage/key_value_store.dart';
@@ -233,6 +234,108 @@ void main() {
         ),
         findsOneWidget,
       );
+    });
+  });
+
+  group('self-signed certificate', () {
+    const fingerprint = 'AB:CD:EF:01';
+
+    testWidgets('is trusted after the user confirmed its fingerprint', (
+      tester,
+    ) async {
+      final api = FakeApi({
+        'POST /auth/login': (_, _) => ok(authJson()),
+        'GET /modules': (_, _) => ok([]),
+        'GET /me/profile': (_, _) => ok(<String, dynamic>{}),
+      })..offline = true;
+      final asked = <Uri>[];
+      final container = await pumpApp(
+        tester,
+        api: api,
+        certificateProbe: (server) async {
+          asked.add(server);
+          // Once trusted, the connection works.
+          api.offline = false;
+          return (
+            host: server.host,
+            port: 443,
+            fingerprint: fingerprint,
+            subject: 'CN=hiker.test',
+            validUntil: DateTime(2030),
+          );
+        },
+      );
+
+      await tester.enterText(field('Server-Adresse'), 'https://hiker.test');
+      await tester.enterText(field('E-Mail'), 'anna@example.org');
+      await tester.enterText(field('Passwort'), 'Correct-Horse-7');
+      await tester.tap(find.widgetWithText(FilledButton, 'Anmelden'));
+      // The button keeps spinning while the dialog waits for the decision.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.text('Unbekanntes Zertifikat'), findsOneWidget);
+      expect(find.text(fingerprint), findsOneWidget);
+      expect(container.read(sessionProvider).isSignedIn, isFalse);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Vertrauen'));
+      await tester.pumpAndSettle();
+
+      expect(asked.single.host, 'hiker.test');
+      expect(container.read(trustedCertificatesProvider), {
+        'hiker.test:443': fingerprint,
+      });
+      expect(container.read(sessionProvider).isSignedIn, isTrue);
+    });
+
+    testWidgets('is not trusted if the user declines', (tester) async {
+      final api = FakeApi()..offline = true;
+      final container = await pumpApp(
+        tester,
+        api: api,
+        certificateProbe: (server) async => (
+          host: server.host,
+          port: 443,
+          fingerprint: fingerprint,
+          subject: 'CN=hiker.test',
+          validUntil: DateTime(2030),
+        ),
+      );
+
+      await tester.enterText(field('Server-Adresse'), 'https://hiker.test');
+      await tester.enterText(field('E-Mail'), 'anna@example.org');
+      await tester.enterText(field('Passwort'), 'Correct-Horse-7');
+      await tester.tap(find.widgetWithText(FilledButton, 'Anmelden'));
+      // The button keeps spinning while the dialog waits for the decision.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(find.widgetWithText(TextButton, 'Abbrechen'));
+      await tester.pumpAndSettle();
+
+      expect(container.read(trustedCertificatesProvider), isEmpty);
+      expect(
+        find.textContaining('Der Server ist nicht erreichbar'),
+        findsOneWidget,
+      );
+    });
+
+    test('decisions are stored and restored per server', () async {
+      final store = MemoryKeyValueStore();
+      final first = createContainer(api: FakeApi(), store: store);
+      await first
+          .read(trustedCertificatesProvider.notifier)
+          .trust('hiker.test', 8443, fingerprint);
+
+      final second = createContainer(api: FakeApi(), store: store);
+      await second.read(trustedCertificatesProvider.notifier).load();
+
+      expect(second.read(trustedCertificatesProvider), {
+        'hiker.test:8443': fingerprint,
+      });
+      await second
+          .read(trustedCertificatesProvider.notifier)
+          .forget('hiker.test:8443');
+      expect(second.read(trustedCertificatesProvider), isEmpty);
     });
   });
 

@@ -158,6 +158,27 @@ class AppLocalizationsDe extends AppLocalizations {
   String get copied => 'Kopiert';
 
   @override
+  String get certificateTitle => 'Unbekanntes Zertifikat';
+
+  @override
+  String get certificateUnknown =>
+      'Das Zertifikat dieses Servers stammt von keiner bekannten Stelle – etwa weil es selbst signiert ist.';
+
+  @override
+  String get certificateChanged =>
+      'Achtung: Der Server zeigt ein anderes Zertifikat als das, dem du bisher vertraut hast.';
+
+  @override
+  String get certificateFingerprint => 'Fingerabdruck (SHA-256):';
+
+  @override
+  String get certificateAdvice =>
+      'Vertraue ihm nur, wenn der Fingerabdruck mit dem deines Servers übereinstimmt. Die App akzeptiert danach genau dieses Zertifikat. Die Karte braucht zusätzlich ein in Android installiertes Zertifikat.';
+
+  @override
+  String get certificateTrust => 'Vertrauen';
+
+  @override
   String get errorMfaRequired =>
       'Bitte auch den Code der Authenticator-App eingeben.';
 

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 
 import 'core/modules/feature_module.dart';
+import 'core/network/trusted_certificates.dart';
 import 'core/router/app_router.dart';
 import 'core/session/session.dart';
 import 'core/sync/sync_service.dart';
@@ -60,6 +61,7 @@ class _HikerAppState extends ConsumerState<HikerApp>
     WidgetsBinding.instance.addObserver(this);
     // Load the stored session; the router leaves the splash screen afterwards.
     Future.microtask(() async {
+      await ref.read(trustedCertificatesProvider.notifier).load();
       await ref.read(sessionProvider.notifier).restore();
       await ref.read(syncProvider.notifier).load();
       _sync();

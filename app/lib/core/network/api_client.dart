@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/app_config.dart';
 import '../session/session.dart';
+import 'trusted_certificates.dart';
 
 /// Adds the access token to every request and renews it once when the server
 /// answers 401. If the refresh token is no longer valid the user is signed out.
@@ -116,6 +119,17 @@ final dioProvider = Provider<Dio>((ref) {
   if (adapter != null) {
     plain.httpClientAdapter = adapter;
     dio.httpClientAdapter = adapter;
+  } else {
+    // A certificate the system does not know is accepted only if the user
+    // chose to trust exactly this one for this server (self-signed).
+    ref.watch(trustedCertificatesProvider);
+    final trusted = ref.read(trustedCertificatesProvider.notifier);
+    HttpClient createClient() =>
+        HttpClient()..badCertificateCallback = trusted.accepts;
+    plain.httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: createClient,
+    );
+    dio.httpClientAdapter = IOHttpClientAdapter(createHttpClient: createClient);
   }
   dio.interceptors.add(
     AuthInterceptor(

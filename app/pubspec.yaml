@@ -48,6 +48,7 @@ dependencies:
   flutter_zxing: ^3.1.0
   maplibre_gl: ^0.27.1
   collection: ^1.19.1
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:
