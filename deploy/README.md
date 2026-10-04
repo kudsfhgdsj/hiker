@@ -29,8 +29,12 @@ Wichtige Werte in `.env`:
   den öffentlichen Links.
 - `WEB_COOKIE_SECURE`: nur für einen Test ohne HTTPS auf `false`; im Betrieb weglassen.
 - `REGISTRATION_MODE`: nach dem Anlegen des ersten Kontos (wird Administrator) auf `closed`.
+- `MFA_REQUIRED`: der zweite Faktor (TOTP) ist Pflicht; `false` macht ihn freiwillig.
+- `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`: Anmeldung über einen OpenID-Connect-Anbieter
+  (optional). Redirect-URI beim Anbieter: `<PUBLIC_BASE_URL>/login/sso/callback`.
 
-Der Smoke-Test legt ein Wegwerf-Konto an. Auf einer frischen Instanz würde dieses Konto zum
+Der Smoke-Test legt ein Wegwerf-Konto an und richtet dafür den zweiten Faktor ein. Für ein
+vorhandenes Konto mit zweitem Faktor braucht er zusätzlich `SMOKE_TOTP_SECRET`. Auf einer frischen Instanz würde dieses Konto zum
 Administrator – dort erst das eigene Konto anlegen oder den Test mit `SMOKE_EMAIL` und
 `SMOKE_PASSWORD` eines vorhandenen Kontos starten.
 
@@ -122,6 +126,19 @@ git pull
 docker compose up -d --build     # Datenbankmigrationen laufen beim Start der API
 deploy/smoke_test.py
 ```
+
+## Nutzer verwalten
+
+Administratoren finden im Web-Frontend unter „Verwaltung“ alle Nutzer und können sie entfernen,
+Passwörter zurücksetzen (vorläufiges Passwort, wird einmal angezeigt) und einen verlorenen zweiten
+Faktor zurücksetzen. Hat der einzige Administrator selbst den zweiten Faktor und alle
+Wiederherstellungscodes verloren, hilft nur die Datenbank:
+
+```sh
+docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "UPDATE user_account SET totp_secret = NULL, totp_enabled_at = NULL, totp_last_counter = NULL WHERE email = '"'"'admin@example.org'"'"'"'
+```
+
+Beim nächsten Login richtet er den Faktor neu ein.
 
 ## Betrieb im Blick
 

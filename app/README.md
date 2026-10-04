@@ -77,3 +77,37 @@ im Arbeitsspeicher.
 Die Kartenkacheln kommen vom eigenen Server (`/api/v1/maps/tiles/…`, Modul `maps`), der sie
 zwischenspeichert. Hat der Server das Modul nicht, lädt die App direkt von OpenStreetMap. Eine
 feste Quelle lässt sich beim Bauen setzen: `--dart-define=MAP_TILE_URL=https://…/{z}/{x}/{y}.png`.
+
+## Anmeldung und Sicherheit
+
+- Registrierung mit doppelter Passworteingabe; die Regeln (BSI) werden schon in der App geprüft.
+- Zweiter Faktor: Nach dem ersten Login führt die App durch das Einrichten (Schlüssel für die
+  Authenticator-App, Wiederherstellungscodes). Beim Anmelden fragt sie nach dem Code.
+- SSO über OpenID Connect gibt es vorerst nur im Web-Frontend.
+
+## Eigene oder selbst signierte Zertifikate
+
+- **Selbst signiert**: Scheitert die Verbindung am Zertifikat, zeigt die App dessen
+  SHA-256-Fingerabdruck. Vergleichen mit
+  `openssl x509 -in server.crt -noout -fingerprint -sha256` und bestätigen – die App akzeptiert
+  danach genau dieses Zertifikat für diesen Server.
+- **Eigene Zertifizierungsstelle**: Das Wurzelzertifikat in Android installieren (Einstellungen →
+  Sicherheit → Zertifikat installieren). Die App vertraut installierten Stellen.
+- Die Karte lädt ihre Kacheln über eine native Bibliothek, die die Bestätigung in der App nicht
+  kennt. Damit die Karte funktioniert, muss das Zertifikat bzw. die CA in Android installiert sein.
+- Unverschlüsseltes HTTP ist nicht erlaubt.
+
+## App testen ohne Telefon am Rechner
+
+Der Android-Emulator braucht Hardware-Virtualisierung (KVM). In einer VM ohne verschachtelte
+Virtualisierung läuft er nicht brauchbar. Wege, die funktionieren:
+
+1. **Echtes Telefon über WLAN** (empfohlen, testet auch Kamera und Karte): am Telefon
+   „Debugging über WLAN“ einschalten, dann `adb pair <ip>:<port>`, `adb connect <ip>:<port>` und
+   `flutter run`. Telefon und Rechner müssen sich im Netz erreichen.
+2. **APK von Hand installieren**: `flutter build apk --debug` und die Datei aufs Telefon kopieren.
+3. **Verschachtelte Virtualisierung** im Hypervisor der VM einschalten; danach funktioniert der
+   normale Emulator aus Android Studio bzw. `sdkmanager`/`avdmanager`.
+4. **Waydroid** (Android als Container, braucht kein KVM): möglich, aber mit Software-Grafik; ob
+   die Karte (OpenGL) darin läuft, ist offen.
+

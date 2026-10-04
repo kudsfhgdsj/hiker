@@ -6,7 +6,9 @@ und Schätzungen kommen von der API (siehe `DESIGN.md`, Abschnitt 9a).
 
 ## Umfang
 
-- Anmeldung, Registrierung, Profil
+- Anmeldung (mit Code der Authenticator-App, optional SSO über OpenID Connect), Registrierung mit
+  doppelter Passworteingabe, zweiten Faktor einrichten, Passwort ändern, Profil
+- Verwaltung für Administratoren: Nutzer ansehen, entfernen, Passwort und zweiten Faktor zurücksetzen
 - Ausrüstung: Liste mit Filtern, Formular, Bild, Summen mit Gruppierung, Tags und Kategorien, Katalog
 - Essen: eigene Lebensmittel, Suche im Katalog, Barcode von Hand, Übernahme aus dem Katalog
 - Touren: Liste, Detail mit Karte und Höhenprofil, Editor, GPX- und Foto-Upload, Verlauf mit
@@ -76,6 +78,17 @@ Seiten eines Moduls gibt es nur, wenn die API es unter `/modules` meldet.
 - Öffentliche Links: `X-Robots-Tag: noindex, nofollow`, `Cache-Control: no-store`. Die Tokens erscheinen nicht im Log (Filter in `security.py`; gunicorn
   läuft ohne Zugriffs-Log). **Der Reverse Proxy muss `/p/…` ebenfalls aus seinem Log halten.**
 - Die Client-Adresse wird an die API weitergegeben, damit deren Rate-Limit je Besucher zählt.
+
+## Anmeldung
+
+Solange einer Sitzung der zweite Faktor oder ein neues Passwort fehlt, ist nur die Seite
+erreichbar, die das erledigt (`/mfa/setup`, `/password`). Der QR-Code für die Authenticator-App
+wird auf dem Server als SVG erzeugt (`segno`); Wiederherstellungscodes und vorläufige Passwörter
+werden genau einmal angezeigt und nirgends im Web-Frontend gespeichert.
+
+SSO: Beim OIDC-Anbieter `<PUBLIC_BASE_URL>/login/sso/callback` als Redirect-URI eintragen und in
+der `.env` der API `OIDC_ISSUER`, `OIDC_CLIENT_ID` und `OIDC_CLIENT_SECRET` setzen. Dann zeigt die
+Anmeldeseite den Knopf „Mit … anmelden“.
 
 ## Karte
 

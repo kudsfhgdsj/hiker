@@ -69,6 +69,12 @@ Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen k
 | Ausrüstung: Favoriten | Jeder Nutzer hat einen festen, nicht löschbaren Tag „Favorit“ (`system = favorite`); der Stern am Gegenstand setzt ihn. Entschieden am 04.10.2026 | Kein eigenes Feld: Filtern, Gruppieren und Offline-Sync laufen wie bei jedem anderen Tag |
 | Ausrüstung: Währung | Kaufpreise immer in EUR; das Währungsfeld entfällt, entschieden am 04.10.2026 | Eine Summe statt je Währung getrennter Summen |
 | Ausrüstung: Zusatzfelder | Eine Kategorie kann eine Art (`kind`) haben, die ihren Gegenständen Zusatzfelder gibt: `backpack` → Volumen in Litern, `shoes` → Schuhkategorie A, B, B/C, C, D. Werte liegen als JSON in `gear_item.attributes`; `GET /gear/meta` beschreibt die Felder. Entschieden am 04.10.2026 | Neue Arten und Felder kommen in `gear/attributes.py` (Server) und `gearKinds` (App) dazu, ohne Migration |
+| Passwörter | Regeln nach den Empfehlungen des BSI: mindestens 20 Zeichen mit zwei Zeichenarten, oder mindestens 8 Zeichen mit allen vier Arten; solange der zweite Faktor Pflicht ist, genügen bei 8 Zeichen drei Arten. Nicht erlaubt: Name oder E-Mail im Passwort, sehr verbreitete Passwörter. Bei der Registrierung wird das Passwort zweimal eingegeben. Entschieden am 04.10.2026 | Geprüft wird auf dem Server (`auth/passwords.py`); die Clients prüfen vorab dasselbe |
+| Zweiter Faktor | TOTP (RFC 6238) ist für die Anmeldung mit Passwort Pflicht (`MFA_REQUIRED=true`). Nach dem ersten Login erlaubt die Sitzung nur das Einrichten; danach braucht jede Anmeldung den Code. Zehn Wiederherstellungscodes, je einmal gültig. Entschieden am 04.10.2026 | Ohne zusätzliche Bibliothek umgesetzt; der QR-Code im Web kommt von `segno`. Das TOTP-Geheimnis liegt unverschlüsselt in der Datenbank (wie die Passwort-Hashes zu schützen) |
+| SSO | Optional über OpenID Connect (Authorization-Code-Flow mit PKCE), zunächst nur im Web-Frontend. Ein Konto mit derselben vom Anbieter bestätigten E-Mail wird verknüpft, sonst angelegt – unabhängig von `REGISTRATION_MODE`. Bei SSO ist der Anbieter für den zweiten Faktor zuständig. Entschieden am 04.10.2026 | Die App meldet sich weiter mit Passwort und TOTP an; SSO in der App ist ein späterer Schritt |
+| Nutzerverwaltung | Administratoren sehen alle Nutzer, können sie entfernen, Passwörter zurücksetzen (vorläufiges Passwort, einmal angezeigt, muss beim nächsten Login ersetzt werden) und den zweiten Faktor zurücksetzen. Entschieden am 04.10.2026 | Beim Entfernen gehen Touren, Ausrüstung, Lebensmittel und Dateien des Nutzers mit; freigegebene Katalogeinträge bleiben, Autoren in fremder Historie werden anonym |
+| Selbst signierte Zertifikate (App) | Die App zeigt den SHA-256-Fingerabdruck eines unbekannten Zertifikats und akzeptiert nach Bestätigung genau dieses Zertifikat für diesen Server. Zusätzlich vertraut sie Zertifizierungsstellen, die der Nutzer in Android installiert hat. Entschieden am 04.10.2026 | Die Karte (native Bibliothek) kennt die Bestätigung in der App nicht: für Kartenkacheln muss das Zertifikat bzw. die eigene CA in Android installiert sein |
+| Hintergrund | Hinter allen Seiten und Screens steht dezent ein graues Gebirge im Stil des Matterhorns, flächig gezeichnet (eigene Zeichnung: `background.svg` im Web, `MountainBackground` in der App). Entschieden am 04.10.2026 | Schwarz/Weiß mit geringer Deckkraft, funktioniert hell und dunkel |
 | Container-Rechte | Kein Container läuft als root: alle Dienste (auch PostgreSQL) laufen als `HIKER_UID:HIKER_GID`, mit `cap_drop: ALL`, `no-new-privileges` und schreibgeschütztem Dateisystem; entschieden am 04.10.2026 | Ein Ausbruch aus einem Dienst hat auf dem geteilten Server nur die Rechte eines normalen Benutzers |
 | Kartenquellen | Konfigurierbare Tile-URL (Standard: OpenStreetMap) | Lizenzfragen später |
 | Diagramme | Eigenes Höhenprofil-Widget (Höhe, Herzfrequenz, Foto-Marker) | Foto-Marker und Kartenverknüpfung nötig |
@@ -393,6 +399,12 @@ Stand `schema_version` 1: Tour (mit effektiven Werten für Dauer und Startgewich
 |---|---|---|
 | POST | /auth/register, /auth/login, /auth/refresh | Konto/Tokens (Refresh rotiert das Token) |
 | POST | /auth/logout | Refresh-Token widerrufen |
+| POST | /auth/password | Passwort ändern (bisheriges + neues); alle anderen Sitzungen enden |
+| POST | /auth/mfa/setup, /auth/mfa/enable | Zweiten Faktor einrichten: Geheimnis holen, mit erstem Code bestätigen; liefert neue Tokens und Wiederherstellungscodes |
+| POST | /auth/mfa/recovery-codes, /auth/mfa/disable | Neue Wiederherstellungscodes; Abschalten nur, wenn `MFA_REQUIRED=false` |
+| GET/POST | /auth/oidc, /auth/oidc/start, /auth/oidc/callback | SSO: ob angeboten, Anmeldung beginnen, mit `state` und `code` abschließen |
+| GET | /me/session | Was der Sitzung noch fehlt (`mfa_setup_required`, `password_change_required`) |
+| GET/DELETE/POST | /admin/users, /admin/users/{id}, …/reset-password, …/reset-mfa | Nutzerverwaltung (nur `admin`) |
 | GET | /users/lookup?email= | Nutzer für Freigabe/Partner finden (exakte Adresse; liefert nur ID und Anzeigename) |
 | GET | /me | Eigenes Konto |
 | GET/PUT | /me/profile | Profil für Kalorienschätzung |
@@ -532,13 +544,16 @@ Das Web-Frontend ist ein eigenes Projekt in `web/` und ersetzt die früher gepla
 
 ## 10. Sicherheit und Datenschutz
 
-- Passwörter mit argon2 oder bcrypt, JWT kurzlebig + Refresh-Token.
+- Passwörter mit argon2, JWT kurzlebig + Refresh-Token. Passwortregeln nach BSI, zweiter Faktor (TOTP) Pflicht, optional SSO über OIDC (siehe Entscheidungen in Abschnitt 2).
+- **Unvollständige Anmeldung**: Access-Tokens tragen, wie angemeldet wurde (`pwd`, `mfa`, `sso`). Solange der zweite Faktor fehlt oder ein neues Passwort fällig ist, antwortet die API auf alles außer den Endpunkten dafür mit 403 (`mfa_setup_required` bzw. `password_change_required`); die Prüfung sitzt in der zentralen Dependency `CurrentUser`.
+- TOTP-Codes gelten einmal (Zähler des letzten Codes wird gespeichert), Wiederherstellungscodes liegen nur als Hash vor. Ein neues Passwort und ein zurückgesetzter Faktor beenden alle Sitzungen.
+- OIDC: Der Server tauscht den Code selbst ein (Client-Secret bleibt auf dem Server), prüft Aussteller, Empfänger, Ablauf und Nonce des ID-Tokens und verlässt sich für dessen Echtheit auf die TLS-Verbindung zum Token-Endpunkt. `state` gilt einmal und zehn Minuten; das Web-Frontend bindet ihn zusätzlich an den Browser.
 - Rate-Limit auf Login, Public Links und Barcode-Lookup; HTTPS Pflicht. Umsetzung: je Client-Adresse und Minute 20 Anfragen an Registrierung/Login/Refresh, 60 an Barcode-Lookup und öffentliche Ansicht; darüber 429 mit `Retry-After`. Die Client-Adresse kommt aus den Proxy-Headern. Abschaltbar über `RATE_LIMIT_ENABLED=false`.
 - Public-Link-Tokens: kryptografisch zufällig, widerrufbar, optional befristet, nie in Logs.
 - Fotos: EXIF-GPS bei öffentlichen Links optional entfernen; Uploads auf Typ und Größe prüfen, Bilder serverseitig neu kodieren.
 - Dateizugriff nur mit Berechtigungsprüfung oder kurzlebigen signierten URLs.
 - Gesundheitsdaten (Herzfrequenz, Profil) sind sensibel: nur für Owner sichtbar, in Freigaben und Public Links standardmäßig ausgeblendet bzw. abschaltbar.
-- Admin-Rolle nur für Katalogmoderation.
+- Admin-Rolle für Katalogmoderation und Nutzerverwaltung; der erste registrierte Nutzer wird Admin.
 - Historie enthält Autoren; beim Entfernen eines Users werden Autoren anonymisiert.
 - Keine Tracker, keine Analytics von Drittanbietern.
 - Löschen entfernt auch Dateien im Speicher.

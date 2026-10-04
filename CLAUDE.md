@@ -41,6 +41,8 @@ Android-App (Flutter, nur Android), Web-Frontend (Python Flask) und eigenes Back
 - Fotos: EXIF lesen, dem Track zuordnen (GPS, sonst Zeit mit einstellbarem Versatz), Position korrigierbar halten; Uploads prüfen und neu kodieren; EXIF-GPS bei öffentlichen Links optional entfernen.
 - Gemeinsame Kataloge (Ausrüstung, Lebensmittel): nur Produktdaten teilen, keine persönlichen Felder (Kaufpreis, Kaufdatum, Notizen); Freigabe durch `admin`; Kopie statt Verweis bei Übernahme.
 - Gesundheitsdaten (Herzfrequenz, Profil) nur für Owner sichtbar, in Freigaben und Links abschaltbar.
+- Anmeldung: Passwortregeln nach BSI (`auth/passwords.py`), zweiter Faktor (TOTP) Pflicht, optional SSO über OIDC. Ob eine Sitzung vollständig ist, prüft allein die Dependency `CurrentUser`; nur die Endpunkte zum Einrichten des zweiten Faktors und zum Passwortwechsel nutzen `SignedIn`.
+- Ausrüstung: Preise immer in EUR; Favorit ist der feste Tag `favorite`; Zusatzfelder je Art der Kategorie stehen in `gear/attributes.py` und gespiegelt in der App (`gearKinds`).
 
 ## Qualität
 - Backend: pytest-Tests für jede Änderung, vor allem Rechteprüfung, Historie, GPX-Auswertung, Foto-Zuordnung und Kalorienschätzung.
