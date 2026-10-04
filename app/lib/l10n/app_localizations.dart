@@ -2919,6 +2919,48 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Aus Satellitendaten, einige Stunden alt und grob.'**
   String get mapPrecipitationNote;
+
+  /// No description provided for @mapPaths.
+  ///
+  /// In de, this message translates to:
+  /// **'Wege (SAC-Skala, KS = Klettersteig):'**
+  String get mapPaths;
+
+  /// No description provided for @mapOverlayWeather0.
+  ///
+  /// In de, this message translates to:
+  /// **'Wetter heute'**
+  String get mapOverlayWeather0;
+
+  /// No description provided for @mapOverlayWeather1.
+  ///
+  /// In de, this message translates to:
+  /// **'Wetter morgen'**
+  String get mapOverlayWeather1;
+
+  /// No description provided for @mapOverlayWeather2.
+  ///
+  /// In de, this message translates to:
+  /// **'Wetter übermorgen'**
+  String get mapOverlayWeather2;
+
+  /// No description provided for @mapOverlaySnowDepth.
+  ///
+  /// In de, this message translates to:
+  /// **'Schneehöhe'**
+  String get mapOverlaySnowDepth;
+
+  /// No description provided for @mapWeatherNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Vorhersage je Ort: Wetter, höchste/tiefste Temperatur, Niederschlag oder Neuschnee. Ab mittlerer Zoomstufe.'**
+  String get mapWeatherNote;
+
+  /// No description provided for @mapSnowDepthNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Schneehöhe laut Wettermodell, keine Messung.'**
+  String get mapSnowDepthNote;
 }
 
 class _AppLocalizationsDelegate

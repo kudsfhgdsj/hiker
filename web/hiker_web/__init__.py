@@ -216,6 +216,11 @@ def create_app(config: dict | None = None) -> Flask:
         upstream = api().request("GET", f"/maps/contours/{z}/{x}/{y}.pbf", auth=False)
         return _passed_on(upstream, "application/x-protobuf")
 
+    @app.get("/map/weather/<int:z>/<int:x>/<int:y>.pbf")
+    def map_weather_tile(z, x, y):
+        upstream = api().request("GET", f"/maps/weather/{z}/{x}/{y}.pbf", auth=False)
+        return _passed_on(upstream, "application/x-protobuf")
+
     @app.get("/map/slope/<int:z>/<int:x>/<int:y>.png")
     def map_slope_tile(z, x, y):
         upstream = api().request("GET", f"/maps/slope/{z}/{x}/{y}.png", auth=False)

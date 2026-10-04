@@ -128,6 +128,10 @@ def test_raster_layers_and_slope_are_passed_on(browser, fake_api):
     fake_api.route(
         "GET", "/maps/contours/12/2153/1436.pbf", lambda r: httpx2.Response(200, content=b"lines")
     )
+    fake_api.route(
+        "GET", "/maps/weather/9/269/179.pbf", lambda r: httpx2.Response(200, content=b"forecast")
+    )
+    assert browser.get("/map/weather/9/269/179.pbf").data == b"forecast"
     contours = browser.get("/map/contours/12/2153/1436.pbf")
     assert contours.data == b"lines" and contours.mimetype == "application/x-protobuf"
 

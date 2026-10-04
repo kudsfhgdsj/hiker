@@ -292,6 +292,15 @@ TEXTS = {
     "map.overlay.avalanche": "Lawinengefahr",
     "map.overlay.snow": "Schneebedeckung",
     "map.overlay.precipitation": "Niederschlag",
+    "map.overlay.weather0": "Wetter heute",
+    "map.overlay.weather1": "Wetter morgen",
+    "map.overlay.weather2": "Wetter übermorgen",
+    "map.overlay.snowdepth": "Schneehöhe",
+    "map.note.weather": (
+        "Vorhersage je Ort: Wetter, höchste/tiefste Temperatur, Niederschlag oder Neuschnee. "
+        "Ab mittlerer Zoomstufe."
+    ),
+    "map.note.snowdepth": "Schneehöhe laut Wettermodell, keine Messung.",
     "map.note.avalanche": (
         "Höchste Gefahrenstufe des Tages je Region (1–5). Maßgeblich ist das Bulletin "
         "des Lawinenwarndienstes."

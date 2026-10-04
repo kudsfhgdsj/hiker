@@ -220,6 +220,10 @@ class MapLayerSheet extends ConsumerWidget {
       'avalanche' => l10n.mapOverlayAvalanche,
       'snow' => l10n.mapOverlaySnow,
       'precipitation' => l10n.mapOverlayPrecipitation,
+      'weather0' => l10n.mapOverlayWeather0,
+      'weather1' => l10n.mapOverlayWeather1,
+      'weather2' => l10n.mapOverlayWeather2,
+      'snowdepth' => l10n.mapOverlaySnowDepth,
       _ => id,
     };
     String? overlayNote(String id) => switch (id) {
@@ -227,75 +231,80 @@ class MapLayerSheet extends ConsumerWidget {
       'avalanche' => l10n.mapAvalancheNote,
       'snow' => l10n.mapSnowNote,
       'precipitation' => l10n.mapPrecipitationNote,
+      'weather2' => l10n.mapWeatherNote,
+      'snowdepth' => l10n.mapSnowDepthNote,
       _ => null,
     };
+    // The list of layers can be longer than the sheet is high.
     return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Text(
-              l10n.mapLayers,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-          ),
-          if (bases.length > 1)
-            RadioGroup<String>(
-              groupValue: choice.base,
-              onChanged: (base) => notifier.setBase(base!),
-              child: Column(
-                children: [
-                  for (final base in bases)
-                    RadioListTile<String>(
-                      value: base['id'] as String,
-                      title: Text(baseLabel(base['id'] as String)),
-                    ),
-                ],
-              ),
-            ),
-          if (options['legend'] case final List<dynamic> legend
-              when legend.isNotEmpty)
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-              child: Wrap(
-                spacing: 10,
-                runSpacing: 4,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(l10n.mapPaths),
-                  for (final entry in legend.cast<Map<String, dynamic>>())
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 14,
-                          height: 14,
-                          margin: const EdgeInsets.only(right: 4),
-                          decoration: BoxDecoration(
-                            color: _hexColor(entry['color'] as String),
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                        ),
-                        Text(entry['label'] as String),
-                      ],
-                    ),
-                ],
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Text(
+                l10n.mapLayers,
+                style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
-          for (final overlay in overlays)
-            SwitchListTile(
-              value: choice.overlays.contains(overlay['id']),
-              title: Text(overlayLabel(overlay['id'] as String)),
-              subtitle: switch (overlayNote(overlay['id'] as String)) {
-                final note? => Text(note),
-                null => null,
-              },
-              onChanged: (on) =>
-                  notifier.setOverlay(overlay['id'] as String, on: on),
-            ),
-        ],
+            if (bases.length > 1)
+              RadioGroup<String>(
+                groupValue: choice.base,
+                onChanged: (base) => notifier.setBase(base!),
+                child: Column(
+                  children: [
+                    for (final base in bases)
+                      RadioListTile<String>(
+                        value: base['id'] as String,
+                        title: Text(baseLabel(base['id'] as String)),
+                      ),
+                  ],
+                ),
+              ),
+            if (options['legend'] case final List<dynamic> legend
+                when legend.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(l10n.mapPaths),
+                    for (final entry in legend.cast<Map<String, dynamic>>())
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 14,
+                            height: 14,
+                            margin: const EdgeInsets.only(right: 4),
+                            decoration: BoxDecoration(
+                              color: _hexColor(entry['color'] as String),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                          Text(entry['label'] as String),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            for (final overlay in overlays)
+              SwitchListTile(
+                value: choice.overlays.contains(overlay['id']),
+                title: Text(overlayLabel(overlay['id'] as String)),
+                subtitle: switch (overlayNote(overlay['id'] as String)) {
+                  final note? => Text(note),
+                  null => null,
+                },
+                onChanged: (on) =>
+                    notifier.setOverlay(overlay['id'] as String, on: on),
+              ),
+          ],
+        ),
       ),
     );
   }

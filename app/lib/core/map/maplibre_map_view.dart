@@ -341,6 +341,7 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
                   icon: const Icon(Icons.layers_outlined),
                   onPressed: () => showModalBottomSheet<void>(
                     context: context,
+                    isScrollControlled: true,
                     builder: widget.layerSheet!,
                   ),
                 ),

@@ -35,6 +35,9 @@ class TileProxy extends Notifier<int?> {
   static final _contours = RegExp(
     r'^/contours/(\d{1,2})/(\d{1,7})/(\d{1,7})\.pbf$',
   );
+  static final _weather = RegExp(
+    r'^/weather/(\d{1,2})/(\d{1,7})/(\d{1,7})\.pbf$',
+  );
   static final _glyphs = RegExp(
     r'^/fonts/([\w ,%-]{1,200})/(\d{1,5}-\d{1,5})\.pbf$',
   );
@@ -276,6 +279,17 @@ class TileProxy extends Notifier<int?> {
           cacheName: 'contours/$tile',
           type: _protobuf,
           gzipped: true,
+        );
+      } else if (_weather.firstMatch(path) case final forecast?) {
+        final tile = '${forecast[1]}/${forecast[2]}/${forecast[3]}.pbf';
+        await _fromServer(
+          response,
+          apiPath: '/api/v1/maps/weather/$tile',
+          cacheName: 'weather/$tile',
+          type: _protobuf,
+          gzipped: true,
+          // A forecast ages quickly; without network the last one is still shown.
+          freshFor: const Duration(hours: 1),
         );
       } else if (_slope.firstMatch(path) case final slope?) {
         final tile = '${slope[1]}/${slope[2]}/${slope[3]}.png';

@@ -576,5 +576,11 @@
   "mapAvalancheNote": "Höchste Gefahrenstufe des Tages je Region: 1 grün, 2 gelb, 3 orange, 4 rot, 5 schwarz. Maßgeblich ist das Bulletin des Lawinenwarndienstes.",
   "mapSnowNote": "Satellitenbild des letzten Tages; Wolken verdecken den Boden.",
   "mapPrecipitationNote": "Aus Satellitendaten, einige Stunden alt und grob.",
-  "mapPaths": "Wege (SAC-Skala, KS = Klettersteig):"
+  "mapPaths": "Wege (SAC-Skala, KS = Klettersteig):",
+  "mapOverlayWeather0": "Wetter heute",
+  "mapOverlayWeather1": "Wetter morgen",
+  "mapOverlayWeather2": "Wetter übermorgen",
+  "mapOverlaySnowDepth": "Schneehöhe",
+  "mapWeatherNote": "Vorhersage je Ort: Wetter, höchste/tiefste Temperatur, Niederschlag oder Neuschnee. Ab mittlerer Zoomstufe.",
+  "mapSnowDepthNote": "Schneehöhe laut Wettermodell, keine Messung."
 }

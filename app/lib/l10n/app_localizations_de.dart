@@ -1561,4 +1561,26 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get mapPrecipitationNote =>
       'Aus Satellitendaten, einige Stunden alt und grob.';
+
+  @override
+  String get mapPaths => 'Wege (SAC-Skala, KS = Klettersteig):';
+
+  @override
+  String get mapOverlayWeather0 => 'Wetter heute';
+
+  @override
+  String get mapOverlayWeather1 => 'Wetter morgen';
+
+  @override
+  String get mapOverlayWeather2 => 'Wetter übermorgen';
+
+  @override
+  String get mapOverlaySnowDepth => 'Schneehöhe';
+
+  @override
+  String get mapWeatherNote =>
+      'Vorhersage je Ort: Wetter, höchste/tiefste Temperatur, Niederschlag oder Neuschnee. Ab mittlerer Zoomstufe.';
+
+  @override
+  String get mapSnowDepthNote => 'Schneehöhe laut Wettermodell, keine Messung.';
 }
