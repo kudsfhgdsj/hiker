@@ -5,8 +5,11 @@
 <div id="map" role="img" aria-label="{{ t('tour.track') }}"></div>
 {% if tour.track_source != 'none' %}
 <h3>{{ t('tour.profile') }}</h3>
-<svg id="profile" viewBox="0 0 1000 220" preserveAspectRatio="none" aria-label="{{ t('tour.profile') }}"></svg>
-<p id="profile-readout" class="meta" aria-live="polite">&nbsp;</p>
+<div id="profile-box">
+  <svg id="profile" tabindex="0" role="img" aria-label="{{ t('tour.profile') }}"></svg>
+  <div id="profile-tip"></div>
+</div>
+<p class="meta">{{ t('tour.profile.hint') }}</p>
 {% endif %}
 <dialog id="photo-dialog"><form method="dialog"><button class="link" aria-label="{{ t('action.cancel') }}">✕</button></form>
   <img alt=""><p class="meta"></p></dialog>

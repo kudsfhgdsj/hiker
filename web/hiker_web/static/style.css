@@ -73,7 +73,15 @@ table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
 td.num, th.num { text-align: right; white-space: nowrap; }
 #map { height: 22rem; border-radius: .75rem; overflow: hidden; border: 1px solid var(--border); }
-#profile { width: 100%; height: 10rem; display: block; touch-action: none; }
+#profile-box { position: relative; }
+#profile { width: 100%; height: 14rem; display: block; touch-action: pan-y; cursor: crosshair; border-radius: .5rem; }
+#profile:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+#profile-tip { position: absolute; top: .5rem; display: none; pointer-events: none; padding: .4rem .6rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: .5rem; box-shadow: 0 2px 8px #0003;
+  font-size: .85rem; line-height: 1.5; white-space: nowrap; }
+#profile-tip div { display: flex; justify-content: space-between; gap: 1rem; }
+#profile-tip span { color: var(--grey); }
+#profile-box.active #profile-tip { display: block; }
 .photo-strip { display: flex; gap: .5rem; overflow-x: auto; padding: .5rem 0; }
 .photo-strip img { height: 5rem; border-radius: .5rem; }
 .photo-marker { width: 2.6rem; height: 2.6rem; border-radius: 50%; border: 2px solid #fff; object-fit: cover;
@@ -84,10 +92,18 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 1rem; }
 .photo-grid figure { margin: 0; }
 .photo-grid img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: .5rem; display: block; }
-#profile .area { fill: #2e7d3233; stroke: none; }
-#profile .line { fill: none; stroke: #2e7d32; stroke-width: 2; vector-effect: non-scaling-stroke; }
-#profile .cursor { stroke: #c62828; stroke-width: 1; vector-effect: non-scaling-stroke; visibility: hidden; }
-#profile .photo-tick { fill: #1565c0; }
+#profile .fill-stop { stop-color: var(--green); }
+#profile .area { fill: url(#profile-fill); stroke: none; }
+#profile .line { fill: none; stroke: var(--green); stroke-width: 2; stroke-linejoin: round; }
+#profile .grid { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 4; }
+#profile .grid.upright { opacity: .5; }
+#profile .tick { fill: var(--grey); font-size: 12px; }
+#profile .cursor { stroke: #c62828; stroke-width: 1.5; visibility: hidden; }
+#profile .focus { fill: #c62828; stroke: #fff; stroke-width: 2.5; visibility: hidden; }
+#profile-box.active .cursor, #profile-box.active .focus { visibility: visible; }
+#profile .photo-tick { fill: #1565c0; stroke: #fff; stroke-width: 1.5; cursor: pointer; }
+.walk-marker { width: 1.25rem; height: 1.25rem; border-radius: 50%; background: #c62828; border: 3px solid #fff;
+  box-shadow: 0 0 0 .45rem #c6282844, 0 1px 4px #0008; pointer-events: none; }
 #photo-dialog { border: none; border-radius: .75rem; padding: .5rem; max-width: 95vw; }
 #photo-dialog img { max-width: 90vw; max-height: 80vh; display: block; }
 #photo-dialog::backdrop { background: #000a; }

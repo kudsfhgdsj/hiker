@@ -313,6 +313,9 @@ def test_detail_shows_facts_course_lists_and_map_data(user, fake_api):
     assert "Zelt" in detail and "Riegel" in detail and "Ben" in detail
     data = json.loads(re.search(r'id="tour-data">(.*?)</script>', detail, re.S).group(1))
     assert data["trackUrl"] == f"/tours/{TOUR_ID}/track.json?v=4"
+    # The elevation profile with the box that names the place under the pointer.
+    assert 'id="profile-box"' in detail and 'id="profile-tip"' in detail
+    assert data["texts"]["slope"] == "Steigung" and data["texts"]["distance"] == "Strecke"
     assert data["photos"][0]["thumb"] == f"/tours/{TOUR_ID}/photos/{PHOTO_ID}/image?size=thumb"
     assert data["waypoints"][0]["kind"] == "saddle" and data["start"]["name"] == "Wasserauen"
     assert data["workerUrl"].startswith("/static/vendor/maplibre-gl/")

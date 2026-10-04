@@ -494,7 +494,14 @@ void main() {
       final profile = tester.getRect(find.byType(ElevationProfile));
       expect(map.content!.highlight, isNull);
 
-      final gesture = await tester.startGesture(profile.center);
+      // The middle of the chart, which lies inside the room for the labels.
+      const pad = ElevationProfile.padding;
+      final gesture = await tester.startGesture(
+        Offset(
+          profile.left + pad.left + (profile.width - pad.horizontal) / 2,
+          profile.center.dy,
+        ),
+      );
       await tester.pump();
 
       expect(map.content!.highlight, const GeoPoint(47.002, 9.0));

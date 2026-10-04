@@ -200,17 +200,32 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
             ]),
           ),
       if (highlight != null)
+        // The place chosen in the elevation profile: a dot with a halo that
+        // stands out against track and markers.
         Positioned(
-          left: highlight.x - 8,
-          top: highlight.y - 8,
+          left: highlight.x - 18,
+          top: highlight.y - 18,
           child: IgnorePointer(
             child: Container(
-              width: 16,
-              height: 16,
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
+                color: Theme.of(context).colorScheme.error
+                    .withValues(alpha: 0.25),
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 3),
+              ),
+              child: Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.error,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 3),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black38, blurRadius: 4),
+                  ],
+                ),
               ),
             ),
           ),

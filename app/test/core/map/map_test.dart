@@ -95,12 +95,18 @@ void main() {
       final reported = await pumpProfile(tester);
       final box = tester.getRect(find.byType(ElevationProfile));
 
-      // The chart is 400 px wide inside 8 px of padding on both sides.
+      // The chart lies inside the room for the axis labels.
+      const pad = ElevationProfile.padding;
+      final inner = box.width - pad.horizontal;
       final gesture = await tester.startGesture(
-        Offset(box.left + 8, box.center.dy),
+        Offset(box.left + pad.left, box.center.dy),
       );
-      await gesture.moveTo(Offset(box.left + 108, box.center.dy));
-      await gesture.moveTo(Offset(box.left + 208, box.center.dy));
+      await gesture.moveTo(
+        Offset(box.left + pad.left + inner / 4, box.center.dy),
+      );
+      await gesture.moveTo(
+        Offset(box.left + pad.left + inner / 2, box.center.dy),
+      );
       await gesture.moveTo(Offset(box.right + 50, box.center.dy));
       await gesture.up();
       await tester.pump();
@@ -123,14 +129,44 @@ void main() {
       );
       final box = tester.getRect(find.byType(ElevationProfile));
 
-      await tester.tapAt(Offset(box.left + 8 + 100, box.center.dy));
-      await tester.tapAt(Offset(box.left + 8 + 300, box.center.dy));
+      const pad = ElevationProfile.padding;
+      final inner = box.width - pad.horizontal;
+      await tester.tapAt(
+        Offset(box.left + pad.left + inner / 4, box.center.dy),
+      );
+      await tester.tapAt(
+        Offset(box.left + pad.left + inner * 3 / 4, box.center.dy),
+      );
       await tester.pump();
 
       expect(tapped, ['photo-1']);
       // Touching the profile always moves the highlight, also on a marker.
       expect(reported.first, 250);
       expect(reported.last, 750);
+    });
+
+    test('the slope is taken over about 100 m around the place', () {
+      const far = [0.0, 50.0, 100.0, 150.0, 200.0];
+      expect(
+        slopePercent(far, const [1000, 1005, 1010, 1015, 1020], 100),
+        closeTo(10, 0.001),
+      );
+      expect(
+        slopePercent(far, const [1000, 995, 990, 985, 980], 0),
+        closeTo(-10, 0.001),
+      );
+      expect(
+        slopePercent(far, const [1000, null, 1010, null, 1020], 100),
+        isNull,
+      );
+      expect(slopePercent(const [0.0], const [1000], 0), isNull);
+    });
+
+    test('axis steps are round numbers', () {
+      expect(niceStep(1000, 4), 500);
+      expect(niceStep(13.9, 4), 5);
+      expect(niceStep(90, 3), 50);
+      expect(niceStep(0.8, 4), 0.2);
     });
 
     testWidgets('paints nothing for a track without elevation', (tester) async {

@@ -100,6 +100,10 @@ def map_data(tour: dict, photos: list[dict], waypoints: list[dict], urls) -> dic
             "start": t("tour.start"),
             "end": t("tour.end"),
             "heartRate": t("tour.heart_rate"),
+            "distance": t("tour.profile.distance"),
+            "elevation": t("tour.profile.elevation"),
+            "slope": t("tour.profile.slope"),
+            "time": t("tour.profile.time"),
         },
     }
 

@@ -284,6 +284,14 @@ TEXTS = {
     "tour.gpx_download": "GPX herunterladen",
     "tour.track_remove": "Track entfernen",
     "tour.profile": "Höhenprofil",
+    "tour.profile.hint": (
+        "Mit Maus, Finger oder Pfeiltasten über das Höhenprofil fahren: "
+        "Die Karte zeigt die Stelle auf der Route."
+    ),
+    "tour.profile.distance": "Strecke",
+    "tour.profile.elevation": "Höhe",
+    "tour.profile.slope": "Steigung",
+    "tour.profile.time": "Uhrzeit",
     "tour.course": "Verlauf der Tour",
     "tour.places_detect": "Gipfel und Pässe neu suchen",
     "tour.places_done": "Orte entlang des Tracks aktualisiert.",
