@@ -12,9 +12,11 @@ TENT = {
     "type_id": "type-tent",
     "weight_g": 1500,
     "purchase_price": 399.9,
-    "currency": "CHF",
+    "currency": "EUR",
     "status": "active",
-    "tag_ids": ["tag-winter"],
+    "tag_ids": ["tag-winter", "tag-favorite"],
+    "favorite": True,
+    "attributes": {"volume_l": 35},
     "image_file_id": None,
     "catalog_id": None,
 }
@@ -30,10 +32,46 @@ STOVE = {
     "catalog_id": None,
 }
 TYPES = [
-    {"id": "type-tent", "name": "Zelt & Biwak", "standard": True},
-    {"id": "type-photo", "name": "Fotoausrüstung", "standard": False},
+    {"id": "type-tent", "name": "Zelt & Biwak", "standard": True, "kind": "backpack"},
+    {"id": "type-photo", "name": "Fotoausrüstung", "standard": False, "kind": None},
 ]
-TAGS = [{"id": "tag-winter", "name": "Winter", "color": "#3366cc"}]
+TAGS = [
+    {"id": "tag-favorite", "name": "Favorit", "color": "#f5b400", "system": "favorite"},
+    {"id": "tag-winter", "name": "Winter", "color": "#3366cc", "system": None},
+]
+META = {
+    "currency": "EUR",
+    "image_formats": ["JPEG", "PNG", "WebP"],
+    "max_upload_mb": 15,
+    "kinds": [
+        {
+            "kind": "backpack",
+            "attributes": [
+                {
+                    "key": "volume_l",
+                    "type": "number",
+                    "unit": "l",
+                    "minimum": 1,
+                    "maximum": 200,
+                    "options": [],
+                }
+            ],
+        },
+        {
+            "kind": "shoes",
+            "attributes": [
+                {
+                    "key": "shoe_category",
+                    "type": "choice",
+                    "unit": None,
+                    "minimum": None,
+                    "maximum": None,
+                    "options": ["A", "B", "B/C", "C", "D"],
+                }
+            ],
+        },
+    ],
+}
 
 
 def page(items):
@@ -48,6 +86,7 @@ def gear_api(fake_api):
     fake_api.route("GET", "/gear/items", page([TENT, STOVE]))
     fake_api.route("GET", "/gear/types", TYPES)
     fake_api.route("GET", "/gear/tags", TAGS)
+    fake_api.route("GET", "/gear/meta", META)
     return fake_api
 
 
@@ -93,7 +132,8 @@ def test_create_item_sends_typed_values(user, fake_api):
             "brand": "",
             "weight_g": "450",
             "purchase_price": "120,50",
-            "currency": "chf",
+            "attr_volume_l": "42,5",
+            "attr_shoe_category": "",
             "status": "active",
             "tag_ids": "tag-winter",
             "website_url": "",
@@ -103,7 +143,10 @@ def test_create_item_sends_typed_values(user, fake_api):
     assert response.status_code == 302 and response.headers["location"] == "/gear/"
     body = json.loads(fake_api.last("POST", "/gear/items").content)
     assert body["name"] == "Pickel" and body["brand"] is None
-    assert (body["weight_g"], body["purchase_price"], body["currency"]) == (450, 120.5, "CHF")
+    assert (body["weight_g"], body["purchase_price"]) == (450, 120.5)
+    # Prices are always in EUR: the form has no currency.
+    assert "currency" not in body
+    assert body["attributes"] == {"volume_l": 42.5, "shoe_category": None}
     assert body["tag_ids"] == ["tag-winter"]
 
 
@@ -136,7 +179,7 @@ def test_edit_shows_the_item_and_saves_with_put(user, fake_api):
     response = user.post(f"/gear/{TENT['id']}", {"name": "Zelt neu", "status": "retired"})
 
     assert 'value="Zelt Hubba"' in form and 'value="399.9"' in form
-    assert '<option value="type-tent" selected>' in form
+    assert '<option value="type-tent" data-kind="backpack" selected>' in form
     assert 'value="tag-winter" checked' in form
     assert response.status_code == 302
     body = json.loads(fake_api.last("PUT", f"/gear/items/{TENT['id']}").content)
@@ -185,7 +228,7 @@ def test_summary_with_grouping(user, fake_api):
         "weight_g": 2750,
         "items_without_weight": 1,
         "items_without_price": 0,
-        "value": [{"currency": "CHF", "amount": 520.0}, {"currency": "EUR", "amount": 95.5}],
+        "value": [{"currency": "EUR", "amount": 615.5}],
     }
     fake_api.route(
         "GET",
@@ -214,7 +257,7 @@ def test_summary_with_grouping(user, fake_api):
     plain = text(user.get("/gear/summary"))
     grouped = text(user.get("/gear/summary?group_by=tag&status=active"))
 
-    assert "2,75 kg" in plain and "520,00 CHF + 95,50 EUR" in plain and "1 ohne Gewicht." in plain
+    assert "2,75 kg" in plain and "615,50 EUR" in plain and "1 ohne Gewicht." in plain
     assert "Verleihbar" in grouped and "Nicht zugeordnet" in grouped
     assert "zählt in jedem seiner Tags" in grouped
     params = fake_api.last("GET", "/gear/summary").url.params
@@ -350,3 +393,51 @@ def test_packing_list_form_and_saving(user, fake_api):
     }
     assert created == {"name": "Leer", "description": None, "entries": []}
     assert deleted.headers["location"] == "/gear/lists"
+
+
+def test_form_shows_formats_extra_fields_and_no_currency(user, fake_api):
+    gear_api(fake_api)
+    fake_api.route("GET", "/gear/items/*", TENT)
+
+    form = text(user.get(f"/gear/{TENT['id']}"))
+
+    assert "Erlaubt: JPEG, PNG, WebP, höchstens 15 MB." in form
+    assert "Kaufpreis (EUR)" in form and 'name="currency"' not in form
+    assert 'data-kind="backpack"' in form and 'name="attr_volume_l" value="35"' in form
+    assert "Schuhkategorie" in form and '<option value="B/C">B/C</option>' in form
+    assert 'value="tag-favorite" checked' in form
+
+
+def test_star_marks_and_unmarks_a_favorite(user, fake_api):
+    gear_api(fake_api)
+    fake_api.route("PUT", "/gear/items/*/favorite", TENT)
+    fake_api.route("DELETE", "/gear/items/*/favorite", TENT)
+
+    listing = text(user.get("/gear/?favorite=1"))
+    marked = user.post(f"/gear/{STOVE['id']}/favorite", {"favorite": "1", "back": "/gear/?q=k"})
+    unmarked = user.post(
+        f"/gear/{TENT['id']}/favorite", {"favorite": "0", "back": "//evil.example"}
+    )
+
+    assert "★" in listing and "☆" in listing and 'aria-pressed="true"' in listing
+    assert fake_api.last("GET", "/gear/items").url.params["favorite"] == "true"
+    assert f"PUT /gear/items/{STOVE['id']}/favorite" in fake_api.requested()
+    assert f"DELETE /gear/items/{TENT['id']}/favorite" in fake_api.requested()
+    assert marked.headers["location"] == "/gear/?q=k"
+    assert unmarked.headers["location"] == "/gear/"
+
+
+def test_system_tag_has_no_delete_button_and_types_can_get_a_kind(user, fake_api):
+    gear_api(fake_api)
+    fake_api.route("POST", "/gear/types", lambda r: httpx2.Response(201, json={}))
+
+    page_text = text(user.get("/gear/manage"))
+    user.post("/gear/manage", {"kind": "type", "name": "Bergschuhe", "type_kind": "shoes"})
+
+    assert "fester Tag" in page_text and "/gear/manage/tag/tag-favorite/delete" not in page_text
+    assert "/gear/manage/tag/tag-winter/delete" in page_text
+    assert "Angaben für Rucksack" in page_text
+    assert json.loads(fake_api.last("POST", "/gear/types").content) == {
+        "name": "Bergschuhe",
+        "kind": "shoes",
+    }

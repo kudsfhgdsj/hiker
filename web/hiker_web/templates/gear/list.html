@@ -33,6 +33,7 @@
     {% endfor %}
   </fieldset>
   {% endif %}
+  <label><input type="checkbox" name="favorite" value="1"{% if filters.favorite %} checked{% endif %}> {{ t('gear.only_favorites') }}</label>
   <button>{{ t('action.search') }}</button>
 </form>
 {% if items %}
@@ -47,6 +48,12 @@
       <span class="meta">{{ [item.brand, type_names.get(item.type_id)]|select|join(' · ') }}</span>
     </a>
     <span>{{ item.weight_g|weight }}</span>
+    <form method="post" action="{{ url_for('gear.item_favorite', item_id=item.id) }}" class="inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="back" value="{{ request.full_path }}">
+      <button class="star{% if item.favorite %} on{% endif %}" name="favorite" value="{{ '0' if item.favorite else '1' }}"
+        aria-pressed="{{ 'true' if item.favorite else 'false' }}" title="{{ t('gear.favorite') }}" aria-label="{{ t('gear.favorite') }}">{{ '★' if item.favorite else '☆' }}</button>
+    </form>
   </li>
   {% endfor %}
 </ul>

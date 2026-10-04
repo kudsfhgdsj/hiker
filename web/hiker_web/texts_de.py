@@ -74,9 +74,26 @@ TEXTS = {
     "gear.status": "Status",
     "gear.status.active": "In Gebrauch",
     "gear.status.retired": "Ausgemustert",
-    "gear.price": "Kaufpreis",
-    "gear.price_hint": "Höchstens zwei Nachkommastellen; mit Preis ist die Währung Pflicht.",
-    "gear.currency": "Währung",
+    "gear.price": "Kaufpreis ({currency})",
+    "gear.price_hint": "Höchstens zwei Nachkommastellen.",
+    "gear.favorite": "Favorit",
+    "gear.only_favorites": "nur Favoriten",
+    "gear.tag_system": "fester Tag",
+    "gear.image_hint": (
+        "Erlaubt: {formats}, höchstens {size} MB. Das Bild wird als JPEG gespeichert."
+    ),
+    "gear.type_kind": "Zusatzfelder",
+    "gear.kind_fields": "Angaben für {kind}",
+    "gear.kind.backpack": "Rucksack",
+    "gear.kind.shoes": "Schuhe",
+    "gear.attr.volume_l": "Volumen (Liter)",
+    "gear.attr.shoe_category": "Schuhkategorie",
+    "gear.attr_hint.shoe_category": (
+        "A: leichte Wanderschuhe · B: Trekking · B/C: schwere Trekkingstiefel, bedingt "
+        "steigeisenfest · C: Bergstiefel · D: Expeditionsstiefel"
+    ),
+    "error.system_tag": "Dieser Tag gehört fest zur App und bleibt, wie er ist.",
+    "error.invalid_attribute": "Ein Zusatzfeld hat einen ungültigen Wert.",
     "gear.purchase_date": "Kaufdatum",
     "gear.description": "Beschreibung",
     "gear.notes": "Notizen",

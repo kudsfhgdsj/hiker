@@ -8,7 +8,9 @@
 <ul class="list">
   {% for tag in tags %}
   <li><span class="chip"{% if tag.color %} style="border-left:.8rem solid {{ tag.color }}"{% endif %}>{{ tag.name }}</span>
-    <span class="grow"></span>{{ delete_form(url_for('gear.manage_delete', kind='tag', record_id=tag.id)) }}</li>
+    <span class="grow"></span>
+    {% if tag.system %}<span class="meta">{{ t('gear.tag_system') }}</span>
+    {% else %}{{ delete_form(url_for('gear.manage_delete', kind='tag', record_id=tag.id)) }}{% endif %}</li>
   {% endfor %}
 </ul>
 <form method="post" class="row">{{ csrf() }}<input type="hidden" name="kind" value="tag">
@@ -18,13 +20,16 @@
 <h2>{{ t('gear.types') }}</h2>
 <ul class="list">
   {% for type in types %}
-  <li><span class="grow">{{ type.name }} <span class="meta">{{ t('gear.type_standard' if type.standard else 'gear.type_own') }}</span></span>
+  <li><span class="grow">{{ type.name }} <span class="meta">{{ t('gear.type_standard' if type.standard else 'gear.type_own') }}{% if type.kind %} · {{ t('gear.kind_fields', kind=t('gear.kind.' ~ type.kind)) }}{% endif %}</span></span>
     {# The standard list is shared by all users; only admins change it. #}
     {% if not type.standard or current_user.role == 'admin' %}{{ delete_form(url_for('gear.manage_delete', kind='type', record_id=type.id)) }}{% endif %}</li>
   {% endfor %}
 </ul>
 <form method="post" class="row">{{ csrf() }}<input type="hidden" name="kind" value="type">
   {{ field('name', t('gear.new_type'), required=True, attrs='maxlength="80"') }}
+  <label class="field"><span>{{ t('gear.type_kind') }}</span>
+    <select name="type_kind"><option value="">{{ t('common.none') }}</option>
+      {% for kind in meta.kinds %}<option value="{{ kind.kind }}">{{ t('gear.kind.' ~ kind.kind) }}</option>{% endfor %}</select></label>
   <button>{{ t('action.add') }}</button></form>
 <p><a href="{{ url_for('gear.item_list') }}">{{ t('action.back') }}</a></p>
 {% endblock %}

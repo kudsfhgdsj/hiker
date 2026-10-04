@@ -17,11 +17,23 @@ def _filters() -> dict:
         "status": request.args.get("status", ""),
         "type_id": request.args.get("type_id", ""),
         "tag_id": request.args.getlist("tag_id"),
+        "favorite": "true" if request.args.get("favorite") else "",
     }
 
 
-def _item_from_form() -> dict:
-    currency = forms.text("currency")
+def _attributes(meta: dict) -> dict:
+    """The extra fields of all kinds as sent by the form; the API keeps those that apply."""
+    values = {}
+    for kind in meta["kinds"]:
+        for attribute in kind["attributes"]:
+            name = f"attr_{attribute['key']}"
+            values[attribute["key"]] = (
+                forms.number(name) if attribute["type"] == "number" else forms.text(name)
+            )
+    return values
+
+
+def _item_from_form(meta: dict) -> dict:
     return {
         "name": forms.text("name") or "",
         "brand": forms.text("brand"),
@@ -29,7 +41,6 @@ def _item_from_form() -> dict:
         "weight_g": forms.whole("weight_g"),
         "purchase_date": forms.text("purchase_date"),
         "purchase_price": forms.number("purchase_price"),
-        "currency": currency.upper() if currency else None,
         "description": forms.text("description"),
         "notes": forms.text("notes"),
         "website_url": forms.text("website_url"),
@@ -38,6 +49,7 @@ def _item_from_form() -> dict:
         "size": forms.text("size"),
         "color": forms.text("color"),
         "tag_ids": request.form.getlist("tag_ids"),
+        "attributes": _attributes(meta),
     }
 
 
@@ -65,19 +77,22 @@ def _form_page(item: dict, is_new: bool, status: int = 200):
         is_new=is_new,
         types=client.get("/gear/types"),
         tags=client.get("/gear/tags"),
+        meta=client.get("/gear/meta"),
     )
     return page, status
 
 
 def _save(method: str, path: str, item_id: str | None):
     """Send the form to the API; show it again with the message if it is rejected."""
+    form = request.form
     submitted = {
-        **request.form.to_dict(),
-        "tag_ids": request.form.getlist("tag_ids"),
+        **form.to_dict(),
+        "tag_ids": form.getlist("tag_ids"),
         "id": item_id,
+        "attributes": {key[5:]: value for key, value in form.items() if key.startswith("attr_")},
     }
     try:
-        api().send(method, path, _item_from_form())
+        api().send(method, path, _item_from_form(api().get("/gear/meta")))
     except forms.FormError:
         flash(t("error.validation"), "error")
         return _form_page(submitted, item_id is None, 422)
@@ -112,6 +127,18 @@ def item_delete(item_id):
     api().send("DELETE", f"/gear/items/{item_id}")
     flash(t("common.deleted"), "success")
     return redirect(url_for("gear.item_list"))
+
+
+@blueprint.post("/<uuid:item_id>/favorite")
+@gear_page
+def item_favorite(item_id):
+    """The star in the list: mark as favourite or take the mark away."""
+    method = "PUT" if request.form.get("favorite") == "1" else "DELETE"
+    api().send(method, f"/gear/items/{item_id}/favorite")
+    back = request.form.get("back") or ""
+    # Only back to a page of this site.
+    safe = back.startswith("/") and not back.startswith("//")
+    return redirect(back if safe else url_for("gear.item_list"))
 
 
 @blueprint.get("/<uuid:item_id>/image")
@@ -168,11 +195,14 @@ def manage():
         if kind == "tag":
             client.send("POST", "/gear/tags", {"name": name, "color": forms.text("color")})
         else:
-            client.send("POST", "/gear/types", {"name": name})
+            client.send("POST", "/gear/types", {"name": name, "kind": forms.text("type_kind")})
         flash(t("common.saved"), "success")
         return redirect(url_for("gear.manage"))
     return render_template(
-        "gear/manage.html", types=client.get("/gear/types"), tags=client.get("/gear/tags")
+        "gear/manage.html",
+        types=client.get("/gear/types"),
+        tags=client.get("/gear/tags"),
+        meta=client.get("/gear/meta"),
     )
 
 

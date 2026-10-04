@@ -12,7 +12,8 @@
     <form method="post" action="{{ url_for('gear.item_image_upload', item_id=item.id) }}" enctype="multipart/form-data">
       {{ csrf() }}
       <label class="field"><span>{{ t('gear.image') }}</span>
-        <input type="file" name="file" accept="image/jpeg,image/png,image/webp" required></label>
+        <input type="file" name="file" accept="image/jpeg,image/png,image/webp" required>
+        <small>{{ t('gear.image_hint', formats=meta.image_formats|join(', '), size=meta.max_upload_mb) }}</small></label>
       <button>{{ t('gear.image_upload') }}</button>
     </form>
     {% if item.image_file_id %}
@@ -29,9 +30,25 @@
       <select name="type_id">
         <option value="">{{ t('gear.no_type') }}</option>
         {% for type in types %}
-        <option value="{{ type.id }}"{% if item.type_id == type.id %} selected{% endif %}>{{ type.name }}</option>
+        <option value="{{ type.id }}" data-kind="{{ type.kind or '' }}"{% if item.type_id == type.id %} selected{% endif %}>{{ type.name }}</option>
         {% endfor %}
       </select></label>
+    {# Extra fields that depend on the type; the script shows the ones that apply. #}
+    {% for kind in meta.kinds %}
+    <fieldset class="stack kind-fields" data-kind="{{ kind.kind }}"><legend>{{ t('gear.kind_fields', kind=t('gear.kind.' ~ kind.kind)) }}</legend>
+      {% for attribute in kind.attributes %}
+      {% set value = (item.attributes or {}).get(attribute.key) %}
+      {% if attribute.type == 'choice' %}
+      <label class="field"><span>{{ t('gear.attr.' ~ attribute.key) }}</span>
+        <select name="attr_{{ attribute.key }}"><option value="">{{ t('value.none') }}</option>
+          {% for option in attribute.options %}<option value="{{ option }}"{% if value == option %} selected{% endif %}>{{ option }}</option>{% endfor %}</select>
+        <small>{{ t('gear.attr_hint.' ~ attribute.key) }}</small></label>
+      {% else %}
+      {{ field('attr_' ~ attribute.key, t('gear.attr.' ~ attribute.key), value, attrs='inputmode="decimal"') }}
+      {% endif %}
+      {% endfor %}
+    </fieldset>
+    {% endfor %}
     {{ field('weight_g', t('gear.weight'), item.weight_g, attrs='inputmode="numeric"') }}
     {% if tags %}
     <fieldset class="field"><legend class="meta">{{ t('gear.tags') }}</legend>
@@ -46,10 +63,7 @@
         <option value="{{ value }}"{% if item.status == value %} selected{% endif %}>{{ t('gear.status.' ~ value) }}</option>
         {% endfor %}
       </select></label>
-    <div class="row">
-      {{ field('purchase_price', t('gear.price'), item.purchase_price, hint=t('gear.price_hint'), attrs='inputmode="decimal"') }}
-      {{ field('currency', t('gear.currency'), item.currency, attrs='maxlength="3" placeholder="CHF"') }}
-    </div>
+    {{ field('purchase_price', t('gear.price', currency=meta.currency), item.purchase_price, hint=t('gear.price_hint'), attrs='inputmode="decimal"') }}
     {{ field('purchase_date', t('gear.purchase_date'), item.purchase_date, type='date') }}
     <label class="field"><span>{{ t('gear.description') }}</span><textarea name="description">{{ item.description or '' }}</textarea></label>
     <label class="field"><span>{{ t('gear.notes') }}</span><textarea name="notes">{{ item.notes or '' }}</textarea></label>

@@ -35,3 +35,17 @@ for (const input of document.querySelectorAll("input[data-utc-target]")) {
 for (const input of document.querySelectorAll("input.select-on-focus")) {
   input.addEventListener("focus", () => input.select());
 }
+
+// Gear form: show only the extra fields that belong to the chosen type.
+for (const select of document.querySelectorAll('select[name="type_id"]')) {
+  const groups = select.form.querySelectorAll(".kind-fields");
+  const update = () => {
+    const kind = select.selectedOptions[0] ? select.selectedOptions[0].dataset.kind : "";
+    for (const group of groups) {
+      group.hidden = group.dataset.kind !== kind;
+      for (const input of group.querySelectorAll("input, select")) input.disabled = group.hidden;
+    }
+  };
+  select.addEventListener("change", update);
+  update();
+}
