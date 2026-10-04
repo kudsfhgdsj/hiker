@@ -7,7 +7,7 @@ import hashlib
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Integer, String, Uuid
+from sqlalchemy import Integer, String, Uuid, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from app.core.db import Base, UTCDateTime, utcnow
@@ -77,3 +77,15 @@ def delete_file(db: Session, storage: Storage, file_id: uuid.UUID | None) -> Non
     db.delete(file)
     db.commit()
     storage.delete(key)
+
+
+def delete_files_of_owner(db: Session, storage: Storage, owner_id: uuid.UUID) -> int:
+    """Delete everything a user stored, e.g. when the account is removed."""
+    files = list(db.scalars(select(FileObject).where(FileObject.owner_id == owner_id)))
+    keys = [file.storage_key for file in files]
+    for file in files:
+        db.delete(file)
+    db.commit()
+    for key in keys:
+        storage.delete(key)
+    return len(keys)

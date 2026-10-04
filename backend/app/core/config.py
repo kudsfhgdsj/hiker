@@ -23,6 +23,16 @@ class Settings(BaseSettings):
     max_upload_mb: int = Field(default=15, gt=0)
     image_max_edge_px: int = Field(default=2000, ge=200)
     rate_limit_enabled: bool = True
+    # Sign-in with password needs a second factor (TOTP); it is set up after the first login.
+    mfa_required: bool = True
+    # Single sign-on through OpenID Connect; empty issuer or client id = switched off.
+    oidc_issuer: str = ""
+    oidc_client_id: str = ""
+    oidc_client_secret: str = ""
+    oidc_name: str = "SSO"
+    oidc_scopes: str = "openid email profile"
+    # Accounts are linked and created by e-mail address only if the provider confirmed it.
+    oidc_require_verified_email: bool = True
     # Empty value disables the lookup at Open Food Facts.
     openfoodfacts_base_url: str = "https://world.openfoodfacts.org"
     openfoodfacts_cache_days: int = Field(default=30, gt=0)

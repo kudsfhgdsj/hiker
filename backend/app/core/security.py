@@ -29,18 +29,28 @@ def verify_password(password: str, password_hash: str | None) -> bool:
     return password_hash is not None
 
 
-def create_access_token(user_id: uuid.UUID) -> tuple[str, int]:
-    """Return a signed access token and its lifetime in seconds."""
+def create_access_token(user_id: uuid.UUID, method: str = "pwd") -> tuple[str, int]:
+    """Return a signed access token and its lifetime in seconds.
+
+    `method` says how the user signed in: `pwd` (password only), `mfa` (password and
+    one-time code) or `sso`.
+    """
     settings = get_settings()
     lifetime = timedelta(minutes=settings.access_token_ttl_minutes)
     now = utcnow()
-    payload = {"sub": str(user_id), "type": "access", "iat": now, "exp": now + lifetime}
+    payload = {
+        "sub": str(user_id),
+        "type": "access",
+        "amr": method,
+        "iat": now,
+        "exp": now + lifetime,
+    }
     token = jwt.encode(payload, settings.secret_key, algorithm=JWT_ALGORITHM)
     return token, int(lifetime.total_seconds())
 
 
-def decode_access_token(token: str) -> uuid.UUID | None:
-    """Return the user id of a valid access token, otherwise None."""
+def decode_access(token: str) -> tuple[uuid.UUID, str] | None:
+    """Return user id and sign-in method of a valid access token, otherwise None."""
     try:
         payload = jwt.decode(
             token,
@@ -50,9 +60,15 @@ def decode_access_token(token: str) -> uuid.UUID | None:
         )
         if payload.get("type") != "access":
             return None
-        return uuid.UUID(payload["sub"])
+        return uuid.UUID(payload["sub"]), str(payload.get("amr") or "pwd")
     except (jwt.InvalidTokenError, ValueError):
         return None
+
+
+def decode_access_token(token: str) -> uuid.UUID | None:
+    """Return the user id of a valid access token, otherwise None."""
+    decoded = decode_access(token)
+    return decoded[0] if decoded else None
 
 
 def new_refresh_token() -> tuple[str, str]:

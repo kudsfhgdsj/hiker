@@ -20,7 +20,8 @@ def test_register_returns_user_and_tokens(client):
     assert data["token_type"] == "bearer"
     assert data["expires_in"] == 15 * 60
     assert data["access_token"] and data["refresh_token"]
-    assert "password" not in str(data)
+    # Neither the password nor its hash comes back.
+    assert PASSWORD not in str(data) and "password_hash" not in str(data)
 
 
 def test_password_is_stored_hashed(client, db):

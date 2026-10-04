@@ -7,6 +7,8 @@ os.environ.update(
         "DATABASE_URL": "sqlite://",
         "PUBLIC_BASE_URL": "http://testserver",
         "ENABLED_MODULES": "auth,gear,nutrition,protocols,sync,maps",
+        # Most tests sign in with a password only; test_auth_security.py switches it on.
+        "MFA_REQUIRED": "false",
         "REGISTRATION_MODE": "open",
         "ACCESS_TOKEN_TTL_MINUTES": "15",
         "REFRESH_TOKEN_TTL_DAYS": "30",
@@ -188,7 +190,7 @@ def storage(tmp_path):
     return LocalFsStorage(tmp_path / "files")
 
 
-PASSWORD = "correct-horse-battery"
+PASSWORD = "Correct-Horse-7"
 
 
 def make_image(size=(64, 48), image_format="JPEG", mode="RGB", exif_gps=False) -> bytes:

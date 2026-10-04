@@ -78,6 +78,13 @@ services:
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?PUBLIC_BASE_URL fehlt in .env}
       ENABLED_MODULES: ${ENABLED_MODULES:-auth,gear,nutrition,protocols,sync,maps}
       REGISTRATION_MODE: ${REGISTRATION_MODE:-open}
+      MFA_REQUIRED: ${MFA_REQUIRED:-true}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_NAME: ${OIDC_NAME:-SSO}
+      OIDC_SCOPES: ${OIDC_SCOPES:-openid email profile}
+      OIDC_REQUIRE_VERIFIED_EMAIL: ${OIDC_REQUIRE_VERIFIED_EMAIL:-true}
       STORAGE_PATH: /data/files
       TILE_CACHE_PATH: /data/tiles
       TILE_CACHE_DAYS: ${TILE_CACHE_DAYS:-14}
