@@ -24,15 +24,25 @@ for area in "$@"; do
     *[!a-z0-9-]*|"") echo "Ungültiger Gebietsname: $area" >&2; exit 1 ;;
   esac
   echo "== $area =="
-  # Erst in eine eigene Datei bauen und dann umbenennen: die API sieht nie eine halbe Karte.
+  # 1. Grundkarte (OpenMapTiles-Schema); lädt dabei den OSM-Auszug.
   docker compose --profile mapbuild run --rm mapbuild \
     --download --area="$area" \
     --download-dir=/data/build/sources --tmpdir=/data/build/tmp \
-    --output="/data/build/$area.mbtiles" --force
+    --output="/data/build/$area.base.mbtiles" --force
+  # 2. Wege mit ihrer Schwierigkeit (SAC-Skala, Klettersteige) aus demselben Auszug.
+  docker compose --profile mapbuild run --rm mapbuild \
+    generate-custom --schema=/schema/hiking.yml --area="$area" \
+    --tmpdir=/data/build/tmp \
+    --output="/data/build/$area.paths.mbtiles" --force
+  # 3. Beides zu einer Datei zusammenfügen. Erst danach umbenennen: die API sieht nie
+  #    eine halbe Karte.
+  docker compose --profile mapbuild run --rm mapmerge \
+    "/data/build/$area.base.mbtiles" "/data/build/$area.paths.mbtiles" "/data/build/$area.mbtiles"
   DATA_DIR="${DATA_DIR:-$(sed -n 's/^DATA_DIR=//p' .env 2>/dev/null | tail -n 1)}"
   DATA_DIR="${DATA_DIR:-./data}"
   mv "$DATA_DIR/maps/build/$area.mbtiles" "$DATA_DIR/maps/$area.mbtiles"
-  # Der OSM-Auszug wird nicht mehr gebraucht; die Hilfsdaten bleiben für den nächsten Lauf.
-  rm -f "$DATA_DIR/maps/build/sources/$area.osm.pbf"
+  # Zwischenergebnisse und OSM-Auszug werden nicht mehr gebraucht; die Hilfsdaten bleiben.
+  rm -f "$DATA_DIR/maps/build/$area.base.mbtiles" "$DATA_DIR/maps/build/$area.paths.mbtiles" \
+    "$DATA_DIR/maps/build/sources/$area.osm.pbf"
   ls -lh "$DATA_DIR/maps/$area.mbtiles"
 done

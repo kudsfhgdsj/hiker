@@ -90,6 +90,21 @@ window.hikerMapLayers = (map, texts) => {
       apply(on);
     }
 
+    // --- What the colours of the paths mean ---
+    if (meta.legend && meta.legend.length) {
+      panel.append(document.createElement("hr"));
+      const legend = document.createElement("div");
+      legend.className = "map-legend paths";
+      legend.append(`${texts.paths} `);
+      for (const entry of meta.legend) {
+        const swatch = document.createElement("i");
+        swatch.style.background = entry.color;
+        legend.append(swatch, entry.label);
+      }
+      legend.title = texts.pathsNote;
+      panel.append(legend);
+    }
+
     // --- 2D / 3D: the map is lifted by the elevation data and tilted ---
     if (meta.terrain && map.setTerrain) {
       const apply = (on) => {

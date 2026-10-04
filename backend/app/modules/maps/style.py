@@ -18,6 +18,9 @@ WATER = "#a8d0ea"
 WATER_LINE = "#7db4d8"
 PATH = "#b5342a"
 # Not "#ffffffcc": the map library of the app does not read colours with eight digits.
+# T1 … T6 on the SAC scale, and via ferratas.
+DIFFICULTY = ["#e3b000", "#e2452f", "#a31621", "#2f7fd6", "#17479e", "#111111"]
+VIA_FERRATA = "#6b21a8"
 HALO = "rgba(255, 255, 255, 0.8)"
 
 
@@ -226,6 +229,46 @@ def build_style(
             minzoom=11,
             cap="butt",
         ),
+        # The difficulty of a path on the SAC hiking scale, where the data names it:
+        # yellow for hiking paths, red for mountain paths, blue for alpine routes.
+        _line(
+            "path-difficulty",
+            "hiking",
+            ["has", "sac_scale"],
+            {
+                "line-color": [
+                    "match",
+                    ["get", "sac_scale"],
+                    "hiking",
+                    DIFFICULTY[0],
+                    "mountain_hiking",
+                    DIFFICULTY[1],
+                    "demanding_mountain_hiking",
+                    DIFFICULTY[2],
+                    "alpine_hiking",
+                    DIFFICULTY[3],
+                    "demanding_alpine_hiking",
+                    DIFFICULTY[4],
+                    "difficult_alpine_hiking",
+                    DIFFICULTY[5],
+                    PATH,
+                ],
+                "line-width": _width((11, 0.9), (14, 1.8), (18, 4)),
+            },
+            minzoom=11,
+        ),
+        _line(
+            "via-ferrata",
+            "hiking",
+            ["==", ["get", "highway"], "via_ferrata"],
+            {
+                "line-color": VIA_FERRATA,
+                "line-width": _width((11, 1.0), (14, 2.2), (18, 4.5)),
+                "line-dasharray": [1, 1.5],
+            },
+            minzoom=11,
+            cap="butt",
+        ),
         _line(
             "boundary",
             "boundary",
@@ -396,7 +439,18 @@ def build_style(
             "attribution": attribution,
         }
     }
-    hiker: dict = {"bases": [{"id": "map", "show": [], "hide": []}], "overlays": []}
+    hiker: dict = {
+        "bases": [{"id": "map", "show": [], "hide": []}],
+        "overlays": [],
+        # What the colours of the paths mean.
+        "legend": [
+            *(
+                {"label": f"T{level + 1}", "color": colour}
+                for level, colour in enumerate(DIFFICULTY)
+            ),
+            {"label": "KS", "color": VIA_FERRATA},
+        ],
+    }
     # What an aerial image replaces: the drawn ground, not paths, water lines and names.
     ground = [
         layer["id"]

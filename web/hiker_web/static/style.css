@@ -120,6 +120,7 @@ del { color: #c62828; } ins { color: #2e7d32; text-decoration: none; }
 .map-layers-panel small { color: #666; max-width: 17rem; margin: -.15rem 0 .15rem 1.4rem; }
 .map-layers-panel hr { width: 100%; border: 0; border-top: 1px solid #0002; margin: .1rem 0; }
 .map-legend { display: inline-flex; align-items: center; gap: .2rem; margin-left: .5rem; color: #555; }
+.map-legend.paths { margin-left: 0; flex-wrap: wrap; max-width: 18rem; }
 .map-legend i { width: .8rem; height: .8rem; border-radius: 2px; display: inline-block; margin-left: .2rem; }
 #map.tall { height: 30rem; }
 dl.facts[hidden] { display: none; }

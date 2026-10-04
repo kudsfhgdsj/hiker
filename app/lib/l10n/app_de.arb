@@ -575,5 +575,6 @@
   "mapOverlayPrecipitation": "Niederschlag",
   "mapAvalancheNote": "Höchste Gefahrenstufe des Tages je Region: 1 grün, 2 gelb, 3 orange, 4 rot, 5 schwarz. Maßgeblich ist das Bulletin des Lawinenwarndienstes.",
   "mapSnowNote": "Satellitenbild des letzten Tages; Wolken verdecken den Boden.",
-  "mapPrecipitationNote": "Aus Satellitendaten, einige Stunden alt und grob."
+  "mapPrecipitationNote": "Aus Satellitendaten, einige Stunden alt und grob.",
+  "mapPaths": "Wege (SAC-Skala, KS = Klettersteig):"
 }

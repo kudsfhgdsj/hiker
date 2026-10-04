@@ -1,0 +1,38 @@
+# Zusatz-Ebene der eigenen Karte: Wege mit ihrer Schwierigkeit.
+# Das OpenMapTiles-Schema kennt die SAC-Wanderskala und Klettersteige nicht; diese Ebene
+# trägt sie nach. deploy/build-map.sh baut sie mit Planetiler und fügt sie in die Karte ein.
+schema_name: hiker hiking paths
+schema_description: Paths with their difficulty on the SAC hiking scale, and via ferratas
+attribution: © OpenStreetMap contributors
+args:
+  area:
+    description: Geofabrik area, e.g. switzerland
+    default: switzerland
+sources:
+  osm:
+    type: osm
+    url: '${ "geofabrik:" + args.area }'
+    local_path: '${ "/data/build/sources/" + args.area + ".osm.pbf" }'
+layers:
+  - id: hiking
+    features:
+      - source: osm
+        geometry: line
+        min_zoom: 11
+        include_when:
+          sac_scale:
+            - hiking
+            - mountain_hiking
+            - demanding_mountain_hiking
+            - alpine_hiking
+            - demanding_alpine_hiking
+            - difficult_alpine_hiking
+          highway: via_ferrata
+        attributes:
+          - key: sac_scale
+            tag_value: sac_scale
+          - key: highway
+            tag_value: highway
+          - key: name
+            tag_value: name
+            min_zoom: 14

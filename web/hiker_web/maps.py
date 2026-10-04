@@ -52,6 +52,8 @@ def map_config(attribution: str) -> dict:
                 "precipitation": t("map.note.precipitation"),
             },
             "terrain": t("map.terrain"),
+            "paths": t("map.paths"),
+            "pathsNote": t("map.paths_note"),
             "from": t("map.from"),
         },
     }

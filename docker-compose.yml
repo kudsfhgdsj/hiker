@@ -194,7 +194,23 @@ services:
       - /tmp
     volumes:
       - ${DATA_DIR:-./data}/maps:/data
+      # Schema der Zusatz-Ebene mit der Schwierigkeit der Wege.
+      - ./deploy/map:/schema:ro
     cpus: ${MAP_BUILD_CPUS:-2.0}
+
+  # Fügt Grundkarte und Wege-Ebene zu einer Datei je Gebiet zusammen (Teil von build-map.sh).
+  mapmerge:
+    build: ./backend
+    profiles: ["mapbuild"]
+    restart: "no"
+    <<: *unprivileged
+    entrypoint: ["python", "-m", "app.modules.maps.merge"]
+    tmpfs:
+      - /tmp
+    volumes:
+      - ${DATA_DIR:-./data}/maps:/data
+    cpus: 1.0
+    mem_limit: 1g
 
   # Reverse Proxy mit selbst ausgestelltem Zertifikat. Nur mit dem Profil "proxy" aktiv
   # (COMPOSE_PROFILES=proxy in der .env), damit der Stack auf einem Server mit eigenem

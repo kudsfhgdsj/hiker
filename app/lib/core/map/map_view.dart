@@ -186,6 +186,14 @@ Map<String, dynamic>? mapLayerOptions(String? styleJson) {
   return (metadata as Map<String, dynamic>?)?['hiker'] as Map<String, dynamic>?;
 }
 
+/// "#e3b000" → colour; grey for anything else.
+Color _hexColor(String text) {
+  final value = int.tryParse(text.replaceFirst('#', ''), radix: 16);
+  return value == null || text.length != 7
+      ? const Color(0xFF888888)
+      : Color(0xFF000000 | value);
+}
+
 /// The sheet in which the user chooses base map and overlays.
 class MapLayerSheet extends ConsumerWidget {
   const MapLayerSheet({super.key, required this.options});
@@ -243,6 +251,35 @@ class MapLayerSheet extends ConsumerWidget {
                     RadioListTile<String>(
                       value: base['id'] as String,
                       title: Text(baseLabel(base['id'] as String)),
+                    ),
+                ],
+              ),
+            ),
+          if (options['legend'] case final List<dynamic> legend
+              when legend.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(l10n.mapPaths),
+                  for (final entry in legend.cast<Map<String, dynamic>>())
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 14,
+                          height: 14,
+                          margin: const EdgeInsets.only(right: 4),
+                          decoration: BoxDecoration(
+                            color: _hexColor(entry['color'] as String),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                        Text(entry['label'] as String),
+                      ],
                     ),
                 ],
               ),

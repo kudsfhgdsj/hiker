@@ -6,6 +6,7 @@ import sqlite3
 import pytest
 
 from app.core.config import get_settings
+from app.modules.maps.merge import merge
 from app.modules.maps.style import build_style
 from app.tests.conftest import auth_header, register
 
@@ -164,3 +165,62 @@ def test_glyphs_of_the_fonts_are_served(client):
     # Several fonts in one request: the first one known answers.
     stack = client.get("/api/v1/maps/fonts/Unknown,Noto Sans Bold/0-255.pbf")
     assert stack.status_code == 200 and len(stack.content) > 10_000
+
+
+# --- Joining the base map and the paths with their difficulty ---
+
+
+def test_layers_of_a_second_map_are_added_to_the_first(tmp_path):
+    def build(path, tiles: dict, layer: str):
+        with sqlite3.connect(path) as db:
+            db.execute("CREATE TABLE metadata (name TEXT, value TEXT)")
+            db.execute(
+                "CREATE TABLE tiles"
+                " (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_data BLOB)"
+            )
+            meta = {"format": "pbf", "bounds": "9,47,10,47.5", "minzoom": "0", "maxzoom": "14"}
+            meta["json"] = json.dumps({"vector_layers": [{"id": layer}]})
+            db.executemany("INSERT INTO metadata VALUES (?, ?)", meta.items())
+            for (z, x, y), data in tiles.items():
+                db.execute("INSERT INTO tiles VALUES (?, ?, ?, ?)", (z, x, y, gzip.compress(data)))
+
+    build(tmp_path / "base.mbtiles", {(12, 1, 1): b"BASE", (12, 2, 2): b"only base"}, "water")
+    build(tmp_path / "paths.mbtiles", {(12, 1, 1): b"PATHS", (12, 3, 3): b"only paths"}, "hiking")
+
+    count = merge(tmp_path / "base.mbtiles", tmp_path / "paths.mbtiles", tmp_path / "alps.mbtiles")
+
+    assert count == 2
+    with sqlite3.connect(tmp_path / "alps.mbtiles") as db:
+        tiles = {
+            (z, x, y): gzip.decompress(data) for z, x, y, data in db.execute("SELECT * FROM tiles")
+        }
+        meta = dict(db.execute("SELECT name, value FROM metadata"))
+    # A vector tile is a list of layers: both contents, one after the other.
+    assert tiles == {
+        (12, 1, 1): b"BASEPATHS",
+        (12, 2, 2): b"only base",
+        (12, 3, 3): b"only paths",
+    }
+    assert [layer["id"] for layer in json.loads(meta["json"])["vector_layers"]] == [
+        "water",
+        "hiking",
+    ]
+    assert meta["bounds"] == "9,47,10,47.5" and meta["format"] == "pbf"
+
+
+def test_paths_are_coloured_by_their_difficulty():
+    style = build_style("tiles/{z}/{x}/{y}", "fonts/{fontstack}/{range}", "©", 14)
+    layers = {layer["id"]: layer for layer in style["layers"]}
+    order = [layer["id"] for layer in style["layers"]]
+
+    difficulty = layers["path-difficulty"]
+    assert difficulty["source-layer"] == "hiking"
+    # Drawn over the plain paths, under the names.
+    assert order.index("path") < order.index("path-difficulty") < order.index("peak-name")
+    colours = difficulty["paint"]["line-color"]
+    assert colours[:2] == ["match", ["get", "sac_scale"]]
+    assert "difficult_alpine_hiking" in colours and "hiking" in colours
+    assert layers["via-ferrata"]["filter"] == ["==", ["get", "highway"], "via_ferrata"]
+    # What the colours mean travels with the style.
+    legend = style["metadata"]["hiker"]["legend"]
+    assert [entry["label"] for entry in legend] == ["T1", "T2", "T3", "T4", "T5", "T6", "KS"]

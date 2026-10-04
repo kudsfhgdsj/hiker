@@ -299,6 +299,10 @@ TEXTS = {
     "map.note.snow": "Satellitenbild des letzten Tages; Wolken verdecken den Boden.",
     "map.note.precipitation": "Aus Satellitendaten, einige Stunden alt und grob.",
     "map.terrain": "3D-Gelände",
+    "map.paths": "Wege:",
+    "map.paths_note": (
+        "Schwierigkeit nach SAC-Wanderskala, wo OpenStreetMap sie nennt; KS = Klettersteig."
+    ),
     "map.from": "ab",
     "plan.new": "Neue Route",
     "plan.empty": "Noch keine geplanten Routen.",

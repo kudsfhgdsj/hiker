@@ -250,10 +250,8 @@ def test_switchable_layers_start_hidden_and_keep_their_place():
 
     plain = build_style("t", "g", "©", 14)
     assert set(plain["sources"]) == {"hiker"}
-    assert plain["metadata"]["hiker"] == {
-        "bases": [{"id": "map", "show": [], "hide": []}],
-        "overlays": [],
-    }
+    assert plain["metadata"]["hiker"]["bases"] == [{"id": "map", "show": [], "hide": []}]
+    assert plain["metadata"]["hiker"]["overlays"] == []
 
 
 # --- Contour lines ---
