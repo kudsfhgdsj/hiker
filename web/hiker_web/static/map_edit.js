@@ -40,6 +40,7 @@
     zoom: positions.length ? 12 : 6,
   });
   map.addControl(new maplibregl.NavigationControl(), "top-right");
+  if (window.hikerMapLayers) window.hikerMapLayers(map, data.layerTexts);
   map.getCanvas().style.cursor = "crosshair";
   if (positions.length > 1) {
     const bounds = positions.reduce(

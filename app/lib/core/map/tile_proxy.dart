@@ -17,7 +17,9 @@ import 'map_regions.dart';
 /// - `/{z}/{x}/{y}.png`: raster tiles of the user's server,
 /// - `/vector/{z}/{x}/{y}.pbf`: tiles of the own vector map, first from a map
 ///   file on the device (see [MapRegionStore]), else from the user's server,
-/// - `/fonts/{font}/{range}.pbf`: the glyphs for the labels.
+/// - `/fonts/{font}/{range}.pbf`: the glyphs for the labels,
+/// - `/raster/{layer}/{z}/{x}/{y}` and `/slope/{z}/{x}/{y}.png`: elevation,
+///   aerial images and the slope layer of the user's server.
 ///
 /// What comes from the server goes over the connection the app trusts (also
 /// with a certificate the user confirmed by hand) and is kept as a file. A
@@ -32,6 +34,10 @@ class TileProxy extends Notifier<int?> {
   static final _glyphs = RegExp(
     r'^/fonts/([\w ,%-]{1,200})/(\d{1,5}-\d{1,5})\.pbf$',
   );
+  static final _layer = RegExp(
+    r'^/raster/(terrain|satellite)/(\d{1,2})/(\d{1,7})/(\d{1,7})$',
+  );
+  static final _slope = RegExp(r'^/slope/(\d{1,2})/(\d{1,7})/(\d{1,7})\.png$');
   static const _freshFor = Duration(days: 7);
 
   /// Above this size the files not used for the longest time are removed.
@@ -233,6 +239,22 @@ class TileProxy extends Notifier<int?> {
           cacheName:
               'fonts/${font.replaceAll(RegExp(r'[^\w ,-]'), '_')}/${glyphs[2]}.pbf',
           type: _protobuf,
+        );
+      } else if (_layer.firstMatch(path) case final layer?) {
+        final tile = '${layer[2]}/${layer[3]}/${layer[4]}';
+        await _fromServer(
+          response,
+          apiPath: '/api/v1/maps/raster/${layer[1]}/$tile',
+          cacheName: 'raster/${layer[1]}/$tile',
+          type: layer[1] == 'terrain' ? _png : ContentType('image', 'jpeg'),
+        );
+      } else if (_slope.firstMatch(path) case final slope?) {
+        final tile = '${slope[1]}/${slope[2]}/${slope[3]}.png';
+        await _fromServer(
+          response,
+          apiPath: '/api/v1/maps/slope/$tile',
+          cacheName: 'slope/$tile',
+          type: _png,
         );
       } else {
         response.statusCode = HttpStatus.notFound;

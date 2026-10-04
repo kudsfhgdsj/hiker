@@ -76,6 +76,7 @@
 
 <script type="application/json" id="plan-data">{{ plan_data|tojson }}</script>
 <script src="{{ url_for('static', filename='vendor/maplibre-gl/maplibre-gl-csp.js') }}" defer></script>
+<script src="{{ url_for('static', filename='map_layers.js') }}" defer></script>
 <script src="{{ url_for('static', filename='profile.js') }}" defer></script>
 <script src="{{ url_for('static', filename='plan.js') }}" defer></script>
 {% endblock %}

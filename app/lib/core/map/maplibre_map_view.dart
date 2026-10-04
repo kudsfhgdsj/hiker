@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
+import '../../l10n/app_localizations.dart';
 import 'geo.dart';
 import 'map_view.dart';
 
@@ -16,6 +17,9 @@ class MapLibreMapView extends StatefulWidget {
     required this.content,
     required this.tileUrl,
     this.styleJson,
+    this.layerOptions,
+    this.layerChoice = const MapLayerChoice(),
+    this.layerSheet,
   });
 
   final MapContent content;
@@ -25,6 +29,13 @@ class MapLibreMapView extends StatefulWidget {
 
   /// Style of the own vector map; null shows the raster tiles.
   final String? styleJson;
+
+  /// What the style offers to switch (see [mapLayerOptions]) and what is chosen.
+  final Map<String, dynamic>? layerOptions;
+  final MapLayerChoice layerChoice;
+
+  /// Builds the sheet for choosing layers; null hides the button.
+  final WidgetBuilder? layerSheet;
 
   @override
   State<MapLibreMapView> createState() => _MapLibreMapViewState();
@@ -87,10 +98,53 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
     ],
   };
 
+  /// Shows the layers of the chosen base map and overlays, hides the others.
+  Future<void> _applyLayerChoice() async {
+    final controller = _controller;
+    final options = widget.layerOptions;
+    if (controller == null || options == null || !_styleLoaded) return;
+    final choice = widget.layerChoice;
+    final bases = (options['bases'] as List<dynamic>)
+        .cast<Map<String, dynamic>>();
+    final chosen = bases.firstWhere(
+      (base) => base['id'] == choice.base,
+      orElse: () => bases.first,
+    );
+    List<String> names(Map<String, dynamic> entry, String key) =>
+        (entry[key] as List<dynamic>).cast<String>();
+    final visible = <String, bool>{};
+    for (final base in bases) {
+      for (final layer in names(base, 'show')) {
+        visible[layer] = identical(base, chosen);
+      }
+      for (final layer in names(base, 'hide')) {
+        visible[layer] = true;
+      }
+    }
+    for (final layer in names(chosen, 'hide')) {
+      visible[layer] = false;
+    }
+    for (final overlay
+        in (options['overlays'] as List<dynamic>)
+            .cast<Map<String, dynamic>>()) {
+      for (final layer in names(overlay, 'layers')) {
+        visible[layer] = choice.overlays.contains(overlay['id']);
+      }
+    }
+    for (final entry in visible.entries) {
+      try {
+        await controller.setLayerVisibility(entry.key, entry.value);
+      } on Exception {
+        // A layer the style does not have: nothing to switch.
+      }
+    }
+  }
+
   @override
   void didUpdateWidget(MapLibreMapView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!_styleLoaded) return;
+    if (oldWidget.layerChoice != widget.layerChoice) _applyLayerChoice();
     if (!listEquals(oldWidget.content.track, widget.content.track)) {
       _controller?.setGeoJsonSource(_source, _trackGeoJson());
     }
@@ -112,6 +166,7 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
       ),
     );
     _styleLoaded = true;
+    await _applyLayerChoice();
     final bounds = GeoBounds.around(_everything);
     if (bounds != null) {
       await controller.moveCamera(
@@ -273,6 +328,24 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
             ),
           ),
           ..._overlay(),
+          if (widget.layerSheet != null && widget.content.interactive)
+            Positioned(
+              left: 8,
+              top: 8,
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                shape: const CircleBorder(),
+                elevation: 2,
+                child: IconButton(
+                  tooltip: AppLocalizations.of(context).mapLayers,
+                  icon: const Icon(Icons.layers_outlined),
+                  onPressed: () => showModalBottomSheet<void>(
+                    context: context,
+                    builder: widget.layerSheet!,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

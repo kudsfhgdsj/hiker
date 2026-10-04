@@ -563,5 +563,10 @@
   "offlineMaps": "Karten",
   "offlineMapsIntro": "Eine geladene Karte zeigt die App auch ohne Verbindung. Dein Server baut sie selbst aus OpenStreetMap-Daten (ODbL).",
   "offlineMapsNone": "Dieser Server bietet keine Karten zum Herunterladen an.",
-  "offlineSegments": "Wegdaten für die Planung"
+  "offlineSegments": "Wegdaten für die Planung",
+  "mapLayers": "Ebenen",
+  "mapBaseMap": "Karte",
+  "mapBaseSatellite": "Luftbild",
+  "mapOverlaySlope": "Hangneigung",
+  "mapSlopeLegend": "Gelb ab 30°, orange ab 35°, rot ab 40°, violett ab 45°"
 }

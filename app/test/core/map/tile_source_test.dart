@@ -183,6 +183,36 @@ void main() {
               ],
               'maxzoom': 14,
             },
+            'terrain': {
+              'type': 'raster-dem',
+              'tiles': [
+                'https://hiker.example.org/api/v1/maps/raster/terrain/{z}/{x}/{y}',
+              ],
+            },
+            'slope': {
+              'type': 'raster',
+              'tiles': [
+                'https://hiker.example.org/api/v1/maps/slope/{z}/{x}/{y}.png',
+              ],
+            },
+          },
+          'metadata': {
+            'hiker': {
+              'bases': [
+                {'id': 'map', 'show': <String>[], 'hide': <String>[]},
+                {
+                  'id': 'satellite',
+                  'show': ['satellite'],
+                  'hide': ['wood'],
+                },
+              ],
+              'overlays': [
+                {
+                  'id': 'slope',
+                  'layers': ['slope'],
+                },
+              ],
+            },
           },
           'layers': <dynamic>[],
         }),
@@ -208,6 +238,17 @@ void main() {
         'http://127.0.0.1:$port/vector/{z}/{x}/{y}.pbf',
       ]);
       expect(source['maxzoom'], 14);
+      final sources = style['sources'] as Map;
+      expect((sources['terrain'] as Map)['tiles'], [
+        'http://127.0.0.1:$port/raster/terrain/{z}/{x}/{y}',
+      ]);
+      expect((sources['slope'] as Map)['tiles'], [
+        'http://127.0.0.1:$port/slope/{z}/{x}/{y}.png',
+      ]);
+      // What can be switched travels with the style.
+      final options = mapLayerOptions(jsonEncode(style))!;
+      expect((options['bases'] as List).length, 2);
+      expect(mapLayerOptions(null), isNull);
 
       // Without network the style seen before is used.
       api.offline = true;
@@ -237,6 +278,9 @@ void main() {
           );
           request.response.headers.set('content-encoding', 'gzip');
           request.response.add([31, 139, 9, 9]);
+        } else if (request.uri.path.contains('/raster/') ||
+            request.uri.path.contains('/slope/')) {
+          request.response.add([1, 2, 3]);
         } else if (request.uri.path.contains('/fonts/')) {
           request.response.add([7, 7, 7]);
         } else {
@@ -297,6 +341,18 @@ void main() {
         '/api/v1/maps/fonts/Noto%20Sans%20Regular/0-255.pbf',
       ]);
 
+      // Elevation, aerial images and slope come from the server and are kept too.
+      expect((await get('/raster/terrain/12/2153/1436')).$2, [1, 2, 3]);
+      expect((await get('/raster/satellite/12/2153/1436')).$2, [1, 2, 3]);
+      expect((await get('/slope/12/2153/1436.png')).$2, [1, 2, 3]);
+      expect((await get('/raster/other/12/2153/1436')).$1, 404);
+      expect(asked.sublist(3), [
+        '/api/v1/maps/raster/terrain/12/2153/1436',
+        '/api/v1/maps/raster/satellite/12/2153/1436',
+        '/api/v1/maps/slope/12/2153/1436.png',
+      ]);
+      asked.removeRange(3, asked.length);
+
       // What was seen stays without network, also "nothing there".
       await upstream.close(force: true);
       expect((await get('/vector/10/538/360.pbf')).$2, [31, 139, 9, 9]);
@@ -308,9 +364,28 @@ void main() {
       ]);
       expect((await get('/vector/10/2/2.pbf')).$1, 502);
 
+      expect((await get('/slope/12/2153/1436.png')).$2, [1, 2, 3]);
       // A removed map no longer answers.
       await store.delete('switzerland');
       expect((await get('/vector/10/538/359.pbf')).$1, 502);
+    });
+  });
+
+  group('layer choice', () {
+    test('base and overlays are chosen independently', () {
+      final container = createContainer(api: FakeApi());
+      final notifier = container.read(mapLayerChoiceProvider.notifier);
+
+      expect(container.read(mapLayerChoiceProvider), const MapLayerChoice());
+      notifier.setOverlay('slope', on: true);
+      notifier.setBase('satellite');
+      expect(
+        container.read(mapLayerChoiceProvider),
+        const MapLayerChoice(base: 'satellite', overlays: {'slope'}),
+      );
+      notifier.setOverlay('slope', on: false);
+      expect(container.read(mapLayerChoiceProvider).overlays, isEmpty);
+      expect(container.read(mapLayerChoiceProvider).base, 'satellite');
     });
   });
 }

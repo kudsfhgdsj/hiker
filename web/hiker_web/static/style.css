@@ -111,6 +111,15 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 .conflict { border-color: #c62828; }
 del { color: #c62828; } ins { color: #2e7d32; text-decoration: none; }
 .checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .25rem 1rem; }
+.map-layers { display: grid; justify-items: start; gap: .25rem; }
+.map-layers-button { padding: .3rem .7rem; border-radius: .4rem; border: 0; background: #fff; color: #222;
+  box-shadow: 0 0 0 2px #0002; font: inherit; font-size: .85rem; cursor: pointer; }
+.map-layers-panel { display: grid; gap: .3rem; padding: .6rem .8rem; border-radius: .5rem; background: #fff;
+  color: #222; box-shadow: 0 0 0 2px #0002; font-size: .85rem; }
+.map-layers-panel[hidden] { display: none; }
+.map-layers-panel hr { width: 100%; border: 0; border-top: 1px solid #0002; margin: .1rem 0; }
+.map-legend { display: inline-flex; align-items: center; gap: .2rem; margin-left: .5rem; color: #555; }
+.map-legend i { width: .8rem; height: .8rem; border-radius: 2px; display: inline-block; margin-left: .2rem; }
 #map.tall { height: 30rem; }
 dl.facts[hidden] { display: none; }
 #map.plan { height: min(36rem, 70vh); }

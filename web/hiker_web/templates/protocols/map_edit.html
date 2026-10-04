@@ -17,6 +17,7 @@
 <script type="application/json" id="tour-data">{{ map_data|tojson }}</script>
 <script type="application/json" id="map-texts">{{ {'pick': t('map.pick_hint'), 'draw': t('map.draw_hint')}|tojson }}</script>
 <script src="{{ url_for('static', filename='vendor/maplibre-gl/maplibre-gl-csp.js') }}" defer></script>
+<script src="{{ url_for('static', filename='map_layers.js') }}" defer></script>
 <script src="{{ url_for('static', filename='map_edit.js') }}" defer></script>
 
 <section id="waypoints">

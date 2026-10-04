@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../config/app_config.dart';
 import '../db/app_database.dart';
 import '../network/api_client.dart';
@@ -111,34 +112,159 @@ final mapStyleProvider = FutureProvider<String?>((ref) async {
   }
   if (style == null) return null;
   if (port != null) {
+    // Everything the style loads from the server's maps module goes through
+    // the map server of the app instead.
     final local = 'http://127.0.0.1:$port';
+    const marker = '/api/v1/maps/';
     style = {
       ...style,
       'glyphs': '$local/fonts/{fontstack}/{range}.pbf',
       'sources': {
         for (final entry in (style['sources'] as Map<String, dynamic>).entries)
-          entry.key: (entry.value as Map<String, dynamic>)['type'] == 'vector'
-              ? {
-                  ...entry.value as Map<String, dynamic>,
-                  'tiles': ['$local/vector/{z}/{x}/{y}.pbf'],
-                }
-              : entry.value,
+          entry.key: {
+            ...entry.value as Map<String, dynamic>,
+            if ((entry.value as Map<String, dynamic>)['tiles']
+                case final List<dynamic> tiles)
+              'tiles': [
+                for (final tile in tiles.cast<String>())
+                  tile.contains(marker)
+                      ? '$local/${tile.substring(tile.indexOf(marker) + marker.length)}'
+                      : tile,
+              ],
+          },
       },
     };
   }
   return jsonEncode(style);
 });
 
+/// Which layers of the map the user switched on; the same for every map in
+/// the app.
+class MapLayerChoice {
+  const MapLayerChoice({this.base = 'map', this.overlays = const {}});
+
+  /// `map` (the drawn map) or `satellite` (aerial image under paths and names).
+  final String base;
+  final Set<String> overlays;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MapLayerChoice &&
+      other.base == base &&
+      other.overlays.length == overlays.length &&
+      other.overlays.containsAll(overlays);
+
+  @override
+  int get hashCode => Object.hash(base, Object.hashAllUnordered(overlays));
+}
+
+class MapLayerChoiceNotifier extends Notifier<MapLayerChoice> {
+  @override
+  MapLayerChoice build() => const MapLayerChoice();
+
+  void setBase(String base) =>
+      state = MapLayerChoice(base: base, overlays: state.overlays);
+
+  void setOverlay(String overlay, {required bool on}) => state = MapLayerChoice(
+    base: state.base,
+    overlays: on
+        ? {...state.overlays, overlay}
+        : state.overlays.difference({overlay}),
+  );
+}
+
+final mapLayerChoiceProvider =
+    NotifierProvider<MapLayerChoiceNotifier, MapLayerChoice>(
+      MapLayerChoiceNotifier.new,
+    );
+
+/// What the style of the server offers to switch (`metadata.hiker`).
+Map<String, dynamic>? mapLayerOptions(String? styleJson) {
+  if (styleJson == null) return null;
+  final metadata = (jsonDecode(styleJson) as Map<String, dynamic>)['metadata'];
+  return (metadata as Map<String, dynamic>?)?['hiker'] as Map<String, dynamic>?;
+}
+
+/// The sheet in which the user chooses base map and overlays.
+class MapLayerSheet extends ConsumerWidget {
+  const MapLayerSheet({super.key, required this.options});
+
+  final Map<String, dynamic> options;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final choice = ref.watch(mapLayerChoiceProvider);
+    final notifier = ref.read(mapLayerChoiceProvider.notifier);
+    final bases = (options['bases'] as List<dynamic>)
+        .cast<Map<String, dynamic>>();
+    final overlays = (options['overlays'] as List<dynamic>)
+        .cast<Map<String, dynamic>>();
+    String baseLabel(String id) => switch (id) {
+      'map' => l10n.mapBaseMap,
+      'satellite' => l10n.mapBaseSatellite,
+      _ => id,
+    };
+    String overlayLabel(String id) => id == 'slope' ? l10n.mapOverlaySlope : id;
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child: Text(
+              l10n.mapLayers,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          if (bases.length > 1)
+            RadioGroup<String>(
+              groupValue: choice.base,
+              onChanged: (base) => notifier.setBase(base!),
+              child: Column(
+                children: [
+                  for (final base in bases)
+                    RadioListTile<String>(
+                      value: base['id'] as String,
+                      title: Text(baseLabel(base['id'] as String)),
+                    ),
+                ],
+              ),
+            ),
+          for (final overlay in overlays)
+            SwitchListTile(
+              value: choice.overlays.contains(overlay['id']),
+              title: Text(overlayLabel(overlay['id'] as String)),
+              subtitle: overlay['id'] == 'slope'
+                  ? Text(l10n.mapSlopeLegend)
+                  : null,
+              onChanged: (on) =>
+                  notifier.setOverlay(overlay['id'] as String, on: on),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Builds the map. Tests replace it, because the real map needs the platform.
 final mapViewBuilderProvider = Provider<MapViewBuilder>((ref) {
   final tileUrl = ref.watch(mapTileUrlProvider);
   final style = ref.watch(mapStyleProvider).asData?.value;
+  final choice = ref.watch(mapLayerChoiceProvider);
+  final options = mapLayerOptions(style);
   return (content) => MapLibreMapView(
     // Another style is another map: it is built anew.
     key: ValueKey(style == null ? tileUrl : style.hashCode),
     content: content,
     tileUrl: tileUrl,
     styleJson: style,
+    layerOptions: options,
+    layerChoice: choice,
+    layerSheet: options == null
+        ? null
+        : (context) => MapLayerSheet(options: options),
   );
 });
 

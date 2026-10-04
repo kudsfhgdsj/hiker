@@ -15,6 +15,7 @@
   <img alt=""><p class="meta"></p></dialog>
 <script type="application/json" id="tour-data">{{ map_data|tojson }}</script>
 <script src="{{ url_for('static', filename='vendor/maplibre-gl/maplibre-gl-csp.js') }}" defer></script>
+<script src="{{ url_for('static', filename='map_layers.js') }}" defer></script>
 <script src="{{ url_for('static', filename='profile.js') }}" defer></script>
 <script src="{{ url_for('static', filename='tour.js') }}" defer></script>
 {% endmacro %}

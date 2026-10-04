@@ -178,9 +178,14 @@ def create_app(config: dict | None = None) -> Flask:
         style = api().request("GET", "/maps/style.json", auth=False).json()
         root = request.url_root.rstrip("/")
         style["glyphs"] = f"{root}/map/fonts/{{fontstack}}/{{range}}.pbf"
+        # Everything the style loads from the API's maps module comes from here instead.
         for source in style.get("sources", {}).values():
-            if source.get("type") == "vector":
-                source["tiles"] = [f"{root}/map/vector/{{z}}/{{x}}/{{y}}.pbf"]
+            source["tiles"] = [
+                f"{root}/map/{tile.split('/api/v1/maps/', 1)[1]}"
+                if "/api/v1/maps/" in tile
+                else tile
+                for tile in source.get("tiles", [])
+            ]
         response = app.json.response(style)
         response.headers["Cache-Control"] = "public, max-age=300"
         return response
@@ -189,6 +194,16 @@ def create_app(config: dict | None = None) -> Flask:
     def map_vector_tile(z, x, y):
         upstream = api().request("GET", f"/maps/vector/{z}/{x}/{y}.pbf", auth=False)
         return _passed_on(upstream, "application/x-protobuf")
+
+    @app.get("/map/raster/<any(terrain, satellite):layer>/<int:z>/<int:x>/<int:y>")
+    def map_layer_tile(layer, z, x, y):
+        upstream = api().request("GET", f"/maps/raster/{layer}/{z}/{x}/{y}", auth=False)
+        return _passed_on(upstream, upstream.headers.get("content-type", "image/png"))
+
+    @app.get("/map/slope/<int:z>/<int:x>/<int:y>.png")
+    def map_slope_tile(z, x, y):
+        upstream = api().request("GET", f"/maps/slope/{z}/{x}/{y}.png", auth=False)
+        return _passed_on(upstream, "image/png")
 
     @app.get("/map/fonts/<fontstack>/<glyphs>.pbf")
     def map_glyphs(fontstack, glyphs):

@@ -2847,6 +2847,36 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Wegdaten für die Planung'**
   String get offlineSegments;
+
+  /// No description provided for @mapLayers.
+  ///
+  /// In de, this message translates to:
+  /// **'Ebenen'**
+  String get mapLayers;
+
+  /// No description provided for @mapBaseMap.
+  ///
+  /// In de, this message translates to:
+  /// **'Karte'**
+  String get mapBaseMap;
+
+  /// No description provided for @mapBaseSatellite.
+  ///
+  /// In de, this message translates to:
+  /// **'Luftbild'**
+  String get mapBaseSatellite;
+
+  /// No description provided for @mapOverlaySlope.
+  ///
+  /// In de, this message translates to:
+  /// **'Hangneigung'**
+  String get mapOverlaySlope;
+
+  /// No description provided for @mapSlopeLegend.
+  ///
+  /// In de, this message translates to:
+  /// **'Gelb ab 30°, orange ab 35°, rot ab 40°, violett ab 45°'**
+  String get mapSlopeLegend;
 }
 
 class _AppLocalizationsDelegate

@@ -5,6 +5,7 @@ import time
 from flask import current_app, url_for
 
 from hiker_web.api import ApiError, api
+from hiker_web.texts_de import t
 
 # How long the answer of the API about its map is kept.
 _CHECK_EVERY_S = 300
@@ -32,4 +33,11 @@ def map_config(attribution: str) -> dict:
         "styleUrl": style_url(),
         "workerUrl": url_for("static", filename="vendor/maplibre-gl/maplibre-gl-csp-worker.js"),
         "attribution": attribution,
+        "layerTexts": {
+            "title": t("map.layers"),
+            "base": {"map": t("map.base.map"), "satellite": t("map.base.satellite")},
+            "overlay": {"slope": t("map.overlay.slope")},
+            "terrain": t("map.terrain"),
+            "from": t("map.from"),
+        },
     }

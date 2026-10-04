@@ -1521,4 +1521,20 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get offlineSegments => 'Wegdaten für die Planung';
+
+  @override
+  String get mapLayers => 'Ebenen';
+
+  @override
+  String get mapBaseMap => 'Karte';
+
+  @override
+  String get mapBaseSatellite => 'Luftbild';
+
+  @override
+  String get mapOverlaySlope => 'Hangneigung';
+
+  @override
+  String get mapSlopeLegend =>
+      'Gelb ab 30°, orange ab 35°, rot ab 40°, violett ab 45°';
 }

@@ -61,6 +61,7 @@
     zoom: 12,
   });
   map.addControl(new maplibregl.NavigationControl(), "top-right");
+  if (window.hikerMapLayers) window.hikerMapLayers(map, data.layerTexts);
   const bounds = positions.reduce(
     (box, position) => box.extend(position),
     new maplibregl.LngLatBounds(positions[0], positions[0]),
