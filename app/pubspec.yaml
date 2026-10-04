@@ -81,6 +81,11 @@ flutter:
   # Routing profile of hiker and BRouter's tag table, for planning without network.
   assets:
     - assets/brouter/
+    # Glyphs of the map labels (Noto Sans, OFL), the same files the server has: the map
+    # must be able to write names without network.
+    - assets/fonts/noto-sans-regular/
+    - assets/fonts/noto-sans-bold/
+    - assets/fonts/noto-sans-italic/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

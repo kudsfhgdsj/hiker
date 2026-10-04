@@ -135,6 +135,8 @@ ProviderContainer createContainer({
       httpClientAdapterProvider.overrideWithValue(api),
       // No platform in tests: no router on the device, files in a temporary folder.
       deviceRouterProvider.overrideWithValue(deviceRouter),
+      // Tests of the map server decide themselves which fonts the app carries.
+      bundledGlyphsProvider.overrideWithValue((_, _) async => null),
       tileCacheDirectoryProvider.overrideWith(
         (ref) => Directory.systemTemp.createTemp('hiker-tiles'),
       ),

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -268,6 +269,17 @@ class TileProxy extends Notifier<int?> {
         );
       } else if (glyphs != null) {
         final font = Uri.decodeComponent(glyphs[1]!);
+        // The fonts of the map come with the app: names never need the network.
+        final bundled = await ref.read(bundledGlyphsProvider)(
+          font.split(',').first,
+          glyphs[2]!,
+        );
+        if (bundled != null) {
+          response.statusCode = HttpStatus.ok;
+          response.headers.contentType = _protobuf;
+          response.add(bundled);
+          return;
+        }
         await _fromServer(
           response,
           apiPath:
@@ -360,6 +372,22 @@ final tileCacheDirectoryProvider = FutureProvider<Directory>((ref) async {
   final cache = await getApplicationCacheDirectory();
   return Directory('${cache.path}/map-tiles');
 });
+
+/// Reads a glyph file that comes with the app ("Noto Sans Regular", "0-255");
+/// null if the app has none for that font or range.
+typedef BundledGlyphs = Future<List<int>?> Function(String font, String range);
+
+final bundledGlyphsProvider = Provider<BundledGlyphs>(
+  (ref) => (font, range) async {
+    final folder = font.toLowerCase().replaceAll(' ', '-');
+    try {
+      final data = await rootBundle.load('assets/fonts/$folder/$range.pbf');
+      return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    } on Object {
+      return null;
+    }
+  },
+);
 
 /// False in tests, which have no network.
 final tileProxyEnabledProvider = Provider<bool>((ref) => true);

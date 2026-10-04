@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -51,5 +53,25 @@ void main() {
       container.read(mapLayerChoiceProvider),
       const MapLayerChoice(base: 'satellite', overlays: {'slope'}),
     );
+  });
+
+  test('the app carries the same fonts as the server', () {
+    final server = Directory('../backend/app/modules/maps/fonts');
+    final fonts = server.listSync().whereType<Directory>().toList();
+    expect(fonts.length, 3);
+    for (final font in fonts) {
+      final name = font.uri.pathSegments.lastWhere((part) => part.isNotEmpty);
+      final folder = Uri.decodeComponent(name)
+          .toLowerCase()
+          .replaceAll(' ', '-');
+      for (final file in font.listSync().whereType<File>()) {
+        final range = file.uri.pathSegments.last;
+        expect(
+          File('assets/fonts/$folder/$range').readAsBytesSync(),
+          file.readAsBytesSync(),
+          reason: '$folder/$range',
+        );
+      }
+    }
   });
 }
