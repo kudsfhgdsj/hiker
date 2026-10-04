@@ -250,7 +250,13 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
             tiltGesturesEnabled: false,
             scrollGesturesEnabled: widget.content.interactive,
             zoomGesturesEnabled: widget.content.interactive,
-            onMapCreated: (controller) => _controller = controller,
+            onMapCreated: (controller) {
+              _controller = controller;
+              // Without network the map library would not even ask for tiles.
+              // The tiles kept on the device (TileProxy, the library's own
+              // cache) must still be shown, so it is told to ask anyway.
+              controller.forceOnlineMode().catchError((_) {});
+            },
             onStyleLoadedCallback: _onStyleLoaded,
             onCameraMove: (_) => _updatePositions(),
             onCameraIdle: _updatePositions,
