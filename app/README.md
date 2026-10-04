@@ -127,5 +127,11 @@ HTTP; für einen lokalen Stack braucht es deshalb einen HTTPS-Proxy davor, z. B.
 Als Server-Adresse dann `https://10.0.2.2:<Port>` eintragen und den Fingerabdruck bestätigen.
 
 Am 04.10.2026 so geprüft (Android 15): Registrierung, Zertifikatsbestätigung, zweiten Faktor
-einrichten, Ausrüstung mit Favorit und Zusatzfeldern, Tour mit Karte, Kacheln und Höhenprofil,
-Sitzung nach Neustart. Nicht geprüft: Kamera-Scanner, Dateiauswahl, Offline-Sync, Fotos.
+einrichten, Ausrüstung mit Favorit und Zusatzfeldern, Tour anlegen und bearbeiten, GPX und Foto
+über die Dateiauswahl hochladen, Karte mit Kacheln, Höhenprofil und Foto-Marker, Änderungen ohne
+Verbindung und ihr Abgleich danach, Kamera-Berechtigung und Vorschau des Scanners, Sitzung nach
+Neustart. Nicht geprüft: das Erkennen eines echten Barcodes (der Emulator zeigt nur eine
+künstliche Szene), Konflikte beim Abgleich, Teilen und Verlauf in der App.
+
+Die VM braucht dafür Luft: Emulator, Gradle-Build und `flutter test` nicht gleichzeitig laufen
+lassen (bei 7 GB RAM ist der Emulator dabei einmal abgestürzt).

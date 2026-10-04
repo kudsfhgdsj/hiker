@@ -349,6 +349,12 @@ class SyncService extends Notifier<SyncStatus> {
   }
 
   /// Push, upload, pull. Returns false if the server could not be reached.
+  /// Tries again if changes are still waiting, e.g. after the connection came
+  /// back. Does nothing, and asks the server nothing, if all is in sync.
+  Future<void> retryIfWaiting() async {
+    if (state.waiting > 0 && !state.running) await sync();
+  }
+
   Future<bool> sync() async {
     if (state.running || !ref.read(sessionProvider).isSignedIn) return false;
     await _refreshStatus(running: true);

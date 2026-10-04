@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -75,10 +77,21 @@ class _HikerAppState extends ConsumerState<HikerApp>
       await ref.read(syncProvider.notifier).load();
       _sync();
     });
+    // Changes made without a connection go out by themselves once it is back.
+    if (ref.read(autoSyncProvider)) {
+      _retry = Timer.periodic(const Duration(minutes: 1), (_) {
+        if (mounted && ref.read(sessionProvider).isSignedIn) {
+          ref.read(syncProvider.notifier).retryIfWaiting();
+        }
+      });
+    }
   }
+
+  Timer? _retry;
 
   @override
   void dispose() {
+    _retry?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

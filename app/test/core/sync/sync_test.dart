@@ -177,6 +177,28 @@ void main() {
       expect(container.read(syncProvider).running, isFalse);
     });
 
+    test('waiting changes go out by themselves once the network is back', () async {
+      final api = syncApi()..offline = true;
+      final container = await signedIn(api);
+      final sync = container.read(syncProvider.notifier);
+      await sync.enqueue(
+        collection: 'gear_items',
+        id: 'a',
+        data: {'name': 'Zelt'},
+      );
+      await sync.sync();
+      expect(container.read(syncProvider).waiting, 1);
+
+      api.offline = false;
+      await sync.retryIfWaiting();
+
+      expect(container.read(syncProvider).isClean, isTrue);
+      // Nothing waits any more: the next round does not ask the server at all.
+      final requests = api.calls.length;
+      await sync.retryIfWaiting();
+      expect(api.calls.length, requests);
+    });
+
     test('a rejected change is marked and can be discarded', () async {
       final api = syncApi();
       api.routes['POST /sync/push'] = (_, _) => ok({
