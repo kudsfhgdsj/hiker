@@ -4,20 +4,26 @@
     deploy/smoke_test.py --api http://127.0.0.1:8010 --web http://127.0.0.1:8011
 
 Registers a throwaway user (or signs in with SMOKE_EMAIL / SMOKE_PASSWORD when the
-registration is closed), walks through gear, food, a tour with GPX track and photo,
-the history, a public link and the web pages, and removes its tour, gear and food
-again. The throwaway user stays; use an existing account on a real server.
+registration is closed), sets up the second factor if the server demands it, walks
+through gear, food, a tour with GPX track and photo, the history, a public link and
+the web pages, and removes its tour, gear and food again. The throwaway user stays;
+use an existing account on a real server. An account with a second factor also
+needs SMOKE_TOTP_SECRET (the base32 secret of its authenticator entry).
 """
 
 import argparse
 import base64
 import datetime
+import hashlib
+import hmac
 import http.cookiejar
 import json
 import math
 import os
 import re
+import struct
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -96,6 +102,16 @@ def sample_gpx() -> bytes:
     ).encode()
 
 
+def totp(secret: str, offset: int = 0) -> str:
+    """The code an authenticator app shows for the secret (RFC 6238)."""
+    key = base64.b32decode(secret, casefold=True)
+    counter = int(time.time() // 30) + offset
+    digest = hmac.new(key, struct.pack(">Q", counter), hashlib.sha1).digest()
+    position = digest[-1] & 0x0F
+    number = struct.unpack(">I", digest[position : position + 4])[0] & 0x7FFFFFFF
+    return str(number % 1_000_000).zfill(6)
+
+
 def step(name: str) -> None:
     print(f"  ok  {name}")
 
@@ -114,14 +130,26 @@ def run(api_url: str, web_url: str) -> None:
     step(f"both services answer; modules: {', '.join(sorted(modules))}")
 
     email, password = os.environ.get("SMOKE_EMAIL"), os.environ.get("SMOKE_PASSWORD")
+    secret = os.environ.get("SMOKE_TOTP_SECRET")
     if email and password:
-        auth = api.json("POST", f"{prefix}/auth/login", {"email": email, "password": password})
+        body = {"email": email, "password": password}
+        if secret:
+            body["code"] = totp(secret)
+        auth = api.json("POST", f"{prefix}/auth/login", body)
     else:
         email = f"smoke-{uuid.uuid4().hex[:10]}@example.org"
-        password = uuid.uuid4().hex + "Aa1"
+        password = f"Pw-{uuid.uuid4().hex}-X"
         body = {"email": email, "password": password, "display_name": "Smoke Test"}
         auth = api.json("POST", f"{prefix}/auth/register", body)
     api.token = auth["access_token"]
+    if auth.get("mfa_setup_required"):
+        blocked, _h, _raw = api.request("GET", f"{prefix}/me/profile")
+        check(blocked == 403, f"session without second factor is not restricted ({blocked})")
+        secret = api.json("POST", f"{prefix}/auth/mfa/setup")["secret"]
+        auth = api.json("POST", f"{prefix}/auth/mfa/enable", {"code": totp(secret)})
+        api.token = auth["access_token"]
+        check(len(auth["recovery_codes"]) == 10, "no recovery codes")
+        step("second factor is mandatory and was set up")
     step(f"signed in as {email}")
 
     created: list[str] = []
@@ -203,9 +231,11 @@ def run(api_url: str, web_url: str) -> None:
         if secure_only and web_url.startswith("http://"):
             step("web pages and map library served (web login skipped: Secure cookie over HTTP)")
         else:
-            form = urllib.parse.urlencode(
-                {"email": email, "password": password, "csrf_token": csrf.group(1)}
-            ).encode()
+            fields = {"email": email, "password": password, "csrf_token": csrf.group(1)}
+            if secret:
+                # Every code works once: the next period has one that was not used yet.
+                fields["code"] = totp(secret, offset=1)
+            form = urllib.parse.urlencode(fields).encode()
             status, _h, raw = web.request("POST", "/login", data=form)
             check(status == 200 and title in raw.decode(), f"web login or tour list failed ({status})")
             status, _h, raw = web.request("GET", f"/tours/{tour['id']}")
