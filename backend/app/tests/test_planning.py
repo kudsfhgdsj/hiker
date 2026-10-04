@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from xml.etree import ElementTree
 
 import httpx2
@@ -8,6 +9,7 @@ from app.core.config import get_settings
 from app.core.errors import UnprocessableError
 from app.modules.planning.estimate import PRESETS, Pace, walking_time_s
 from app.modules.planning.routing import BRouterEngine, RouteOptions, RoutingUnavailableError
+from app.modules.planning.sun import sun_position, sun_times
 from app.modules.protocols.track import haversine_m
 from app.tests.conftest import auth_header, register
 
@@ -54,6 +56,78 @@ def test_walking_time_follows_the_pace():
     # Trained walkers: 600 m up, 1000 m down, 6 km per hour.
     assert walking_time_s(8000, 1200, 400, PRESETS["pro"]) == round((2.4 + 8 / 6 / 2) * 3600)
     assert walking_time_s(8000, 1200, 400, Pace(1200, 800, 8)) == round((1.5 + 0.5) * 3600)
+
+
+# --- Sun, start time, tags ---
+
+
+def test_sunrise_and_sunset_match_the_almanac():
+    # Säntis at midsummer and midwinter (UTC; local time is two and one hour later).
+    summer = sun_times(47.2494, 9.3433, date(2026, 6, 21))
+    assert summer.sunrise.strftime("%H:%M") == "03:26"
+    assert summer.sunset.strftime("%H:%M") == "19:22"
+    assert summer.dawn < summer.sunrise < summer.noon < summer.sunset < summer.dusk
+    winter = sun_times(47.2494, 9.3433, date(2026, 12, 21))
+    assert winter.sunrise.strftime("%H:%M") == "07:06"
+    assert winter.sunset.strftime("%H:%M") == "15:34"
+    # North of the polar circle the sun does not set in summer.
+    assert sun_times(78.2, 15.6, date(2026, 6, 21)).sunrise is None
+    # At noon the sun stands in the south, high in summer.
+    height, direction = sun_position(47.2494, 9.3433, summer.noon)
+    assert 65 < height < 67 and 179 <= direction <= 181
+
+
+def test_line_carries_the_time_at_every_point(client, anna):
+    body = client.post(PREVIEW, json={"waypoints": [START, HUT, PEAK]}, headers=anna).json()
+
+    times = body["series"]["time_s"]
+    assert len(times) == len(body["series"]["lat"])
+    assert times[0] == 0 and times[-1] == body["duration_s"] and times == sorted(times)
+    assert body["sun"] is None
+
+    faster = client.post(
+        PREVIEW, json={"waypoints": [START, HUT, PEAK], "pace": {"preset": "pro"}}, headers=anna
+    ).json()
+    assert faster["series"]["time_s"][2] < times[2]
+
+
+def test_start_time_places_the_tour_in_the_day(client, anna):
+    # Setting out at 04:00 UTC in June: after first light, before sunrise.
+    early = {"waypoints": [START, HUT, PEAK], "start_time": "2026-06-21T03:00:00Z"}
+    sun = client.post(PREVIEW, json=early, headers=anna).json()["sun"]
+
+    assert sun["sunrise"].startswith("2026-06-21T03:2") and sun["sunset"].startswith(
+        "2026-06-21T19:2"
+    )
+    assert sun["starts_in_dark"] is False and sun["ends_in_dark"] is False
+    assert sun["daylight_left_s"] > 10 * 3600
+    assert sun["summit"]["elevation_m"] == 1900 and sun["summit"]["time"] == sun["end_time"]
+    assert 0 < sun["summit"]["sun_height_deg"] < 40
+
+    # In December at 15:00 UTC the sun sets during the tour and it ends in the dark.
+    late = create(client, anna, start_time="2026-12-21T15:00:00Z")
+    assert late["start_time"] == "2026-12-21T15:00:00Z"
+    assert late["sun"]["daylight_left_s"] < 0 and late["sun"]["ends_in_dark"] is True
+    night = {"waypoints": [START, HUT], "start_time": "2026-12-21T04:00:00Z"}
+    assert client.post(PREVIEW, json=night, headers=anna).json()["sun"]["starts_in_dark"] is True
+    # A time without zone is not accepted: the sun needs to know which moment is meant.
+    naive = {"waypoints": [START, HUT], "start_time": "2026-12-21T04:00:00"}
+    assert client.post(PREVIEW, json=naive, headers=anna).status_code == 422
+
+
+def test_routes_are_found_by_tag(client, anna):
+    create(client, anna, title="Säntis", tags=["Sommer", "Gipfel"])
+    create(client, anna, title="Piz Palü", tags=["Skitour"])
+    create(client, anna, title="Ohne")
+
+    summer = client.get(ROUTES, params={"tag": "sommer"}, headers=anna).json()
+    assert [item["title"] for item in summer["items"]] == ["Säntis"] and summer["total"] == 1
+    assert summer["items"][0]["tags"] == ["Sommer", "Gipfel"]
+    assert client.get(ROUTES, params={"tag": "Winter"}, headers=anna).json()["total"] == 0
+    assert client.get(ROUTES, headers=anna).json()["total"] == 3
+
+    too_many = {"title": "x", "waypoints": [START, HUT], "tags": [str(n) for n in range(21)]}
+    assert client.post(ROUTES, json=too_many, headers=anna).status_code == 422
 
 
 # --- Pace ---
@@ -289,10 +363,14 @@ def test_info_names_the_profiles(client, anna, routing_engine):
 
 
 def test_route_is_stored_with_line_and_key_figures(client, anna):
-    route = create(client, anna, description=" Über die Hütte ", planned_date="2026-07-18")
+    route = create(
+        client, anna, description=" Über die Hütte ", tags=[" Sommer ", "sommer", "Gipfel"]
+    )
 
     assert route["title"] == "Auf den Gipfel" and route["description"] == "Über die Hütte"
-    assert route["planned_date"] == "2026-07-18" and route["version"] == 1
+    # Tags are trimmed and the same tag twice counts once.
+    assert route["tags"] == ["Sommer", "Gipfel"] and route["version"] == 1
+    assert route["start_time"] is None and route["sun"] is None
     assert route["profile"] == "hiking" and route["engine"] == "brouter"
     assert [point["name"] for point in route["waypoints"]] == ["Parkplatz", "Hütte", "Gipfel"]
     assert route["ascent_m"] == 400 and route["duration_estimated"] is True

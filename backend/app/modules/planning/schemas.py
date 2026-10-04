@@ -1,8 +1,16 @@
 import uuid
-from datetime import date, datetime
+from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, computed_field
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    computed_field,
+    field_validator,
+)
 
 from app.core.fields import Name, optional_text
 from app.modules.planning.estimate import PRESETS, Pace
@@ -99,9 +107,15 @@ class RouteWaypoint(BaseModel):
 Waypoints = Annotated[list[RouteWaypoint], Field(min_length=2, max_length=MAX_WAYPOINTS)]
 
 
+Tag = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=40)]
+
+
 class RoutePreviewIn(PathChoice):
     profile: Profile = "hiking"
     waypoints: Waypoints
+    start_time: AwareDatetime | None = Field(
+        default=None, description="When the walker sets out; adds `sun` to the answer"
+    )
 
 
 class RouteSeries(BaseModel):
@@ -111,6 +125,34 @@ class RouteSeries(BaseModel):
     lat: list[float]
     lon: list[float]
     elevation_m: list[float | None] | None
+    time_s: list[int] | None = Field(
+        default=None, description="Seconds from the start at every point, for the chosen pace"
+    )
+
+
+class SummitOut(BaseModel):
+    time: datetime
+    elevation_m: float
+    distance_m: float
+    sun_height_deg: float = Field(description="Height of the sun above the horizon then")
+    sun_direction_deg: int = Field(description="Compass direction of the sun then, 180 = south")
+
+
+class SunOut(BaseModel):
+    """The day of the tour at its start point; times in UTC, for the mathematical horizon."""
+
+    dawn: datetime | None = Field(description="First light (civil twilight begins)")
+    sunrise: datetime | None
+    noon: datetime
+    sunset: datetime | None
+    dusk: datetime | None = Field(description="Last light (civil twilight ends)")
+    end_time: datetime = Field(description="Start time plus walking time, without breaks")
+    starts_in_dark: bool
+    ends_in_dark: bool
+    daylight_left_s: int | None = Field(
+        description="Between the end of the tour and sunset; negative if the sun sets first"
+    )
+    summit: SummitOut | None = Field(description="When the highest point is reached")
 
 
 class RouteStats(BaseModel):
@@ -130,14 +172,27 @@ class RouteStats(BaseModel):
 class RoutePreviewOut(RouteStats):
     engine: str = Field(description="brouter, direct or brouter+direct")
     series: RouteSeries
+    sun: SunOut | None = None
 
 
 class RouteIn(PathChoice):
     title: Name
     description: optional_text(5000) = None
-    planned_date: date | None = None
+    tags: list[Tag] = Field(default_factory=list, max_length=20)
+    start_time: AwareDatetime | None = Field(
+        default=None, description="When the walker sets out; null if not decided yet"
+    )
     profile: Profile = "hiking"
     waypoints: Waypoints
+
+    @field_validator("tags")
+    @classmethod
+    def _unique_tags(cls, tags: list[str]) -> list[str]:
+        # The same tag twice says nothing new; the first spelling stays.
+        seen: dict[str, str] = {}
+        for tag in tags:
+            seen.setdefault(tag.casefold(), tag)
+        return list(seen.values())
 
 
 class RouteCreate(RouteIn):
@@ -156,7 +211,8 @@ class RouteSummary(RouteStats):
     id: uuid.UUID
     title: str
     description: str | None
-    planned_date: date | None
+    tags: list[str]
+    start_time: datetime | None
     profile: str
     max_difficulty: int
     via_ferrata: bool
@@ -170,6 +226,7 @@ class RouteSummary(RouteStats):
 class RouteOut(RouteSummary):
     waypoints: list[RouteWaypoint]
     series: RouteSeries
+    sun: SunOut | None = Field(description="Sunrise and sunset for the tour; null without start")
 
 
 class SegmentInfo(BaseModel):

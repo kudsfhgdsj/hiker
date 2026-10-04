@@ -1,10 +1,10 @@
 import uuid
-from datetime import date
+from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, Date, Float, ForeignKey, Integer, String, Text, Uuid
+from sqlalchemy import JSON, Boolean, Float, ForeignKey, Integer, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db import Base, TimestampMixin
+from app.core.db import Base, TimestampMixin, UTCDateTime
 
 PROFILE_HIKING = "hiking"
 PROFILE_DIRECT = "direct"
@@ -32,7 +32,10 @@ class PlannedRoute(TimestampMixin, Base):
     )
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text)
-    planned_date: Mapped[date | None] = mapped_column(Date)
+    # Free labels of the user, e.g. "Skitour" or "mit Kindern".
+    tags: Mapped[list] = mapped_column(JSON, default=list)
+    # When the walker sets out; the course of the sun along the tour follows from it.
+    start_time: Mapped[datetime | None] = mapped_column(UTCDateTime)
     profile: Mapped[str] = mapped_column(String(20), default=PROFILE_HIKING)
     # Hardest allowed path, 1 (T1) to 6 (T6), and whether via ferratas may be used.
     max_difficulty: Mapped[int] = mapped_column(Integer, default=3)
@@ -60,6 +63,13 @@ class PlannedRoute(TimestampMixin, Base):
 
     # Optimistic locking: an UPDATE only succeeds if the version is still the one we read.
     __mapper_args__ = {"version_id_col": version, "version_id_generator": False}
+
+    @property
+    def sun(self) -> dict | None:
+        """Sunrise, sunset and what they mean for the tour; None without a start time."""
+        from app.modules.planning.schedule import sun_report
+
+        return sun_report(self.series, self.start_time, self.duration_s)
 
     @property
     def pace(self) -> dict:

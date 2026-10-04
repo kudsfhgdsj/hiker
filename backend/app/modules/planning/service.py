@@ -1,6 +1,7 @@
 """Planned routes: the line and its key figures are computed from the waypoints."""
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -12,6 +13,7 @@ from app.modules.auth.models import User
 from app.modules.planning.estimate import PRESETS, Pace, walking_time_s
 from app.modules.planning.models import PROFILE_DIRECT, PaceProfile, PlannedRoute
 from app.modules.planning.routing import RoutedPoint, RouteOptions, RoutingEngine
+from app.modules.planning.schedule import sun_report, times_along
 from app.modules.planning.schemas import (
     PaceProfileCreate,
     PaceProfileIn,
@@ -57,6 +59,7 @@ class ComputedRoute:
     min_elevation_m: float | None
     max_elevation_m: float | None
     duration_s: int
+    sun: dict | None = None
 
 
 # --- Computing the line ---
@@ -102,6 +105,7 @@ def compute_route(
     engine: RoutingEngine,
     elevations: ElevationSource,
     pace: Pace = PRESETS["dav"],
+    start_time: datetime | None = None,
 ) -> ComputedRoute:
     """The line through all waypoints: along paths, except for legs marked as direct."""
     line: list[RoutedPoint] = []
@@ -129,15 +133,19 @@ def compute_route(
     points = [TrackPoint(lat=point.lat, lon=point.lon, ele=point.ele) for point in line]
     stats = compute_stats(points)
     series = build_series(points)
+    duration = walking_time_s(stats["distance_m"], stats["ascent_m"], stats["descent_m"], pace)
+    line_series = {column: series[column] for column in SERIES_COLUMNS}
+    line_series["time_s"] = times_along(line_series, duration, pace)
     return ComputedRoute(
         engine="+".join(sorted(used)),
-        series={column: series[column] for column in SERIES_COLUMNS},
+        series=line_series,
         distance_m=stats["distance_m"],
         ascent_m=stats["ascent_m"],
         descent_m=stats["descent_m"],
         min_elevation_m=stats["min_elevation_m"],
         max_elevation_m=stats["max_elevation_m"],
-        duration_s=walking_time_s(stats["distance_m"], stats["ascent_m"], stats["descent_m"], pace),
+        duration_s=duration,
+        sun=sun_report(line_series, start_time, duration),
     )
 
 
@@ -179,9 +187,15 @@ def _apply(
     route.duration_s = walking_time_s(
         route.distance_m, route.ascent_m, route.descent_m, data.pace.as_pace()
     )
+    # A new dictionary, so that the change of the times is noticed and stored.
+    route.series = {
+        **{column: route.series[column] for column in SERIES_COLUMNS},
+        "time_s": times_along(route.series, route.duration_s, data.pace.as_pace()),
+    }
     route.title = data.title
     route.description = data.description
-    route.planned_date = data.planned_date
+    route.tags = data.tags
+    route.start_time = data.start_time
     route.profile = data.profile
     route.max_difficulty = data.max_difficulty
     route.via_ferrata = data.via_ferrata
@@ -234,17 +248,23 @@ def delete_route(db: Session, route: PlannedRoute) -> None:
     _flush(db)
 
 
-def list_routes(db: Session, user: User, *, q: str | None, limit: int, offset: int):
+def list_routes(
+    db: Session, user: User, *, q: str | None, tag: str | None = None, limit: int, offset: int
+):
     conditions = [PlannedRoute.owner_id == user.id, PlannedRoute.deleted_at.is_(None)]
     if q:
         conditions.append(PlannedRoute.title.icontains(q, autoescape=True))
-    total = db.scalar(select(func.count()).select_from(PlannedRoute).where(*conditions))
     query = (
         select(PlannedRoute)
         .where(*conditions)
         .order_by(PlannedRoute.updated_at.desc(), PlannedRoute.id)
     )
-    return list(db.scalars(query.limit(limit).offset(offset))), total
+    routes = list(db.scalars(query))
+    if tag:
+        # Tags live in a JSON column; a user has few routes, so they are filtered here.
+        wanted = tag.casefold()
+        routes = [route for route in routes if wanted in (t.casefold() for t in route.tags or [])]
+    return routes[offset : offset + limit], len(routes)
 
 
 def route_gpx(route: PlannedRoute) -> bytes:

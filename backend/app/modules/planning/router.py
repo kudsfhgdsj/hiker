@@ -85,7 +85,13 @@ def preview(body: RoutePreviewIn, _user: CurrentUser, engine: Routing, elevation
     """
     options = RouteOptions(body.max_difficulty, body.via_ferrata)
     return service.compute_route(
-        body.waypoints, body.profile, options, engine, elevations, body.pace.as_pace()
+        body.waypoints,
+        body.profile,
+        options,
+        engine,
+        elevations,
+        body.pace.as_pace(),
+        body.start_time,
     )
 
 
@@ -95,9 +101,14 @@ def list_routes(
     db: DbSession,
     paging: Paging,
     q: Annotated[str | None, Query(max_length=100, description="Search in the title")] = None,
+    tag: Annotated[
+        str | None, Query(max_length=40, description="Only routes with this tag")
+    ] = None,
 ):
     """The user's own routes without their lines, newest change first."""
-    items, total = service.list_routes(db, user, q=q, limit=paging.limit, offset=paging.offset)
+    items, total = service.list_routes(
+        db, user, q=q, tag=tag, limit=paging.limit, offset=paging.offset
+    )
     return Page(items=items, total=total, limit=paging.limit, offset=paging.offset)
 
 
