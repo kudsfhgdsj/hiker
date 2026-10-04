@@ -3,7 +3,7 @@
 Lies zuerst `DESIGN.md`. Sie ist die verbindliche Grundlage für Architektur, Datenmodell, API und Phasenplan.
 
 ## Projekt in Kürze
-Android-App (Flutter, nur Android), Web-Frontend (Python Flask) und eigenes Backend (FastAPI + PostgreSQL), selbst gehostet unter `hiker.lacasa.internal` (vorläufig, wird später auf die endgültige Domain umgestellt) auf Ubuntu 26.04. Module: auth, gear, nutrition, protocols (jetzt); planning, reports (später). Aktuell gilt Phase 1 aus `DESIGN.md`.
+Android-App (Flutter, nur Android), Web-Frontend (Python Flask) und eigenes Backend (FastAPI + PostgreSQL), selbst gehostet unter `hiker.lacasa.internal` (vorläufig, wird später auf die endgültige Domain umgestellt) auf Ubuntu 26.04. Module: auth, gear, nutrition, protocols, sync, maps (jetzt); planning, reports (später). Aktuell gilt Phase 1 aus `DESIGN.md`.
 
 ## Sprache
 - UI-Texte und Dokumentation: Deutsch (App: ARB-Dateien; Web-Frontend: eine Übersetzungsdatei, keine Texte verstreut in den Vorlagen).
@@ -16,7 +16,7 @@ Android-App (Flutter, nur Android), Web-Frontend (Python Flask) und eigenes Back
 - Local-first in der Android-App (Drift), Sync über `/sync/*`.
 - Flutter wird nur für Android gebaut; keine Web-Plattform und kein web-spezifischer Code im Flutter-Projekt.
 - Das Web-Frontend (Flask, `web/`) spricht ausschließlich mit der REST-API, nie direkt mit Datenbank oder Dateispeicher, und enthält keine eigene Fachlogik. Tokens bleiben serverseitig in der Sitzung; Formulare sind gegen CSRF geschützt. JavaScript-Bibliotheken werden vom eigenen Server ausgeliefert, nicht von einem CDN.
-- Externe Dienste (Open-Meteo, Open-Meteo-Elevation, Open Food Facts, OpenStreetMap/Overpass, Dateispeicher, später hikr.org) nur über Adapter-Interfaces ansprechen.
+- Externe Dienste (Open-Meteo, Open-Meteo-Elevation, Open Food Facts, OpenStreetMap/Overpass, Kartenkacheln, Dateispeicher, später hikr.org) nur über Adapter-Interfaces ansprechen.
 - Datenbankänderungen nur über Alembic-Migrationen.
 - Konfiguration über Umgebungsvariablen; keine Geheimnisse oder feste Domains im Code (`PUBLIC_BASE_URL`).
 
@@ -52,3 +52,5 @@ Android-App (Flutter, nur Android), Web-Frontend (Python Flask) und eigenes Back
 ## Betrieb
 - Der Stack läuft auf einem bereits genutzten Server. Keine festen Ports 80/443 im Docker-Compose-Stack; API nur auf `127.0.0.1`. Proxy-Beispiele und Backup-Skripte liegen in `deploy/`.
 - Container-Ressourcen begrenzen.
+- Daten liegen als normale Ordner unter `DATA_DIR` (Bind-Mounts), nicht in Docker-Volumes.
+- Kartenkacheln kommen vom eigenen Server (Modul `maps`): beim ersten Ansehen geholt, als Datei gespeichert, frühestens nach 7 Tagen neu geprüft. Nie Kacheln auf Vorrat herunterladen (Nutzungsbedingungen von OpenStreetMap).

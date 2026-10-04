@@ -305,7 +305,9 @@ def test_detail_shows_facts_course_lists_and_map_data(user, fake_api):
     assert re.findall(r'<(?:script|link)[^>]+(?:src|href)="(?:https?:)?//', detail) == []
     assert "/static/vendor/maplibre-gl/maplibre-gl-csp.js" in detail
     policy = response.headers["Content-Security-Policy"]
-    assert "default-src 'self'" in policy and "https://tile.openstreetmap.org" in policy
+    # Tiles come from the own server too; no foreign origin is allowed.
+    assert "default-src 'self'" in policy and "http" not in policy
+    assert data["tileUrl"] == "/tiles/{z}/{x}/{y}.png"
 
 
 def test_owner_tools_are_hidden_from_other_users(user, fake_api):

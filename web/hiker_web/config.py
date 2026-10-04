@@ -18,7 +18,6 @@ def load_config() -> dict:
         "SESSION_COOKIE_SAMESITE": "Lax",
         "SESSION_COOKIE_NAME": "hiker_session",
         "MAX_CONTENT_LENGTH": int(os.environ.get("MAX_UPLOAD_MB", "15")) * 1024 * 1024 * 21,
-        # Tile source of the map; replaceable until the licences are settled.
-        "MAP_TILE_URL": os.environ.get("MAP_TILE_URL")
-        or "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        # Default: the tiles the API caches (module maps), passed through by this service.
+        "MAP_TILE_URL": os.environ.get("MAP_TILE_URL") or "/tiles/{z}/{x}/{y}.png",
     }

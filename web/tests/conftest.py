@@ -64,7 +64,7 @@ class FakeApi:
         if self.offline:
             raise httpx2.ConnectError("offline")
         path = request.url.path.removeprefix("/api/v1")
-        public = path.startswith(("/auth/", "/public/")) or path == "/modules"
+        public = path.startswith(("/auth/", "/public/", "/maps/")) or path == "/modules"
         token = request.headers.get("authorization", "").removeprefix("Bearer ")
         if not public and token not in self.valid_tokens:
             return error(401, "invalid_token")

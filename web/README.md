@@ -39,7 +39,7 @@ export WEB_COOKIE_SECURE=false          # nur lokal ohne HTTPS
 | `WEB_SESSION_DAYS` | ungenutzte Sitzungen werden danach gelöscht; wie `REFRESH_TOKEN_TTL_DAYS` der API wählen | `30` |
 | `WEB_COOKIE_SECURE` | Cookie nur über HTTPS; `false` nur für lokale Entwicklung | `true` |
 | `MAX_UPLOAD_MB` | Größe einer Datei wie in der API; begrenzt Uploads | `15` |
-| `MAP_TILE_URL` | Kachelquelle der Karte | OpenStreetMap |
+| `MAP_TILE_URL` | Kachelquelle der Karte; leer = Kacheln vom eigenen Server | `/tiles/{z}/{x}/{y}.png` |
 
 ## Aufbau
 
@@ -82,8 +82,10 @@ Paket `maplibre-gl` von npm laden und `dist/maplibre-gl-csp.js`, `dist/maplibre-
 `dist/maplibre-gl.css` sowie `LICENSE.txt` ersetzen, `VERSION.txt` anpassen. Version 6 liefert
 nur noch ES-Module und braucht eine andere Einbindung.
 
-Die Kacheln kommen standardmäßig von `tile.openstreetmap.org` (Nutzungsbedingungen beachten;
-für mehr als gelegentliche Nutzung eine eigene Quelle in `MAP_TILE_URL` eintragen).
+Die Kacheln kommen vom eigenen Server: `/tiles/{z}/{x}/{y}.png` reicht die Kacheln durch, die
+die API im Modul `maps` zwischenspeichert (beim ersten Ansehen von OpenStreetMap geholt, danach
+lokal). Hinter dem Reverse Proxy geht es mit `MAP_TILE_URL=https://<domain>/api/v1/maps/tiles/{z}/{x}/{y}.png`
+ohne den Umweg über das Web-Frontend.
 
 ## Tests
 

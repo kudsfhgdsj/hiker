@@ -34,6 +34,28 @@ Der Smoke-Test legt ein Wegwerf-Konto an. Auf einer frischen Instanz würde dies
 Administrator – dort erst das eigene Konto anlegen oder den Test mit `SMOKE_EMAIL` und
 `SMOKE_PASSWORD` eines vorhandenen Kontos starten.
 
+## Daten
+
+Alle Daten liegen als normale Dateien unter `DATA_DIR` (Standard `./data` im Repository), nicht
+in Docker-Volumes:
+
+| Ordner | Inhalt | Besitzer |
+|---|---|---|
+| `db/` | PostgreSQL | Benutzer des Datenbank-Containers (UID 70) |
+| `files/` | Fotos und GPX | `HIKER_UID:HIKER_GID` |
+| `tiles/` | Kartenkacheln (Zwischenspeicher) | `HIKER_UID:HIKER_GID` |
+| `web-sessions/` | Anmeldungen des Web-Frontends | `HIKER_UID:HIKER_GID` |
+
+Der Dienst `init` legt die Ordner beim Start an. `db/` nie im laufenden Betrieb kopieren – für
+die Datenbank gibt es `backup.sh`.
+
+Kartenkacheln holt der Server beim ersten Ansehen von OpenStreetMap und liefert sie danach
+selbst aus. Nach `TILE_CACHE_DAYS` (14) fragt er nach, ob sich eine Kachel geändert hat. Der
+Speicher ist auf `TILE_CACHE_MAX_MB` (2000) begrenzt und muss nicht gesichert werden.
+
+Leere Instanz (z. B. nach Tests): `docker compose down`, dann `sudo rm -rf data/db data/files
+data/web-sessions`, dann `docker compose up -d`.
+
 ## Reverse Proxy
 
 `/api/` geht an die API (`API_PORT`, Standard 8010), alles andere an das Web-Frontend (`WEB_PORT`,

@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     open_meteo_forecast_url: str = "https://api.open-meteo.com/v1/forecast"
     open_meteo_archive_url: str = "https://archive-api.open-meteo.com/v1/archive"
 
+    # Map tiles are cached on this server (module maps); empty disables fetching new ones.
+    tile_source_url: str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+    tile_cache_path: str = "./data/tiles"
+    # After this many days the source is asked whether a tile changed (at least 7: OSM policy).
+    tile_cache_days: int = Field(default=14, ge=7)
+    tile_cache_max_mb: int = Field(default=2000, gt=0)
+
     @property
     def module_names(self) -> list[str]:
         return [name.strip() for name in self.enabled_modules.split(",") if name.strip()]

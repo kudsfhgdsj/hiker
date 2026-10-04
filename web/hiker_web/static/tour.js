@@ -36,6 +36,8 @@
 
   // --- Map ---
   maplibregl.setWorkerUrl(data.workerUrl);
+  // Tiles from the own server are configured as a path; the map needs a full address.
+  const tileUrl = data.tileUrl.startsWith("/") ? window.location.origin + data.tileUrl : data.tileUrl;
   const positions = [...line];
   const place = (point) => point && point.lat != null && point.lon != null;
   for (const point of [data.start, data.end, ...data.photos, ...data.waypoints]) {
@@ -50,7 +52,7 @@
     style: {
       version: 8,
       sources: {
-        base: { type: "raster", tiles: [data.tileUrl], tileSize: 256, attribution: data.attribution },
+        base: { type: "raster", tiles: [tileUrl], tileSize: 256, attribution: data.attribution },
       },
       layers: [{ id: "base", type: "raster", source: "base" }],
     },

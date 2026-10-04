@@ -178,3 +178,41 @@ def test_link_tokens_stay_out_of_the_log():
 
     assert TOKEN not in record.getMessage()
     assert "/p/[redacted]/photos/0" in record.getMessage()
+
+
+def test_map_tiles_are_passed_through_without_login(browser, fake_api, app):
+    fake_api.route(
+        "GET",
+        "/maps/tiles/12/2150/1440.png",
+        lambda r: httpx2.Response(
+            200,
+            content=b"PNG",
+            headers={"content-type": "image/png", "cache-control": "public, max-age=86400"},
+        ),
+    )
+
+    tile = browser.get("/tiles/12/2150/1440.png")
+    missing = browser.get("/tiles/12/1/1.png")
+
+    assert tile.data == b"PNG" and tile.mimetype == "image/png"
+    assert tile.headers["Cache-Control"] == "public, max-age=86400"
+    assert "authorization" not in fake_api.calls[0].headers
+    assert missing.status_code == 404
+    assert browser.get("/tiles/12/x/1.png").status_code == 404
+
+
+def test_foreign_tile_source_is_allowed_by_the_security_policy(fake_api, tmp_path):
+    from hiker_web import create_app
+
+    app = create_app(
+        {
+            "SECRET_KEY": "test-secret-key-not-for-production-0123456789",
+            "SESSION_DIR": str(tmp_path / "sessions"),
+            "API_TRANSPORT": fake_api.transport,
+            "MAP_TILE_URL": "https://tiles.example.org/{z}/{x}/{y}.png",
+        }
+    )
+
+    policy = app.test_client().get("/login").headers["Content-Security-Policy"]
+
+    assert "img-src 'self' data: blob: https://tiles.example.org" in policy

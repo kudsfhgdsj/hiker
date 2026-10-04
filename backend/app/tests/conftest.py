@@ -6,7 +6,7 @@ os.environ.update(
         "SECRET_KEY": "test-secret-key-not-for-production-0123456789",
         "DATABASE_URL": "sqlite://",
         "PUBLIC_BASE_URL": "http://testserver",
-        "ENABLED_MODULES": "auth,gear,nutrition,protocols,sync",
+        "ENABLED_MODULES": "auth,gear,nutrition,protocols,sync,maps",
         "REGISTRATION_MODE": "open",
         "ACCESS_TOKEN_TTL_MINUTES": "15",
         "REFRESH_TOKEN_TTL_DAYS": "30",

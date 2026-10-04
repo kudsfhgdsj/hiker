@@ -190,6 +190,15 @@ def run(api_url: str, web_url: str) -> None:
         check(csrf, "login form has no CSRF token")
         status, _h, _raw = web.request("GET", "/static/vendor/maplibre-gl/maplibre-gl-csp.js")
         check(status == 200, "map library is not served")
+        if "maps" in modules:
+            status, _h, raw = web.request("GET", "/tiles/7/67/45.png")
+            if status == 502:
+                print("  --  map tiles: the tile source is not reachable from the server")
+            else:
+                check(status == 200 and raw[:4] == b"\x89PNG", f"map tile -> {status}")
+                status, _h, again = api.request("GET", f"{prefix}/maps/tiles/7/67/45.png")
+                check(status == 200 and again == raw, "map tile is not served from the cache")
+                step("map tiles come from the own server")
         secure_only = any(cookie.secure for cookie in web.cookies)
         if secure_only and web_url.startswith("http://"):
             step("web pages and map library served (web login skipped: Secure cookie over HTTP)")

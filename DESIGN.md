@@ -64,6 +64,8 @@ Hinweis: Flutter/Dart stammen von Google, sind aber Open Source und benötigen k
 | Lokale DB (App) | Drift (SQLite) | Offline |
 | HTTP | dio | Interceptors (Auth, Retry) |
 | Karten | MapLibre (`maplibre_gl`) | Open Source; ab Phase 1 für Track, Fotos, Punktauswahl |
+| Kartenkacheln | Modul `maps`: der eigene Server holt jede Kachel beim ersten Ansehen von OpenStreetMap, speichert sie als Datei und fragt erst nach `TILE_CACHE_DAYS` (Standard 14) mit dem ETag nach, ob sie sich geändert hat; entschieden am 04.10.2026 | Entlastet die OSM-Server und hält sich an deren Nutzungsbedingungen (Zwischenspeichern ja, Vorab-Download nein). Bekannte Gebiete funktionieren auch, wenn OSM nicht erreichbar ist. Für Phase 2 ist eine eigene Karte aus OSM-Rohdaten (Regionsauszug, alle x Tage neu gebaut) vorgesehen |
+| Datenablage im Betrieb | Normale Ordner unter `DATA_DIR` (Bind-Mounts) statt Docker-Volumes, entschieden am 04.10.2026 | Daten sind direkt sichtbar und mit üblichen Werkzeugen zu sichern; `db/` gehört dem PostgreSQL-Benutzer des Containers, der Rest dem Benutzer `HIKER_UID` |
 | Kartenquellen | Konfigurierbare Tile-URL (Standard: OpenStreetMap) | Lizenzfragen später |
 | Diagramme | Eigenes Höhenprofil-Widget (Höhe, Herzfrequenz, Foto-Marker) | Foto-Marker und Kartenverknüpfung nötig |
 | Barcode-Scan | `flutter_zxing` (ZXing, lokal) | Kein ML Kit. Paketstatus geprüft am 03.10.2026: Version 3.1.0 vom 25.09.2026, MIT, aktiv gepflegt. Im Web-Frontend wird der Barcode eingetippt |
@@ -425,6 +427,8 @@ Stand `schema_version` 1: Tour (mit effektiven Werten für Dauer und Startgewich
 | GET, POST | /contacts | Partner-Kontakte listen / anlegen |
 | PATCH, DELETE | /contacts/{id} | Umbenennen, mit Nutzer verknüpfen (`linked_user_id`, `null` löst) / löschen |
 | GET | /sync/changes?since=, POST /sync/push | Offline-Sync |
+| GET | /maps/tiles/{z}/{x}/{y}.png | Kartenkachel aus dem Speicher des Servers; ohne Anmeldung (öffentliche Linkseiten), Rate-Limit 1500/Minute je Client |
+| GET | /maps/info | Kachel-Adresse, höchste Zoomstufe, Quellenangabe, Prüfintervall |
 
 ### Ausrüstung
 | Methode | Pfad | Zweck |
@@ -513,7 +517,7 @@ Das Web-Frontend ist ein eigenes Projekt in `web/` und ersetzt die früher gepla
 - **Sitzungen**: je Sitzung eine JSON-Datei in `WEB_SESSION_DIR` (Rechte 600) mit Tokens, Nutzer und aktiven Modulen; das Cookie enthält nur die zufällige Sitzungs-ID und das CSRF-Token. Ungenutzte Sitzungen werden nach `WEB_SESSION_DAYS` gelöscht. Weil ein Refresh-Token nur einmal gilt und eine Seite ihre Bilder parallel lädt, erneuert je Sitzung nur eine Anfrage die Tokens (Dateisperre); die anderen übernehmen das Ergebnis.
 - **Konflikte**: Das Bearbeiten-Formular schickt neben der `version` die Werte mit, mit denen es geladen wurde. Bei 409 führt das Frontend feldweise zusammen: unveränderte Felder übernehmen den neuen Stand, eigene Änderungen bleiben eingetragen; als Abweichung angezeigt werden nur Felder, die beide Seiten geändert haben. Bei den Listen gilt der neue Stand, eigene Änderungen an vorhandenen Zeilen sind eingetragen. Gespeichert wird erst nach erneutem Absenden, dann auf Basis der neuen Version.
 - **Rechte**: Die Oberfläche blendet aus, was die API ohnehin ablehnt (Track, Freigaben, Löschen nur für den Besitzer; Zeiten und Zahlenwerte bei `edit` als unveränderte versteckte Felder). Entscheidend bleibt die Prüfung der API.
-- **Karte**: MapLibre GL JS 5.24.0 in der CSP-Variante unter `static/vendor/maplibre-gl/`; Kachelquelle über `MAP_TILE_URL`. Höhenprofil als SVG ohne weitere Bibliothek, mit der Karte gekoppelt (Position unter dem Zeiger, Foto-Marker).
+- **Karte**: MapLibre GL JS 5.24.0 in der CSP-Variante unter `static/vendor/maplibre-gl/`; Kacheln standardmäßig vom eigenen Server: `/tiles/{z}/{x}/{y}.png` reicht die Kacheln des Moduls `maps` durch (`MAP_TILE_URL` leer); eine fremde Quelle lässt sich weiterhin eintragen. Höhenprofil als SVG ohne weitere Bibliothek, mit der Karte gekoppelt (Position unter dem Zeiger, Foto-Marker).
 - **Sicherheits-Header**: `Content-Security-Policy` (Skripte und Stile nur vom eigenen Server, Kacheln nur von der Kachelquelle), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` – auch auf der öffentlichen Seite: fremde Server erfahren nur die Herkunft, nie den Pfad mit dem Token. `no-referrer` scheidet aus, weil der Kachelserver von OpenStreetMap Anfragen ohne Referer blockiert.
 - **Öffentliche Seite**: `/p/<token>`, `/p/<token>/track.json`, `/p/<token>/photos/<index>`; Token mit falscher Form erreichen die API nicht. gunicorn schreibt kein Zugriffs-Log.
 - **Noch nicht im Web** (in der App vorhanden oder später): Track zeichnen, Fotoposition verschieben, Wegpunkte von Hand, eigener Wetterpunkt, Packlisten, Start-/Endpunkt von Hand. Zeiten lassen sich nur mit JavaScript bearbeiten (Umrechnung der Ortszeit im Browser); alles andere funktioniert auch ohne.
@@ -542,6 +546,7 @@ Ziel: Ubuntu 26.04, Domain `hiker.lacasa.internal`, läuft auf dem bereits genut
 - Upload-Größen im Proxy erhöhen (Fotos, GPX).
 - Backups: Nächtlicher `pg_dump` plus Sicherung des Foto-/GPX-Verzeichnisses nach `/var/backups/hiker`, 14 Tage Rotation, per systemd-Timer. Eine Kopie außerhalb des Servers ist empfohlen (Ziel noch offen). Wiederherstellung einmal testen.
 - **Umsetzung (Schritt 14)**: `deploy/` enthält `install-docker.sh`, Proxy-Beispiele für nginx und Caddy (beide halten Link-Tokens und Referer aus dem Log), `backup.sh`/`restore.sh` mit systemd-Units und `smoke_test.py`, der einen laufenden Stack von der Registrierung bis zum öffentlichen Link prüft. Am 04.10.2026 lief der Stack erstmals in Docker mit PostgreSQL; Smoke-Test, Sicherung und Wiederherstellung sowie die nginx-Konfiguration wurden dabei praktisch geprüft, die Caddy-Konfiguration nur mit `caddy validate`. Anleitung: `deploy/README.md`.
+- **Datenordner**: `DATA_DIR` (Standard `./data`) enthält `db/`, `files/`, `tiles/` und `web-sessions/`. Der Dienst `init` legt die Ordner an und übergibt sie `HIKER_UID:HIKER_GID`; API und Web-Frontend laufen unter diesem Benutzer. Der Kachelspeicher ist auf `TILE_CACHE_MAX_MB` (Standard 2000) begrenzt, die ältesten Kacheln fallen zuerst weg; er wird nicht gesichert.
 - Zertifikat: Für eine interne Domain (`*.internal`) stellt Let's Encrypt nichts aus; bis zur Umstellung auf die endgültige Domain braucht es eine eigene Zertifizierungsstelle, deren Wurzelzertifikat auch auf dem Android-Gerät installiert ist.
 - Datenbankmigrationen mit Alembic, Updates über neue Images.
 - Health-Endpunkt `/healthz`; Logs über Docker/journald; Firewall (ufw) nur 22/80/443.
@@ -577,6 +582,6 @@ Stehen in der separaten Datei `CLAUDE.md` im Repository-Hauptverzeichnis.
 
 1. Backup-Ziel außerhalb des Servers (z. B. zweiter Server, externer Speicher).
 2. Welcher Webserver bzw. Reverse Proxy läuft auf dem Server bereits? Beispiele für nginx und Caddy liegen in `deploy/`; für Apache gibt es noch keines.
-3. Kartenquellen und Lizenzen (bis Phase 2).
+3. Kartenquellen und Lizenzen (bis Phase 2). Die Android-App holt ihre Kacheln noch direkt von der Kachelquelle (`MAP_TILE_URL` beim Bauen) und nicht über das Modul `maps`.
 4. Das Rate-Limit liegt im Arbeitsspeicher eines API-Prozesses. Läuft die API später in mehreren Prozessen, muss es in den Proxy oder einen gemeinsamen Speicher wandern.
 5. Genauer Wunsch zur Foto-Darstellung nach Sichtung der wanderer-Demo (Abschnitt 9), falls etwas anders sein soll.

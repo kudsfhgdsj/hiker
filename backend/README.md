@@ -95,3 +95,11 @@ Das Datenbankschema umfasst alle installierten Module, unabhängig von `ENABLED_
 
 Automatisch erzeugte Skripte vor dem Commit prüfen: `app.core.db.UTCDateTime` durch
 `sa.DateTime(timezone=True)` ersetzen, damit Migrationen keinen App-Code importieren.
+
+## Modul maps (Kartenkacheln)
+
+`GET /api/v1/maps/tiles/{z}/{x}/{y}.png` liefert Kacheln aus dem eigenen Speicher
+(`TILE_CACHE_PATH`). Eine fehlende Kachel wird einmal von `TILE_SOURCE_URL` geholt; nach
+`TILE_CACHE_DAYS` fragt der Server mit dem gespeicherten ETag nach einer neuen Fassung. Ist die
+Quelle nicht erreichbar, wird die gespeicherte Kachel weiter ausgeliefert. Es wird nichts auf
+Vorrat geladen. Quelle nennen: © OpenStreetMap-Mitwirkende (ODbL).

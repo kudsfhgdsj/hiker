@@ -139,6 +139,16 @@ def create_app(config: dict | None = None) -> Flask:
     def healthz():
         return {"status": "ok"}
 
+    @app.get("/tiles/<int:z>/<int:x>/<int:y>.png")
+    def tile(z, x, y):
+        """A map tile from the cache of the API. No login: public link pages show a map."""
+        upstream = api().request("GET", f"/maps/tiles/{z}/{x}/{y}.png", auth=False)
+        response = app.response_class(upstream.content, mimetype="image/png")
+        response.headers["Cache-Control"] = upstream.headers.get(
+            "cache-control", "public, max-age=86400"
+        )
+        return response
+
     from hiker_web.views import auth, gear, nutrition, protocols, public
 
     app.register_blueprint(auth.blueprint)
