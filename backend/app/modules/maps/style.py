@@ -126,6 +126,8 @@ def build_style(
     precipitation_url: str | None = None,
     avalanche_url: str | None = None,
     weather_url: str | None = None,
+    radar: dict | None = None,
+    history_days: int = 0,
     attributions: dict[str, str] | None = None,
 ) -> dict:
     """The MapLibre style; the `*_url` arguments are URL templates.
@@ -572,11 +574,24 @@ def build_style(
                 "layers": ["slope"],
                 # Angle in degrees and colour of every class, for the legend.
                 "legend": [
+                    {"from": 15, "color": "#50af8c"},
+                    {"from": 20, "color": "#82c86e"},
+                    {"from": 25, "color": "#bedc5a"},
                     {"from": 30, "color": "#f5d73c"},
                     {"from": 35, "color": "#f0821e"},
                     {"from": 40, "color": "#c82828"},
                     {"from": 45, "color": "#7c3aad"},
                 ],
+                # The user chooses from and up to which angle slopes are coloured: the
+                # clients add `?low=…&high=…` to the tiles of the source.
+                "range": {
+                    "source": "slope",
+                    "min": 15,
+                    "max": 60,
+                    "step": 5,
+                    "low": 30,
+                    "high": 90,
+                },
             }
         )
     # Snow cover and precipitation: coarse satellite products, drawn over the ground.
@@ -717,6 +732,15 @@ def build_style(
                 + (["hillshade"] if terrain_url else []),
             }
         )
+    # Layers that also show a day in the past: the clients add `?date=YYYY-MM-DD` to the
+    # addresses of these sources.
+    dated = [name for name in ("avalanche", "snow", "weather") if name in sources]
+    if dated and history_days:
+        hiker["history"] = {"sources": dated, "days": history_days}
+    if radar:
+        # Rain radar and clouds change every few minutes: the clients ask `frames` for
+        # the times and build the layers themselves from the addresses with {time}.
+        hiker["radar"] = radar | {"attribution": notes.get("radar", "")}
     return {
         "version": 8,
         "name": "hiker",

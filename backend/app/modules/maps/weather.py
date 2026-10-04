@@ -10,7 +10,7 @@ map around costs few requests.
 import gzip
 import logging
 import math
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from functools import lru_cache
 from typing import Annotated, Protocol
 
@@ -47,29 +47,45 @@ class ForecastSourceError(Exception):
 
 
 class ForecastSource(Protocol):
-    def forecast(self, places: list[tuple[float, float]]) -> list[dict]:
-        """Per (lat, lon) the answer of the weather service with `daily` and `hourly`."""
+    def forecast(self, places: list[tuple[float, float]], day: date | None = None) -> list[dict]:
+        """Per (lat, lon) the answer of the weather service with `daily` and `hourly`:
+        the next days, or the one day in the past that is asked for."""
 
 
 class OpenMeteoForecast:
-    def __init__(self, url: str, user_agent: str, *, transport: httpx2.BaseTransport | None = None):
+    def __init__(
+        self,
+        url: str,
+        user_agent: str,
+        *,
+        archive_url: str = "",
+        transport: httpx2.BaseTransport | None = None,
+    ):
         self._url = url
+        self._archive_url = archive_url
         self._client = httpx2.Client(
             headers={"User-Agent": user_agent}, timeout=10.0, transport=transport
         )
 
-    def forecast(self, places: list[tuple[float, float]]) -> list[dict]:
+    def forecast(self, places: list[tuple[float, float]], day: date | None = None) -> list[dict]:
+        url = self._url
         params = {
             "latitude": ",".join(f"{lat:.3f}" for lat, _ in places),
             "longitude": ",".join(f"{lon:.3f}" for _, lon in places),
             "daily": "weather_code,temperature_2m_max,temperature_2m_min,"
             "precipitation_sum,snowfall_sum",
             "hourly": "snow_depth",
-            "forecast_days": str(DAYS),
             "timezone": "UTC",
         }
+        if day is None:
+            params["forecast_days"] = str(DAYS)
+        else:
+            params["start_date"] = params["end_date"] = day.isoformat()
+            # The forecast service keeps about three months; older days are in the archive.
+            if (datetime.now(UTC).date() - day).days > 80 and self._archive_url:
+                url = self._archive_url
         try:
-            response = self._client.get(self._url, params=params)
+            response = self._client.get(url, params=params)
             response.raise_for_status()
             data = response.json()
         except (httpx2.HTTPError, ValueError) as exc:
@@ -184,11 +200,21 @@ def encode_points(layer: str, points: list[tuple[int, int, dict[str, str]]]) -> 
     return _bytes_field(3, body)
 
 
-def weather_tile(source: ForecastSource, z: int, x: int, y: int, now: datetime | None) -> bytes:
-    """The gzip-compressed vector tile with the forecast at the places of the tile."""
+def weather_tile(
+    source: ForecastSource,
+    z: int,
+    x: int,
+    y: int,
+    now: datetime | None,
+    day: date | None = None,
+) -> bytes:
+    """The gzip-compressed vector tile with the forecast at the places of the tile; for
+    a day in the past with the weather of that day (`day0`) and its snow depth at noon."""
     moment = now or datetime.now(UTC)
+    if day is not None:
+        moment = datetime(day.year, day.month, day.day, 12, tzinfo=UTC)
     places = places_of(z, x, y)
-    answers = source.forecast([(lat, lon) for lat, lon, _, _ in places])
+    answers = source.forecast([(lat, lon) for lat, lon, _, _ in places], day)
     points = []
     for (_lat, _lon, px, py), answer in zip(places, answers, strict=True):
         attributes = {}
@@ -206,15 +232,19 @@ def weather_tile(source: ForecastSource, z: int, x: int, y: int, now: datetime |
 
 
 @lru_cache
-def _source(url: str, public_base_url: str) -> ForecastSource:
-    return OpenMeteoForecast(url, f"hiker/{__version__} ({public_base_url})")
+def _source(url: str, archive_url: str, public_base_url: str) -> ForecastSource:
+    return OpenMeteoForecast(
+        url, f"hiker/{__version__} ({public_base_url})", archive_url=archive_url
+    )
 
 
 def get_forecast_source() -> ForecastSource | None:
     settings = get_settings()
     if not settings.open_meteo_forecast_url or not settings.weather_layers_enabled:
         return None
-    return _source(settings.open_meteo_forecast_url, settings.public_base_url)
+    return _source(
+        settings.open_meteo_forecast_url, settings.open_meteo_archive_url, settings.public_base_url
+    )
 
 
 Forecast = Annotated[ForecastSource | None, Depends(get_forecast_source)]

@@ -11,8 +11,10 @@
 # italy, bayern, alps). Der OSM-Auszug wird bei jedem Lauf neu geholt, die Hilfsdaten
 # (Küstenlinien, Natural Earth, rund 1,5 GB) nur beim ersten Mal.
 #
-# Bedarf, grob: Schweiz rund 3 GB RAM und einige Minuten; Alpen rund 6 GB RAM (mit
-# MAP_BUILD_MEMORY=6g in der .env), eine halbe Stunde und 15 GB freien Platz während des Baus.
+# Bedarf, grob: ein Land wie die Schweiz oder Österreich rund 3 GB freien Arbeitsspeicher
+# (MAP_BUILD_MEMORY=2g Java-Heap genügt, Standard 3g) und 10 bis 30 Minuten. Der Bau legt
+# seine Zwischendaten auf die Platte (--storage=mmap), damit er mit wenig RAM auskommt;
+# reicht der Speicher nicht, beendet das System den Bau (Exit-Code 137).
 # Ein monatlicher Aufruf (cron) hält die Karte aktuell.
 set -eu
 
@@ -26,7 +28,7 @@ for area in "$@"; do
   echo "== $area =="
   # 1. Grundkarte (OpenMapTiles-Schema); lädt dabei den OSM-Auszug.
   docker compose --profile mapbuild run --rm mapbuild \
-    --download --area="$area" \
+    --download --area="$area" --storage=mmap \
     --download-dir=/data/build/sources --tmpdir=/data/build/tmp \
     --output="/data/build/$area.base.mbtiles" --force
   # 2. Wege mit ihrer Schwierigkeit (SAC-Skala, Klettersteige) aus demselben Auszug.

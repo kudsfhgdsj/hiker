@@ -148,7 +148,8 @@ class Avalanche:
         self._source = source
         self._folder = Path(cache_path) / "_avalanche"
         self._lock = threading.Lock()
-        self._built: tuple[float, date, dict] | None = None
+        # Per day: when it was built and the result. Past days do not change any more.
+        self._built: dict[date, tuple[float, dict]] = {}
 
     def _regions(self, area: str) -> list[dict]:
         """Thinned-out outlines of an area, from the file kept here if it is fresh."""
@@ -182,15 +183,16 @@ class Avalanche:
         """All regions that have a danger level today, as GeoJSON."""
         day = today or datetime.now(UTC).date()
         with self._lock:
-            built = self._built
-            if built and built[1] == day and time.monotonic() - built[0] < _RATINGS_FOR_S:
-                return built[2]
+            built = self._built.get(day)
+            past = day < datetime.now(UTC).date()
+            if built and (past or time.monotonic() - built[0] < _RATINGS_FOR_S):
+                return built[1]
             try:
                 ratings = self._source.ratings(day)
             except AvalancheSourceError as exc:
                 logger.warning("Avalanche ratings unavailable: %s", exc)
-                if built and built[1] == day:
-                    return built[2]
+                if built:
+                    return built[1]
                 ratings = {}
             features = []
             for area in AREAS if ratings else ():
@@ -218,7 +220,9 @@ class Avalanche:
                 "attribution": ATTRIBUTION,
                 "features": features,
             }
-            self._built = (time.monotonic(), day, result)
+            while len(self._built) >= 40:
+                self._built.pop(next(iter(self._built)))
+            self._built[day] = (time.monotonic(), result)
             return result
 
 

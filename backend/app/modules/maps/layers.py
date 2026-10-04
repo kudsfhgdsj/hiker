@@ -15,8 +15,9 @@ providers are deliberately not part of this list.
 
 import io
 import math
+import threading
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
@@ -118,13 +119,19 @@ _FRESH_DAYS = {"snow": 0.25, "precipitation": 0.02, "weather": 0.125}
 _BLANK_BYTES = 1500
 SLOPE_MIN_ZOOM = 9
 SLOPE_MAX_ZOOM = 14
-# From this angle on a slope is coloured, like on avalanche maps.
+# The colour of a slope by its angle: from 30° on as on avalanche maps, below that in
+# greens for those who look for gentle ground. Which part is drawn is up to the user.
 SLOPE_CLASSES = (
     (45, (124, 58, 173, 165)),
     (40, (200, 40, 40, 165)),
     (35, (240, 130, 30, 160)),
     (30, (245, 215, 60, 150)),
+    (25, (190, 220, 90, 140)),
+    (20, (130, 200, 110, 135)),
+    (15, (80, 175, 140, 130)),
 )
+SLOPE_LOW = 30
+SLOPE_HIGH = 90
 _EQUATOR_M = 40075016.686
 
 
@@ -156,6 +163,17 @@ class DatedTileSource(HttpTileSource):
         # Without the stored ETag: it belongs to the image of another day.
         return super().fetch(z, x, y, None)
 
+    def of_day(self, day: date) -> TileSource:
+        """The same source for a day in the past."""
+        outer = self
+
+        class _OfDay:
+            def fetch(self, z: int, x: int, y: int, etag: str | None) -> FetchedTile | None:
+                outer._template = outer._dated.replace("{date}", day.isoformat())
+                return HttpTileSource.fetch(outer, z, x, y, None)
+
+        return _OfDay()
+
 
 class _Composite:
     """Several providers as one source: the first one that has an image answers."""
@@ -184,8 +202,11 @@ class _Composite:
         return None
 
 
-def slope_tile(terrain_png: bytes, z: int, y: int) -> bytes:
-    """A transparent tile that colours slopes of 30° and more, from an elevation tile."""
+def slope_tile(
+    terrain_png: bytes, z: int, y: int, low: int = SLOPE_LOW, high: int = SLOPE_HIGH
+) -> bytes:
+    """A transparent tile that colours slopes from `low` up to `high` degrees, from an
+    elevation tile. Flatter and steeper ground stays clear."""
     image = Image.open(io.BytesIO(terrain_png)).convert("RGB")
     width, height = image.size
     pixels = image.tobytes()
@@ -197,8 +218,15 @@ def slope_tile(terrain_png: bytes, z: int, y: int) -> bytes:
     lat = math.radians(tile_center(z, 0, y)[0])
     metres = _EQUATOR_M * math.cos(lat) / 2**z / width
     # tan² of the class borders, so that no angle has to be computed per pixel.
-    classes = [(math.tan(math.radians(angle)) ** 2, colour) for angle, colour in SLOPE_CLASSES]
+    classes = [
+        (math.tan(math.radians(angle)) ** 2, colour)
+        for angle, colour in SLOPE_CLASSES
+        if angle >= low
+    ] or [(math.tan(math.radians(low)) ** 2, SLOPE_CLASSES[0][1])]
+    # The lowest class starts at `low`, whatever its own border is.
+    classes[-1] = (math.tan(math.radians(low)) ** 2, classes[-1][1])
     lowest = classes[-1][0]
+    highest = math.tan(math.radians(min(high, 89.9))) ** 2 if high < 90 else math.inf
     step = 2 * metres
     out = bytearray(width * height * 4)
     for row in range(height):
@@ -216,7 +244,7 @@ def slope_tile(terrain_png: bytes, z: int, y: int) -> bytes:
                 step if down - up == 2 * width else metres
             )
             steepness = dx * dx + dy * dy
-            if steepness < lowest:
+            if steepness < lowest or steepness >= highest:
                 continue
             for limit, colour in classes:
                 if steepness >= limit:
@@ -233,6 +261,10 @@ class Layers:
 
     def __init__(self, cache_path: str, cache_days: float, max_bytes: int, sources: dict):
         self._sources: dict[str, TileSource] = sources
+        self._root = Path(cache_path)
+        self._max_bytes = max_bytes
+        self._lock = threading.Lock()
+        self._dated: dict[str, TileCache] = {}
         self._caches = {
             name: TileCache(
                 Path(cache_path) / "_layers" / name, _FRESH_DAYS.get(name, cache_days), max_bytes
@@ -246,15 +278,31 @@ class Layers:
             names.update(("slope", "contours"))
         return names
 
-    def raster(self, layer: str, z: int, x: int, y: int) -> bytes:
+    def raster(self, layer: str, z: int, x: int, y: int, day: date | None = None) -> bytes:
         source = self._sources.get(layer)
         if source is None:
             raise NotFoundError("No such layer")
+        if day is not None and isinstance(source, DatedTileSource):
+            # The image of a past day never changes: kept in a folder of its own.
+            return self._dated_cache(layer, day).get(source.of_day(day), z, x, y)
         return self._caches[layer].get(source, z, x, y)
 
-    def slope(self, z: int, x: int, y: int) -> bytes:
+    def _dated_cache(self, name: str, day: date) -> TileCache:
+        key = f"{name}-{day.isoformat()}"
+        with self._lock:
+            if key not in self._dated:
+                # Few days are looked at in a row; older ones make room.
+                while len(self._dated) >= 40:
+                    self._dated.pop(next(iter(self._dated)))
+                self._dated[key] = TileCache(self._root / "_layers" / key, 365, self._max_bytes)
+            return self._dated[key]
+
+    def slope(self, z: int, x: int, y: int, low: int = SLOPE_LOW, high: int = SLOPE_HIGH) -> bytes:
         if "terrain" not in self._sources:
             raise NotFoundError("No such layer")
+        if (low, high) != (SLOPE_LOW, SLOPE_HIGH):
+            # Another choice of angles is computed anew; only the usual one is kept as a file.
+            return slope_tile(self.raster("terrain", z, x, y), z, y, low, high)
         layers = self
 
         class _Computed:
@@ -275,17 +323,19 @@ class Layers:
 
         return self._caches["contours"].get(_Computed(), z, x, y)
 
-    def weather(self, source, z: int, x: int, y: int) -> bytes:
-        """Gzip-compressed vector tile with the forecast, kept for three hours."""
+    def weather(self, source, z: int, x: int, y: int, day: date | None = None) -> bytes:
+        """Gzip-compressed vector tile with the forecast, kept for three hours; for a day
+        in the past with what was, kept for good."""
 
         class _Computed:
             def fetch(self, z: int, x: int, y: int, etag: str | None) -> FetchedTile | None:
                 try:
-                    return FetchedTile(weather_tile(source, z, x, y, None))
+                    return FetchedTile(weather_tile(source, z, x, y, None, day))
                 except ForecastSourceError as exc:
                     raise TileSourceError(str(exc)) from exc
 
-        return self._caches["weather"].get(_Computed(), z, x, y)
+        cache = self._caches["weather"] if day is None else self._dated_cache("weather", day)
+        return cache.get(_Computed(), z, x, y)
 
 
 def media_type(layer: str) -> str:

@@ -1,14 +1,14 @@
 import re
-from datetime import datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path as FilePath
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Response
+from fastapi import APIRouter, Depends, Path, Query, Response
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
-from app.core.errors import NotFoundError, error_responses
+from app.core.errors import NotFoundError, UnprocessableError, error_responses
 from app.core.ratelimit import rate_limit
 from app.modules.auth.deps import CurrentUser
 from app.modules.maps.avalanche import ATTRIBUTION as AVALANCHE_ATTRIBUTION
@@ -20,6 +20,12 @@ from app.modules.maps.layers import (
     MapLayers,
     attributions,
     media_type,
+)
+from app.modules.maps.radar import (
+    CLOUDS_MAX_ZOOM,
+    RADAR_ATTRIBUTION,
+    RAIN_MAX_ZOOM,
+    RadarLayer,
 )
 from app.modules.maps.style import build_style
 from app.modules.maps.tiles import OSM_ATTRIBUTION, Cache, Tiles
@@ -33,6 +39,26 @@ from app.modules.maps.weather import (
 
 router = APIRouter()
 PROTOBUF = "application/x-protobuf"
+# How far back the layers with a history go.
+HISTORY_DAYS = 400
+
+
+def _past_day(
+    day: Annotated[
+        date | None,
+        Query(alias="date", description="A day in the past instead of now (up to 400 days back)"),
+    ] = None,
+) -> date | None:
+    if day is None:
+        return None
+    today = datetime.now(UTC).date()
+    if not today - timedelta(days=HISTORY_DAYS) <= day <= today:
+        raise UnprocessableError("The date must lie in the last 400 days", code="invalid_date")
+    # Today is not history: it is still changing.
+    return None if day == today else day
+
+
+PastDay = Annotated[date | None, Depends(_past_day)]
 
 # Above this zoom the tile source has nothing.
 MAX_ZOOM = 19
@@ -106,7 +132,11 @@ class RegionInfo(BaseModel):
 
 @router.get("/style.json", responses=error_responses(404))
 def read_style(
-    vectors: Vectors, layers: MapLayers, avalanche: AvalancheLayer, forecast: Forecast
+    vectors: Vectors,
+    layers: MapLayers,
+    avalanche: AvalancheLayer,
+    forecast: Forecast,
+    radar: RadarLayer,
 ) -> dict:
     """The MapLibre style of the own map. No login (public link pages)."""
     if not vectors.regions():
@@ -141,8 +171,24 @@ def read_style(
         ),
         avalanche_url=f"{base}/avalanche.geojson" if avalanche is not None else None,
         weather_url=f"{base}/weather/{{z}}/{{x}}/{{y}}.pbf" if forecast is not None else None,
+        radar=(
+            {
+                "frames": f"{base}/radar/frames",
+                "rain": f"{base}/radar/rain/{{time}}/{{z}}/{{x}}/{{y}}.png",
+                "clouds": f"{base}/radar/clouds/{{time}}/{{z}}/{{x}}/{{y}}.png",
+                "rain_max_zoom": RAIN_MAX_ZOOM,
+                "clouds_max_zoom": CLOUDS_MAX_ZOOM,
+            }
+            if radar is not None
+            else None
+        ),
+        history_days=HISTORY_DAYS,
         attributions=attributions(layers.available())
-        | {"avalanche": AVALANCHE_ATTRIBUTION, "weather": WEATHER_ATTRIBUTION},
+        | {
+            "avalanche": AVALANCHE_ATTRIBUTION,
+            "weather": WEATHER_ATTRIBUTION,
+            "radar": RADAR_ATTRIBUTION,
+        },
     )
 
 
@@ -182,30 +228,33 @@ def read_layer_tile(
     x: Annotated[int, Path(ge=0)],
     y: Annotated[int, Path(ge=0)],
     layers: MapLayers,
+    day: PastDay,
 ):
     """A tile of an open raster layer (elevation, aerial image, snow, precipitation),
-    cached here. No login."""
+    cached here. No login. `date` gives the snow cover of a day in the past."""
     if x >= 2**z or y >= 2**z:
         raise NotFoundError("No such tile")
-    # Snow and precipitation change within hours; the others hardly ever.
-    lasting = layer in ("terrain", "satellite")
+    # Snow and precipitation change within hours; the others and past days hardly ever.
+    lasting = layer in ("terrain", "satellite") or day is not None
     return Response(
-        layers.raster(layer, z, x, y),
+        layers.raster(layer, z, x, y, day if layer == "snow" else None),
         media_type=media_type(layer),
         headers={"Cache-Control": f"public, max-age={604800 if lasting else 1800}"},
     )
 
 
 @router.get("/avalanche.geojson", responses=error_responses(404))
-def read_avalanche(avalanche: AvalancheLayer):
-    """The avalanche warning regions with their highest danger level of today (1 to 5).
+def read_avalanche(avalanche: AvalancheLayer, day: PastDay):
+    """The avalanche warning regions with their highest danger level of the day (1 to 5).
 
-    No login. Regions without a bulletin today are left out; out of season the list is
-    short or empty. `date` names the day, `attribution` the sources.
+    No login. Regions without a bulletin on the day are left out; out of season the list
+    is short or empty. `date` asks for a day in the past; the answer names the day and
+    the sources.
     """
     if avalanche is None:
         raise NotFoundError("No such layer")
-    return JSONResponse(avalanche.geojson(), headers={"Cache-Control": "public, max-age=1800"})
+    age = 86400 if day is not None else 1800
+    return JSONResponse(avalanche.geojson(day), headers={"Cache-Control": f"public, max-age={age}"})
 
 
 @router.get(
@@ -242,13 +291,15 @@ def read_weather_tile(
     y: Annotated[int, Path(ge=0)],
     layers: MapLayers,
     forecast: Forecast,
+    day: PastDay,
 ):
     """Weather forecast (today and the two days after) and snow depth at a grid of places,
-    as a vector tile (layer `weather`). A model forecast from Open-Meteo. No login."""
+    as a vector tile (layer `weather`). A model forecast from Open-Meteo. No login.
+    With `date`: the weather and the snow depth of that day in the past."""
     if forecast is None or x >= 2**z or y >= 2**z:
         raise NotFoundError("No such tile")
     return Response(
-        layers.weather(forecast, z, x, y),
+        layers.weather(forecast, z, x, y, day),
         media_type=PROTOBUF,
         headers={"Content-Encoding": "gzip", "Cache-Control": "public, max-age=3600"},
     )
@@ -265,14 +316,60 @@ def read_slope_tile(
     x: Annotated[int, Path(ge=0)],
     y: Annotated[int, Path(ge=0)],
     layers: MapLayers,
+    low: Annotated[int, Query(ge=10, le=60, description="Colour slopes from this angle")] = 30,
+    high: Annotated[int, Query(ge=15, le=90, description="… up to this angle (90: no limit)")] = 90,
 ):
-    """Slopes of 30° and more, coloured by steepness; computed from the elevation tiles."""
+    """Slopes coloured by steepness, computed from the elevation tiles: from 30° on by
+    default, or between `low` and `high` degrees."""
     if x >= 2**z or y >= 2**z:
         raise NotFoundError("No such tile")
+    if low >= high:
+        raise UnprocessableError("low must be smaller than high", code="invalid_range")
     return Response(
-        layers.slope(z, x, y),
+        layers.slope(z, x, y, low, high),
         media_type="image/png",
         headers={"Cache-Control": "public, max-age=604800"},
+    )
+
+
+# --- Rain radar and clouds with their time ---
+
+
+class RadarFrames(BaseModel):
+    rain: list[int] = Field(description="Unix times of the radar images, oldest first")
+    clouds: list[int] = Field(description="Unix times of the cloud images, oldest first")
+    attribution: str
+
+
+@router.get("/radar/frames", response_model=RadarFrames, responses=error_responses(404))
+def read_radar_frames(radar: RadarLayer):
+    """For which times rain radar and cloud images exist (the last two hours). No login."""
+    if radar is None:
+        raise NotFoundError("No such layer")
+    return radar.frames()
+
+
+@router.get(
+    "/radar/{kind}/{frame}/{z}/{x}/{y}.png",
+    response_class=Response,
+    responses={200: {"content": {"image/png": {}}}, **error_responses(404, 429, 502)},
+    dependencies=[Depends(rate_limit("radar-tiles", limit=1200))],
+)
+def read_radar_tile(
+    kind: Annotated[str, Path(pattern="^(rain|clouds)$")],
+    frame: Annotated[int, Path(ge=0)],
+    z: Annotated[int, Path(ge=0, le=10)],
+    x: Annotated[int, Path(ge=0)],
+    y: Annotated[int, Path(ge=0)],
+    radar: RadarLayer,
+):
+    """A tile of the rain radar or the cloud image of one time. No login."""
+    if radar is None or x >= 2**z or y >= 2**z:
+        raise NotFoundError("No such tile")
+    data = radar.rain_tile(frame, z, x, y) if kind == "rain" else radar.cloud_tile(frame, z, x, y)
+    # An image of a past moment never changes.
+    return Response(
+        data, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"}
     )
 
 

@@ -21,10 +21,17 @@ from app.modules.maps.layers import (
     slope_tile,
     tile_center,
 )
+from app.modules.maps.radar import (
+    HttpRadarSource,
+    Radar,
+    RadarUnavailableError,
+    get_radar,
+)
 from app.modules.maps.style import build_style
 from app.modules.maps.tiles import FetchedTile, TileSourceError
 from app.modules.maps.weather import (
     ForecastSourceError,
+    OpenMeteoForecast,
     day_label,
     get_forecast_source,
     places_of,
@@ -261,7 +268,11 @@ def test_switchable_layers_start_hidden_and_keep_their_place():
     assert satellite["show"] == ["satellite"]
     assert {"wood", "rock", "water", "hillshade"} <= set(satellite["hide"])
     assert not {"background", "path", "peak-name", "waterway"} & set(satellite["hide"])
-    assert [entry["from"] for entry in hiker["overlays"][0]["legend"]] == [30, 35, 40, 45]
+    legend = [entry["from"] for entry in hiker["overlays"][0]["legend"]]
+    assert legend == [15, 20, 25, 30, 35, 40, 45]
+    assert (
+        hiker["overlays"][0]["range"]["low"] == 30 and hiker["overlays"][0]["range"]["high"] == 90
+    )
 
     plain = build_style("t", "g", "©", 14)
     assert set(plain["sources"]) == {"hiker"}
@@ -529,10 +540,12 @@ def test_avalanche_endpoint(client, tmp_path):
 class FakeForecast:
     def __init__(self):
         self.calls: list[int] = []
+        self.days: list = []
         self.fail = False
 
-    def forecast(self, places):
+    def forecast(self, places, day=None):
         self.calls.append(len(places))
+        self.days.append(day)
         if self.fail:
             raise ForecastSourceError("unreachable")
         hours = [f"2026-02-01T{hour:02d}:00" for hour in range(24)]
@@ -627,3 +640,203 @@ def test_forecast_days_and_snow_depth_are_overlays():
         for name in ("weather-0", "weather-1", "weather-2", "snow-depth")
     )
     assert style["sources"]["weather"]["maxzoom"] == 10
+
+
+# --- Slope between two angles ---
+
+
+def test_slope_is_coloured_only_between_the_chosen_angles():
+    z, y = 12, 1436
+    per_pixel = metres_per_pixel(z, y)
+
+    def shade(tangent, low, high):
+        surface = terrain_png(lambda c, r: 1000 + c * per_pixel * tangent)
+        image = Image.open(io.BytesIO(slope_tile(surface, z, y, low, high)))
+        return image.getpixel((SIZE // 2, SIZE // 2))
+
+    # 22° is clear by default, green when gentle slopes are asked for.
+    assert shade(0.4, 30, 90)[3] == 0
+    assert shade(0.4, 20, 90)[:3] == (130, 200, 110)
+    # 42° is red, but clear when only slopes up to 40° are wanted.
+    assert shade(0.9, 30, 90)[:3] == (200, 40, 40)
+    assert shade(0.9, 30, 40)[3] == 0
+    # The lowest class starts exactly at the chosen angle: 31.8° is clear from 33°, not from 31°.
+    assert shade(0.62, 33, 90)[3] == 0 and shade(0.62, 31, 90)[3] > 0
+
+
+def test_slope_endpoint_takes_the_range(client, layers):
+    usual = client.get("/api/v1/maps/slope/12/2153/1436.png")
+    narrow = client.get("/api/v1/maps/slope/12/2153/1436.png", params={"low": 45, "high": 50})
+    assert usual.status_code == narrow.status_code == 200
+    assert usual.content != narrow.content
+    wrong = client.get("/api/v1/maps/slope/12/2153/1436.png", params={"low": 40, "high": 35})
+    assert wrong.status_code == 422 and wrong.json()["error"]["code"] == "invalid_range"
+    assert client.get("/api/v1/maps/slope/12/2153/1436.png", params={"low": 5}).status_code == 422
+
+
+# --- A day in the past ---
+
+
+def test_layers_with_history_take_a_date(client, layers, tmp_path):
+    source = FakeAvalancheSource()
+    client.app.dependency_overrides[get_avalanche] = lambda: Avalanche(source, str(tmp_path))
+    forecast = FakeForecast()
+    client.app.dependency_overrides[get_forecast_source] = lambda: forecast
+    past = (datetime.now(UTC) - timedelta(days=200)).date().isoformat()
+
+    danger = client.get("/api/v1/maps/avalanche.geojson", params={"date": past})
+    assert danger.status_code == 200 and danger.json()["date"] == past
+    assert "max-age=86400" in danger.headers["cache-control"]
+
+    tile = client.get("/api/v1/maps/weather/9/269/179.pbf", params={"date": past})
+    assert tile.status_code == 200 and forecast.days == [date.fromisoformat(past)]
+    # Today is not history; the future and the distant past are refused.
+    today = datetime.now(UTC).date()
+    client.get("/api/v1/maps/weather/9/269/179.pbf", params={"date": today.isoformat()})
+    assert forecast.days[-1] is None
+    for wrong in (today + timedelta(days=1), today - timedelta(days=500)):
+        response = client.get("/api/v1/maps/avalanche.geojson", params={"date": wrong.isoformat()})
+        assert response.status_code == 422 and response.json()["error"]["code"] == "invalid_date"
+
+
+def test_snow_cover_of_a_past_day_is_asked_for_by_that_day(tmp_path):
+    asked = []
+
+    def handler(request):
+        asked.append(str(request.url))
+        return httpx2.Response(200, content=b"png" * 700, headers={"content-type": "image/png"})
+
+    snow = DatedTileSource(
+        SNOW.url, "hiker-test", "http://testserver", transport=httpx2.MockTransport(handler)
+    )
+    cached = Layers(str(tmp_path), 14, 10_000_000, {"snow": snow})
+
+    cached.raster("snow", 7, 67, 44, date(2026, 2, 1))
+    cached.raster("snow", 7, 67, 44, date(2026, 2, 1))
+
+    assert len(asked) == 1 and "/default/2026-02-01/" in asked[0]
+    assert (tmp_path / "_layers" / "snow-2026-02-01" / "7" / "67" / "44.png").is_file()
+
+
+def test_past_weather_asks_for_one_day_and_old_days_in_the_archive():
+    asked = []
+
+    def handler(request):
+        asked.append(request.url)
+        return httpx2.Response(200, json={"daily": {}, "hourly": {}})
+
+    source = OpenMeteoForecast(
+        "https://forecast.example/v1/forecast",
+        "hiker-test",
+        archive_url="https://archive.example/v1/archive",
+        transport=httpx2.MockTransport(handler),
+    )
+    recent = datetime.now(UTC).date() - timedelta(days=10)
+    old = datetime.now(UTC).date() - timedelta(days=300)
+
+    source.forecast([(47.0, 9.0)])
+    source.forecast([(47.0, 9.0)], recent)
+    source.forecast([(47.0, 9.0)], old)
+
+    assert asked[0].params["forecast_days"] == "3" and "start_date" not in asked[0].params
+    assert asked[1].host == "forecast.example"
+    assert asked[1].params["start_date"] == asked[1].params["end_date"] == recent.isoformat()
+    assert asked[2].host == "archive.example" and asked[2].params["start_date"] == old.isoformat()
+
+
+def test_style_names_the_layers_with_history_and_the_radar():
+    style = build_style(
+        "t",
+        "g",
+        "©",
+        14,
+        snow_url="snow",
+        avalanche_url="danger",
+        weather_url="weather",
+        history_days=400,
+        radar={"frames": "frames", "rain": "rain/{time}", "clouds": "clouds/{time}"},
+    )
+    hiker = style["metadata"]["hiker"]
+
+    assert hiker["history"] == {"sources": ["avalanche", "snow", "weather"], "days": 400}
+    assert hiker["radar"]["rain"] == "rain/{time}" and hiker["radar"]["frames"] == "frames"
+    assert "history" not in build_style("t", "g", "©", 14)["metadata"]["hiker"]
+
+
+# --- Rain radar and clouds ---
+
+
+class FakeRadarSource:
+    def __init__(self):
+        self.frame_calls = 0
+        self.tiles: list[tuple] = []
+        self.fail = False
+
+    def rain_frames(self):
+        self.frame_calls += 1
+        if self.fail:
+            raise RadarUnavailableError("unreachable")
+        return {1000: "/v2/radar/a", 1600: "/v2/radar/b"}
+
+    def rain_tile(self, path, z, x, y):
+        self.tiles.append(("rain", path, z, x, y))
+        return b"rain"
+
+    def cloud_tile(self, moment, z, x, y):
+        self.tiles.append(("clouds", moment, z, x, y))
+        return b"clouds"
+
+
+def test_radar_frames_and_tiles(client):
+    source = FakeRadarSource()
+    radar = Radar(source)
+    client.app.dependency_overrides[get_radar] = lambda: radar
+
+    frames = client.get("/api/v1/maps/radar/frames").json()
+    assert frames["rain"] == [1000, 1600] and "RainViewer" in frames["attribution"]
+    # Cloud images every 15 minutes for two hours, ending half an hour ago.
+    clouds = frames["clouds"]
+    assert len(clouds) == 9 and all(b - a == 900 for a, b in zip(clouds, clouds[1:], strict=False))
+    assert 1800 <= datetime.now(UTC).timestamp() - clouds[-1] < 2700
+
+    rain = client.get("/api/v1/maps/radar/rain/1600/6/33/22.png")
+    assert rain.status_code == 200 and rain.content == b"rain"
+    assert "max-age=86400" in rain.headers["cache-control"]
+    assert source.tiles[-1] == ("rain", "/v2/radar/b", 6, 33, 22)
+    # The list of times is asked for once, not with every tile.
+    assert source.frame_calls == 1
+    assert client.get("/api/v1/maps/radar/rain/1234/6/33/22.png").status_code == 404
+
+    cloud = client.get(f"/api/v1/maps/radar/clouds/{clouds[-1]}/6/33/22.png")
+    assert cloud.status_code == 200 and cloud.content == b"clouds"
+    assert source.tiles[-1][1] == datetime.fromtimestamp(clouds[-1], UTC)
+    # Only times of the grid and of the last day.
+    assert client.get(f"/api/v1/maps/radar/clouds/{clouds[-1] + 60}/6/33/22.png").status_code == 404
+    assert client.get("/api/v1/maps/radar/clouds/900/6/33/22.png").status_code == 404
+
+    client.app.dependency_overrides[get_radar] = lambda: None
+    assert client.get("/api/v1/maps/radar/frames").status_code == 404
+
+
+def test_radar_survives_an_outage_of_the_frame_list():
+    source = FakeRadarSource()
+    source.fail = True
+    radar = Radar(source)
+
+    assert radar.frames()["rain"] == [] and len(radar.frames()["clouds"]) == 9
+
+
+def test_cloud_tiles_are_asked_for_by_area_and_time():
+    asked = []
+
+    def handler(request):
+        asked.append(request.url)
+        return httpx2.Response(200, content=b"png", headers={"content-type": "image/png"})
+
+    source = HttpRadarSource("hiker-test", transport=httpx2.MockTransport(handler))
+    source.cloud_tile(datetime(2026, 10, 4, 12, 15, tzinfo=UTC), 1, 1, 0)
+
+    params = asked[0].params
+    assert params["layers"] == "mtg_fd:ir105_hrfi" and params["time"] == "2026-10-04T12:15:00Z"
+    west, south, east, north = (float(part) for part in params["bbox"].split(","))
+    assert west == 0 and south == 0 and round(east) == round(north) == 20037508
