@@ -202,6 +202,46 @@ class RouteRepository {
     }
   }
 
+  /// A GPX file as a new route; the server reduces the track to waypoints.
+  /// Needs the server: throws `network` without a connection.
+  Future<PlannedRoute> importGpx(List<int> bytes, String filename) => _stored(
+    () => _dio.post<Json>(
+      '/planning/routes/import',
+      data: FormData.fromMap({
+        'file': MultipartFile.fromBytes(bytes, filename: filename),
+      }),
+    ),
+  );
+
+  /// Starts a tour from the route and returns its id. Needs the server.
+  Future<String> tourFromRoute(String routeId) async {
+    final response = await apiCall(
+      () => _dio.post<Json>('/planning/routes/$routeId/tour'),
+    );
+    return response.data!['tour_id'] as String;
+  }
+
+  /// The tours started from the route; without network none are known.
+  Future<List<Json>> routeTours(String routeId) async {
+    try {
+      final response = await apiCall(
+        () => _dio.get<List<dynamic>>('/planning/routes/$routeId/tours'),
+      );
+      return response.data!.cast<Json>();
+    } on ApiException catch (error) {
+      if (error.code != ApiException.network) rethrow;
+      return const [];
+    }
+  }
+
+  /// Plan and walked track of a tour side by side.
+  Future<Json> comparison(String routeId, String tourId) async {
+    final response = await apiCall(
+      () => _dio.get<Json>('/planning/routes/$routeId/comparison/$tourId'),
+    );
+    return response.data!;
+  }
+
   /// The paces the user saved under a name; offline the last known ones.
   Future<List<SavedPace>> paces() async {
     List<Json> documents;
@@ -300,6 +340,12 @@ final savedPacesProvider = FutureProvider.autoDispose<List<SavedPace>>((ref) {
   ref.watch(syncGenerationProvider);
   return ref.watch(routeRepositoryProvider).paces();
 });
+
+final routeToursProvider = FutureProvider.autoDispose
+    .family<List<Json>, String>((ref, routeId) {
+      ref.watch(syncGenerationProvider);
+      return ref.watch(routeRepositoryProvider).routeTours(routeId);
+    });
 
 final planningInfoProvider = FutureProvider.autoDispose<PlanningInfo>(
   (ref) => ref.watch(routeRepositoryProvider).info(),

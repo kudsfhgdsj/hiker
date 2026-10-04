@@ -319,6 +319,121 @@ class _RoutePlanScreenState extends ConsumerState<RoutePlanScreen> {
     }
   }
 
+  /// Starts a tour from the stored route and opens it.
+  Future<void> _startTour() async {
+    final existing = _existing;
+    if (existing == null) return;
+    final router = GoRouter.of(context);
+    try {
+      final tourId = await ref
+          .read(routeRepositoryProvider)
+          .tourFromRoute(existing.id);
+      ref.invalidate(routeToursProvider(existing.id));
+      router.push('/protocols/tour/$tourId');
+    } catch (error) {
+      if (mounted) showError(context, error);
+    }
+  }
+
+  /// Plan and walked track of a tour, as figures side by side.
+  Future<void> _compare(String tourId) async {
+    final l10n = AppLocalizations.of(context);
+    final Json compared;
+    try {
+      compared = await ref
+          .read(routeRepositoryProvider)
+          .comparison(_existing!.id, tourId);
+    } catch (error) {
+      if (mounted) showError(context, error);
+      return;
+    }
+    if (!mounted) return;
+    final planned = compared['planned'] as Json;
+    final actual = compared['actual'] as Json?;
+    final deviation = compared['deviation'] as Json?;
+    String time(Object? seconds) => seconds == null
+        ? '–'
+        : Format.duration(((seconds as num) / 60).round());
+    TableRow row(String label, String plan, String walked) => TableRow(
+      children: [
+        for (final text in [label, plan, walked])
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Text(text),
+          ),
+      ],
+    );
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(compared['tour_title'] as String),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Table(
+                children: [
+                  row('', l10n.planComparePlanned, l10n.planCompareActual),
+                  row(
+                    l10n.planDistance,
+                    Format.distance(planned['distance_m'] as num?),
+                    actual == null
+                        ? '–'
+                        : Format.distance(actual['distance_m'] as num?),
+                  ),
+                  row(
+                    l10n.planAscent,
+                    Format.meters(planned['ascent_m'] as num?),
+                    actual == null
+                        ? '–'
+                        : Format.meters(actual['ascent_m'] as num?),
+                  ),
+                  row(
+                    l10n.planDescent,
+                    Format.meters(planned['descent_m'] as num?),
+                    actual == null
+                        ? '–'
+                        : Format.meters(actual['descent_m'] as num?),
+                  ),
+                  row(
+                    l10n.planDuration,
+                    time(planned['duration_s']),
+                    time(actual?['duration_s']),
+                  ),
+                  row(
+                    l10n.planCompareTotal,
+                    '–',
+                    time(actual?['total_time_s']),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.s),
+              Text(
+                actual == null
+                    ? l10n.planCompareNoTrack
+                    : deviation == null
+                    ? ''
+                    : l10n.planCompareDeviation(
+                        '${deviation['mean_m']}',
+                        '${deviation['max_m']}',
+                        '${((deviation['on_plan_share'] as num) * 100).round()}',
+                      ),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.close),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _problemText(AppLocalizations l10n, String code) => switch (code) {
     'no_route' => l10n.errorNoRoute,
     'routing_unavailable' => l10n.errorRoutingUnavailable,
@@ -370,6 +485,10 @@ class _RoutePlanScreenState extends ConsumerState<RoutePlanScreen> {
           )
         : null;
     final canSave = !_busy && _waypoints.length >= 2;
+    final linkedTours = _existing == null
+        ? const <Json>[]
+        : ref.watch(routeToursProvider(_existing!.id)).asData?.value ??
+              const <Json>[];
 
     return Scaffold(
       appBar: AppBar(
@@ -408,6 +527,11 @@ class _RoutePlanScreenState extends ConsumerState<RoutePlanScreen> {
                 value: _exportGpx,
                 child: Text(l10n.planGpx),
               ),
+              if (_existing != null)
+                PopupMenuItem(
+                  value: _startTour,
+                  child: Text(l10n.planTourCreate),
+                ),
               if (_existing != null)
                 PopupMenuItem(value: _delete, child: Text(l10n.delete)),
             ],
@@ -647,6 +771,28 @@ class _RoutePlanScreenState extends ConsumerState<RoutePlanScreen> {
                             onPressed: canSave ? _save : null,
                             child: Text(l10n.save),
                           ),
+                          // The tours started from this route: plan and
+                          // walked track side by side.
+                          if (linkedTours.isNotEmpty) ...[
+                            const Divider(),
+                            Text(
+                              l10n.planTours,
+                              style: theme.textTheme.titleSmall,
+                            ),
+                            for (final tour in linkedTours)
+                              ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: const Icon(Icons.terrain_outlined),
+                                title: Text(tour['title'] as String),
+                                subtitle: Text(
+                                  tour['has_track'] == true
+                                      ? l10n.planCompare
+                                      : l10n.planCompareNoTrack,
+                                ),
+                                onTap: () =>
+                                    _compare(tour['tour_id'] as String),
+                              ),
+                          ],
                           if (info?.attribution != null) ...[
                             const SizedBox(height: AppSpacing.m),
                             Text(

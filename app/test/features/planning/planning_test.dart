@@ -86,6 +86,43 @@ FakeApi planApi({
   FakeResponse? preview,
 }) => FakeApi({
   'GET /planning/paces': (_, _) => ok([savedPace]),
+  'GET /planning/routes/$routeId/tours': (_, _) => ok([
+    {
+      'tour_id': 'tour-1',
+      'title': 'Gipfeltag',
+      'start_time': null,
+      'has_track': true,
+    },
+  ]),
+  'POST /planning/routes/$routeId/tour': (_, _) {
+    saved?.add('tour');
+    return ok({'tour_id': 'tour-2'}, 201);
+  },
+  'GET /planning/routes/$routeId/comparison/tour-1': (_, _) => ok({
+    'route_id': routeId,
+    'tour_id': 'tour-1',
+    'tour_title': 'Gipfeltag',
+    'planned': {
+      'distance_m': 1200,
+      'ascent_m': 100,
+      'descent_m': 0,
+      'duration_s': 2100,
+      'total_time_s': null,
+    },
+    'actual': {
+      'distance_m': 1350,
+      'ascent_m': 120,
+      'descent_m': 15,
+      'duration_s': 2400,
+      'total_time_s': 3600,
+    },
+    'deviation': {'mean_m': 35, 'max_m': 150, 'on_plan_share': 0.8},
+    'track': null,
+  }),
+  'POST /planning/routes/import': (_, _) {
+    saved?.add('import');
+    return ok(route, 201);
+  },
   'POST /planning/paces': (_, body) {
     paces?.add(body);
     return ok(body, 201);
@@ -712,6 +749,65 @@ void main() {
       expect(stored['ascent_m_per_h'], 350.0);
       expect(stored['descent_m_per_h'], 400.0);
       expect(((previews.last! as Map)['pace'] as Map)['name'], 'Gemütlich');
+    });
+
+    testWidgets('a route is compared with the tour started from it', (
+      tester,
+    ) async {
+      final saved = <Object?>[];
+      await openPlanning(tester, planApi(saved: saved));
+      await tester.tap(find.text('Auf den Gipfel'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Touren zu dieser Route'), findsOneWidget);
+      await tester.ensureVisible(find.text('Gipfeltag'));
+      await tester.tap(find.text('Gipfeltag'));
+      await tester.pumpAndSettle();
+      expect(find.text('Geplant'), findsOneWidget);
+      expect(find.text('Gegangen'), findsOneWidget);
+      expect(find.text('1,4 km'), findsOneWidget);
+      expect(find.text('40 min'), findsOneWidget);
+      expect(find.text('1 h'), findsOneWidget);
+      expect(
+        find.textContaining(
+          'im Mittel 35 m neben dem Plan, höchstens 150 m; 80 %',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Schließen'));
+      await tester.pumpAndSettle();
+
+      // The menu starts a new tour from the route.
+      await tester.tap(find.byKey(const ValueKey('plan-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tour aus dieser Route anlegen'));
+      await tester.pumpAndSettle();
+      expect(saved, ['tour']);
+    });
+
+    testWidgets('a GPX file is imported as a route', (tester) async {
+      final saved = <Object?>[];
+      final map = FakeMap();
+      final Override picker = filePickerProvider.overrideWithValue(
+        ({required List<String> extensions, bool multiple = false}) async => [
+          PickedFile('runde.gpx', Uint8List.fromList(utf8.encode('<gpx/>'))),
+        ],
+      );
+      await pumpApp(
+        tester,
+        api: planApi(saved: saved),
+        store: MemoryKeyValueStore(signedInStore),
+        overrides: [map.override, picker],
+        modules: [planningModule],
+        size: const Size(420, 2400),
+      );
+      await tester.tap(find.byTooltip('GPX-Datei als Route importieren'));
+      await tester.pumpAndSettle();
+
+      expect(saved, ['import']);
+      // The planner opens with the imported route.
+      expect(map.content!.track.length, 3);
+      expect(find.text('Parkplatz'), findsOneWidget);
     });
 
     testWidgets('no route and no routing are explained', (tester) async {

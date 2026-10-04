@@ -8,6 +8,7 @@ import '../../../core/format.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/empty_list.dart';
 import '../../../core/widgets/error_text.dart';
+import '../../../core/widgets/file_pick.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/route_models.dart';
 import '../data/route_repository.dart';
@@ -43,6 +44,27 @@ class _RouteListScreenState extends ConsumerState<RouteListScreen> {
       appBar: AppBar(
         title: Text(l10n.planTitle),
         actions: [
+          IconButton(
+            tooltip: l10n.planImport,
+            icon: const Icon(Icons.upload_file_outlined),
+            onPressed: () async {
+              final files = await ref.read(filePickerProvider)(
+                extensions: const ['gpx'],
+              );
+              if (files.isEmpty || !context.mounted) return;
+              try {
+                final route = await ref
+                    .read(routeRepositoryProvider)
+                    .importGpx(files.first.bytes, files.first.name);
+                ref.invalidate(routeListProvider);
+                if (context.mounted) {
+                  context.push('/planning/route/${route.id}');
+                }
+              } catch (error) {
+                if (context.mounted) showError(context, error);
+              }
+            },
+          ),
           IconButton(
             tooltip: l10n.offlineTitle,
             icon: const Icon(Icons.download_for_offline_outlined),

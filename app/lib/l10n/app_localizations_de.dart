@@ -1443,6 +1443,35 @@ class AppLocalizationsDe extends AppLocalizations {
       'Eigene Vorgaben siehst nur du. Pausen sind in der Gehzeit nicht enthalten.';
 
   @override
+  String get planImport => 'GPX-Datei als Route importieren';
+
+  @override
+  String get planTourCreate => 'Tour aus dieser Route anlegen';
+
+  @override
+  String get planTours => 'Touren zu dieser Route';
+
+  @override
+  String get planCompare => 'Plan und Tour vergleichen';
+
+  @override
+  String get planComparePlanned => 'Geplant';
+
+  @override
+  String get planCompareActual => 'Gegangen';
+
+  @override
+  String get planCompareTotal => 'Gesamtzeit';
+
+  @override
+  String get planCompareNoTrack => 'Die Tour hat noch keinen Track.';
+
+  @override
+  String planCompareDeviation(String mean, String max, String share) {
+    return 'Der Track liegt im Mittel $mean m neben dem Plan, höchstens $max m; $share % näher als 50 m.';
+  }
+
+  @override
   String get planTags => 'Tags';
 
   @override

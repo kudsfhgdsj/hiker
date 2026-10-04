@@ -27,6 +27,9 @@ und Schätzungen kommen von der API (siehe `DESIGN.md`, Abschnitt 9a).
   lassen (nur für den Ersteller). Tags statt Datum; mit einem Startzeitpunkt zeigt die Seite
   Sonnenaufgang und -untergang, die Uhrzeit an jeder Stelle des Profils und warnt, wenn die
   Tour ins Dunkle reicht. Der Planer braucht JavaScript.
+  Aus einer Route lässt sich eine Tour anlegen; hat die Tour einen Track, stellt
+  „Vergleichen“ Plan und Gegangenes gegenüber (Zahlen, Abweichung, beide Linien auf der
+  Karte). Eine GPX-Datei lässt sich in der Routenliste als Route importieren.
 - Karte (`/map`): die Karte ansehen, ohne zu planen. Ein Klick nennt Gipfel, Hütte oder Weg
   mit Schwierigkeit und die Sonnenzeiten des Tages dort (für Gipfel auch bei freiem Horizont)
   und führt auf Wunsch in den Planer. Ebenen: Hangneigung mit einstellbaren Winkeln,

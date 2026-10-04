@@ -2698,6 +2698,60 @@ abstract class AppLocalizations {
   /// **'Eigene Vorgaben siehst nur du. Pausen sind in der Gehzeit nicht enthalten.'**
   String get planPaceNote;
 
+  /// No description provided for @planImport.
+  ///
+  /// In de, this message translates to:
+  /// **'GPX-Datei als Route importieren'**
+  String get planImport;
+
+  /// No description provided for @planTourCreate.
+  ///
+  /// In de, this message translates to:
+  /// **'Tour aus dieser Route anlegen'**
+  String get planTourCreate;
+
+  /// No description provided for @planTours.
+  ///
+  /// In de, this message translates to:
+  /// **'Touren zu dieser Route'**
+  String get planTours;
+
+  /// No description provided for @planCompare.
+  ///
+  /// In de, this message translates to:
+  /// **'Plan und Tour vergleichen'**
+  String get planCompare;
+
+  /// No description provided for @planComparePlanned.
+  ///
+  /// In de, this message translates to:
+  /// **'Geplant'**
+  String get planComparePlanned;
+
+  /// No description provided for @planCompareActual.
+  ///
+  /// In de, this message translates to:
+  /// **'Gegangen'**
+  String get planCompareActual;
+
+  /// No description provided for @planCompareTotal.
+  ///
+  /// In de, this message translates to:
+  /// **'Gesamtzeit'**
+  String get planCompareTotal;
+
+  /// No description provided for @planCompareNoTrack.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Tour hat noch keinen Track.'**
+  String get planCompareNoTrack;
+
+  /// No description provided for @planCompareDeviation.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Track liegt im Mittel {mean} m neben dem Plan, höchstens {max} m; {share} % näher als 50 m.'**
+  String planCompareDeviation(String mean, String max, String share);
+
   /// No description provided for @planTags.
   ///
   /// In de, this message translates to:
