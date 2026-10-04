@@ -63,6 +63,13 @@ class Settings(BaseSettings):
     # The own map: folder with vector maps (<region>.mbtiles) built from OpenStreetMap
     # data by deploy/build-map.sh. Without files there the cached raster tiles are used.
     map_data_path: str = "./data/maps"
+    # Elevation tiles (Terrarium encoding) for hillshading, the 3D view and the slope layer;
+    # fetched through this server and cached. Empty switches these layers off.
+    terrain_tiles_url: str = (
+        "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
+    )
+    # Aerial images from open sources (swisstopo, basemap.at, Sentinel-2 cloudless 2016).
+    satellite_enabled: bool = True
 
     @property
     def module_names(self) -> list[str]:

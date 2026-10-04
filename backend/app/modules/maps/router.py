@@ -11,6 +11,13 @@ from app.core.config import get_settings
 from app.core.errors import NotFoundError, error_responses
 from app.core.ratelimit import rate_limit
 from app.modules.auth.deps import CurrentUser
+from app.modules.maps.layers import (
+    SLOPE_MAX_ZOOM,
+    SLOPE_MIN_ZOOM,
+    MapLayers,
+    attributions,
+    media_type,
+)
 from app.modules.maps.style import build_style
 from app.modules.maps.tiles import OSM_ATTRIBUTION, Cache, Tiles
 from app.modules.maps.vector import REGION_NAME, VECTOR_ATTRIBUTION, Vectors
@@ -86,7 +93,7 @@ class RegionInfo(BaseModel):
 
 
 @router.get("/style.json", responses=error_responses(404))
-def read_style(vectors: Vectors) -> dict:
+def read_style(vectors: Vectors, layers: MapLayers) -> dict:
     """The MapLibre style of the own map. No login (public link pages)."""
     if not vectors.regions():
         raise NotFoundError("No vector map is installed")
@@ -96,6 +103,18 @@ def read_style(vectors: Vectors) -> dict:
         glyph_url=f"{base}/fonts/{{fontstack}}/{{range}}.pbf",
         attribution=VECTOR_ATTRIBUTION,
         max_zoom=vectors.max_zoom(),
+        terrain_url=(
+            f"{base}/raster/terrain/{{z}}/{{x}}/{{y}}" if "terrain" in layers.available() else None
+        ),
+        slope_url=(
+            f"{base}/slope/{{z}}/{{x}}/{{y}}.png" if "slope" in layers.available() else None
+        ),
+        satellite_url=(
+            f"{base}/raster/satellite/{{z}}/{{x}}/{{y}}"
+            if "satellite" in layers.available()
+            else None
+        ),
+        attributions=attributions(layers.available()),
     )
 
 
@@ -120,6 +139,51 @@ def read_vector_tile(
         data,
         media_type=PROTOBUF,
         headers={"Content-Encoding": "gzip", "Cache-Control": "public, max-age=86400"},
+    )
+
+
+@router.get(
+    "/raster/{layer}/{z}/{x}/{y}",
+    response_class=Response,
+    responses={200: {"content": {"image/png": {}, "image/jpeg": {}}}, **error_responses(404, 502)},
+    dependencies=[Depends(rate_limit("tiles", limit=1500))],
+)
+def read_layer_tile(
+    layer: Annotated[str, Path(pattern="^(terrain|satellite)$")],
+    z: Annotated[int, Path(ge=0, le=20)],
+    x: Annotated[int, Path(ge=0)],
+    y: Annotated[int, Path(ge=0)],
+    layers: MapLayers,
+):
+    """A tile of an open raster layer (elevation, aerial image), cached here. No login."""
+    if x >= 2**z or y >= 2**z:
+        raise NotFoundError("No such tile")
+    return Response(
+        layers.raster(layer, z, x, y),
+        media_type=media_type(layer),
+        headers={"Cache-Control": "public, max-age=604800"},
+    )
+
+
+@router.get(
+    "/slope/{z}/{x}/{y}.png",
+    response_class=Response,
+    responses={200: {"content": {"image/png": {}}}, **error_responses(404, 502)},
+    dependencies=[Depends(rate_limit("tiles", limit=1500))],
+)
+def read_slope_tile(
+    z: Annotated[int, Path(ge=SLOPE_MIN_ZOOM, le=SLOPE_MAX_ZOOM)],
+    x: Annotated[int, Path(ge=0)],
+    y: Annotated[int, Path(ge=0)],
+    layers: MapLayers,
+):
+    """Slopes of 30° and more, coloured by steepness; computed from the elevation tiles."""
+    if x >= 2**z or y >= 2**z:
+        raise NotFoundError("No such tile")
+    return Response(
+        layers.slope(z, x, y),
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=604800"},
     )
 
 

@@ -109,8 +109,22 @@ def _roads() -> list[dict]:
     return layers
 
 
-def build_style(tile_url: str, glyph_url: str, attribution: str, max_zoom: int) -> dict:
-    """The MapLibre style; `tile_url` and `glyph_url` are URL templates."""
+def build_style(
+    tile_url: str,
+    glyph_url: str,
+    attribution: str,
+    max_zoom: int,
+    *,
+    terrain_url: str | None = None,
+    slope_url: str | None = None,
+    satellite_url: str | None = None,
+    attributions: dict[str, str] | None = None,
+) -> dict:
+    """The MapLibre style; the `*_url` arguments are URL templates.
+
+    Layers that can be switched carry `visibility: none`; `metadata.hiker` tells the
+    clients which layers belong to which choice, so that web and app offer the same.
+    """
     cls = ["get", "class"]
     layers: list[dict] = [
         {"id": "background", "type": "background", "paint": {"background-color": LAND}},
@@ -366,18 +380,117 @@ def build_style(tile_url: str, glyph_url: str, attribution: str, max_zoom: int) 
             maxzoom=8,
         ),
     ]
+    notes = attributions or {}
+    sources: dict[str, dict] = {
+        "hiker": {
+            "type": "vector",
+            "tiles": [tile_url],
+            "minzoom": 0,
+            "maxzoom": max_zoom,
+            "attribution": attribution,
+        }
+    }
+    hiker: dict = {"bases": [{"id": "map", "show": [], "hide": []}], "overlays": []}
+    # What an aerial image replaces: the drawn ground, not paths, water lines and names.
+    ground = [
+        layer["id"]
+        for layer in layers
+        if layer["type"] == "fill" or layer["id"] in ("background", "path-halo")
+    ]
+
+    def insert_before(layer_id: str, layer: dict) -> None:
+        layers.insert(next(i for i, item in enumerate(layers) if item["id"] == layer_id), layer)
+
+    if terrain_url:
+        dem = {
+            "type": "raster-dem",
+            "tiles": [terrain_url],
+            "tileSize": 256,
+            "encoding": "terrarium",
+            "maxzoom": 13,
+            "attribution": notes.get("terrain", ""),
+        }
+        # Two sources of the same tiles: one shades the map, one lifts it in the 3D view.
+        sources["terrain"] = dem
+        sources["terrain-3d"] = dict(dem)
+        insert_before(
+            "waterway",
+            {
+                "id": "hillshade",
+                "type": "hillshade",
+                "source": "terrain",
+                "paint": {
+                    "hillshade-exaggeration": 0.45,
+                    "hillshade-shadow-color": "#3d3a34",
+                    "hillshade-highlight-color": "#ffffff",
+                    "hillshade-accent-color": "#5a554c",
+                },
+            },
+        )
+        hiker["terrain"] = {"source": "terrain-3d", "exaggeration": 1.3}
+    if slope_url:
+        sources["slope"] = {
+            "type": "raster",
+            "tiles": [slope_url],
+            "tileSize": 256,
+            "minzoom": 9,
+            "maxzoom": 14,
+            "attribution": notes.get("terrain", ""),
+        }
+        insert_before(
+            "tunnel",
+            {
+                "id": "slope",
+                "type": "raster",
+                "source": "slope",
+                "minzoom": 9,
+                "layout": {"visibility": "none"},
+                "paint": {"raster-opacity": 0.75, "raster-fade-duration": 0},
+            },
+        )
+        hiker["overlays"].append(
+            {
+                "id": "slope",
+                "layers": ["slope"],
+                # Angle in degrees and colour of every class, for the legend.
+                "legend": [
+                    {"from": 30, "color": "#f5d73c"},
+                    {"from": 35, "color": "#f0821e"},
+                    {"from": 40, "color": "#c82828"},
+                    {"from": 45, "color": "#7c3aad"},
+                ],
+            }
+        )
+    if satellite_url:
+        sources["satellite"] = {
+            "type": "raster",
+            "tiles": [satellite_url],
+            "tileSize": 256,
+            "maxzoom": 19,
+            "attribution": notes.get("satellite", ""),
+        }
+        layers.insert(
+            1,
+            {
+                "id": "satellite",
+                "type": "raster",
+                "source": "satellite",
+                "layout": {"visibility": "none"},
+            },
+        )
+        hiker["bases"].append(
+            {
+                "id": "satellite",
+                "show": ["satellite"],
+                "hide": [name for name in ground if name != "background"]
+                + (["hillshade"] if terrain_url else []),
+            }
+        )
     return {
         "version": 8,
         "name": "hiker",
         "glyphs": glyph_url,
-        "sources": {
-            "hiker": {
-                "type": "vector",
-                "tiles": [tile_url],
-                "minzoom": 0,
-                "maxzoom": max_zoom,
-                "attribution": attribution,
-            }
-        },
+        "metadata": {"hiker": hiker},
+        "sources": sources,
         "layers": layers,
     }
