@@ -38,10 +38,45 @@ Dafür braucht es ein JDK (21) und das Android-SDK (Plattform 36, Build-Tools 36
 ```sh
 flutter config --android-sdk ~/Android/Sdk --jdk-dir ~/development/jdk
 flutter build apk --debug      # build/app/outputs/flutter-apk/app-debug.apk
-flutter build apk              # Release; bisher mit dem Debug-Schlüssel signiert
+flutter build apk --release    # build/app/outputs/flutter-apk/app-release.apk
 ```
 
-Für eine Veröffentlichung fehlt noch ein eigener Signaturschlüssel.
+### Release signieren
+
+Ein Release wird mit einem eigenen Schlüssel signiert, sobald `android/key.properties`
+vorhanden ist (die Datei steht in `.gitignore`); ohne sie nimmt der Build den Debug-Schlüssel,
+und die APK taugt nur zum Ausprobieren.
+
+```sh
+keytool -genkeypair -v -keystore /sicherer/ort/hiker-release.jks \
+  -alias hiker -keyalg RSA -keysize 4096 -validity 10000
+```
+
+```properties
+# android/key.properties
+storeFile=/sicherer/ort/hiker-release.jks
+storePassword=…
+keyAlias=hiker
+keyPassword=…
+```
+
+Schlüsseldatei und Passwort gehören nicht ins Repository und müssen gesichert werden: Android
+installiert ein Update nur, wenn es mit demselben Schlüssel signiert ist. Geht er verloren,
+muss die App deinstalliert werden (die lokalen, noch nicht abgeglichenen Daten gehen dabei
+verloren). Die Signatur einer APK zeigt
+`~/Android/Sdk/build-tools/36.0.0/apksigner verify --print-certs app-release.apk`.
+
+Der erste Release-Build lädt Flutter-Bausteine von `storage.googleapis.com`; der Rechner muss
+diesen Namen auflösen und erreichen können.
+
+### App-Symbol und Berechtigungen
+
+Das Symbol erzeugt `tool/make_icon.py` (braucht Pillow) in allen Auflösungen, als adaptives
+Symbol und als einfaches Bild für ältere Geräte: `python3 tool/make_icon.py`.
+
+Die App verlangt nur Internet und Kamera (Barcode-Scan). Berechtigungen, die Bibliotheken
+mitbringen (Standort von der Karte, Mikrofon von der Kamera), entfernt das Manifest wieder
+(`tools:node="remove"`), weil die App sie nicht nutzt.
 
 ## Aufbau
 

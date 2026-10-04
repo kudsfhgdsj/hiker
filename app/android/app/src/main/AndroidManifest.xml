@@ -1,6 +1,14 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- The app talks to the self-hosted hiker server. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The camera is only used to scan barcodes; the scanner plugin would also ask for
+         the microphone, which the app never needs. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove" />
+    <!-- The map only shows tracks; the app never asks where the device is. The map
+         plugin would declare the location permissions anyway. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" tools:node="remove" />
     <application
         android:label="hiker"
         android:networkSecurityConfig="@xml/network_security_config"
