@@ -8,30 +8,45 @@
 # web-sessions/ (Anmeldungen des Web-Frontends).
 name: hiker
 
+# Kein Container läuft als root: alle Prozesse gehören HIKER_UID:HIKER_GID, haben keine
+# Linux-Capabilities, können keine neuen Rechte erlangen und ein schreibgeschütztes Dateisystem.
+x-unprivileged: &unprivileged
+  user: "${HIKER_UID:-1000}:${HIKER_GID:-1000}"
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+
 services:
-  # Legt die Datenordner an und übergibt sie dem Benutzer, unter dem API und Web-Frontend laufen.
+  # Legt die Datenordner an. Läuft wie alle Dienste als HIKER_UID, nie als root; DATA_DIR selbst
+  # muss deshalb vorhanden sein und diesem Benutzer gehören (./data ist im Repository angelegt).
   init:
     image: postgres:17-alpine
     restart: "no"
-    user: root
+    <<: *unprivileged
     entrypoint:
       - sh
       - -c
       - |
-        set -e
-        owner="${HIKER_UID:-1000}:${HIKER_GID:-1000}"
-        chown "$$owner" /data
-        for dir in files tiles web-sessions; do
-          mkdir -p "/data/$$dir"
-          [ "$$(stat -c %u:%g "/data/$$dir")" = "$$owner" ] || chown -R "$$owner" "/data/$$dir"
-        done
-        chmod 700 /data/web-sessions
+        if ! mkdir -p /data/db /data/files /data/tiles /data/web-sessions; then
+          echo "DATA_DIR muss existieren und dem Benutzer $$(id -u):$$(id -g) gehören." >&2
+          exit 1
+        fi
+        chmod 700 /data/db /data/web-sessions
     volumes:
       - ${DATA_DIR:-./data}:/data
 
   db:
     image: postgres:17-alpine
     restart: unless-stopped
+    <<: *unprivileged
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    tmpfs:
+      - /var/run/postgresql
+      - /tmp
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-hiker}
       POSTGRES_USER: ${POSTGRES_USER:-hiker}
@@ -49,7 +64,9 @@ services:
   api:
     build: ./backend
     restart: unless-stopped
-    user: "${HIKER_UID:-1000}:${HIKER_GID:-1000}"
+    <<: *unprivileged
+    tmpfs:
+      - /tmp
     depends_on:
       init:
         condition: service_completed_successfully
@@ -83,7 +100,9 @@ services:
   web:
     build: ./web
     restart: unless-stopped
-    user: "${HIKER_UID:-1000}:${HIKER_GID:-1000}"
+    <<: *unprivileged
+    tmpfs:
+      - /tmp
     depends_on:
       init:
         condition: service_completed_successfully

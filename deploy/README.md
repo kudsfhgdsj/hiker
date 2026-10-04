@@ -39,21 +39,26 @@ Administrator – dort erst das eigene Konto anlegen oder den Test mit `SMOKE_EM
 Alle Daten liegen als normale Dateien unter `DATA_DIR` (Standard `./data` im Repository), nicht
 in Docker-Volumes:
 
-| Ordner | Inhalt | Besitzer |
-|---|---|---|
-| `db/` | PostgreSQL | Benutzer des Datenbank-Containers (UID 70) |
-| `files/` | Fotos und GPX | `HIKER_UID:HIKER_GID` |
-| `tiles/` | Kartenkacheln (Zwischenspeicher) | `HIKER_UID:HIKER_GID` |
-| `web-sessions/` | Anmeldungen des Web-Frontends | `HIKER_UID:HIKER_GID` |
+| Ordner | Inhalt |
+|---|---|
+| `db/` | PostgreSQL |
+| `files/` | Fotos und GPX |
+| `tiles/` | Kartenkacheln (Zwischenspeicher) |
+| `web-sessions/` | Anmeldungen des Web-Frontends |
 
-Der Dienst `init` legt die Ordner beim Start an. `db/` nie im laufenden Betrieb kopieren – für
-die Datenbank gibt es `backup.sh`.
+**Kein Container läuft als root.** Alle Dienste laufen als `HIKER_UID:HIKER_GID` (Standard
+1000:1000, also der erste Benutzer des Systems), ohne Linux-Capabilities, ohne Möglichkeit, neue
+Rechte zu erlangen, und mit schreibgeschütztem Dateisystem. Alle Dateien unter `DATA_DIR` gehören
+diesem Benutzer. `DATA_DIR` muss vor dem ersten Start existieren und ihm gehören (`./data` ist im
+Repository angelegt); die Unterordner legt der Dienst `init` an.
+
+`db/` nie im laufenden Betrieb kopieren – für die Datenbank gibt es `backup.sh`.
 
 Kartenkacheln holt der Server beim ersten Ansehen von OpenStreetMap und liefert sie danach
 selbst aus. Nach `TILE_CACHE_DAYS` (14) fragt er nach, ob sich eine Kachel geändert hat. Der
 Speicher ist auf `TILE_CACHE_MAX_MB` (2000) begrenzt und muss nicht gesichert werden.
 
-Leere Instanz (z. B. nach Tests): `docker compose down`, dann `sudo rm -rf data/db data/files
+Leere Instanz (z. B. nach Tests): `docker compose down`, dann `rm -rf data/db data/files
 data/web-sessions`, dann `docker compose up -d`.
 
 ## Reverse Proxy

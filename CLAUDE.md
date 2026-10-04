@@ -52,5 +52,6 @@ Android-App (Flutter, nur Android), Web-Frontend (Python Flask) und eigenes Back
 ## Betrieb
 - Der Stack läuft auf einem bereits genutzten Server. Keine festen Ports 80/443 im Docker-Compose-Stack; API nur auf `127.0.0.1`. Proxy-Beispiele und Backup-Skripte liegen in `deploy/`.
 - Container-Ressourcen begrenzen.
+- Kein Container läuft als root: Dienste laufen als `HIKER_UID`, ohne Capabilities, mit schreibgeschütztem Dateisystem.
 - Daten liegen als normale Ordner unter `DATA_DIR` (Bind-Mounts), nicht in Docker-Volumes.
 - Kartenkacheln kommen vom eigenen Server (Modul `maps`): beim ersten Ansehen geholt, als Datei gespeichert, frühestens nach 7 Tagen neu geprüft. Nie Kacheln auf Vorrat herunterladen (Nutzungsbedingungen von OpenStreetMap).

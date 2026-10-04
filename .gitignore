@@ -16,7 +16,8 @@ dist/
 # Local development data
 *.db
 *.sqlite3
-/data/
+/data/*
+!/data/.gitkeep
 
 # Editors
 .vscode/
