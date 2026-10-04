@@ -37,6 +37,9 @@ String describeError(AppLocalizations l10n, Object error) {
     'no_track' => l10n.tourNoEstimateTrack,
     'no_duration' => l10n.tourNoEstimateDuration,
     'source_unavailable' => l10n.foodSourceUnavailable,
+    'no_route' => l10n.errorNoRoute,
+    'routing_unavailable' => l10n.errorRoutingUnavailable,
+    'version_conflict' => l10n.errorVersionConflict,
     _ => switch (error.statusCode) {
       403 => l10n.errorForbidden,
       404 => l10n.errorNotFound,

@@ -18,6 +18,7 @@ import 'features/auth/presentation/auth_form_screen.dart';
 import 'features/auth/presentation/profile_screen.dart';
 import 'features/gear/gear_module.dart';
 import 'features/nutrition/nutrition_module.dart';
+import 'features/planning/planning_module.dart';
 import 'features/protocols/data/tour_repository.dart';
 import 'features/protocols/protocols_module.dart';
 import 'l10n/app_localizations.dart';
@@ -25,6 +26,7 @@ import 'l10n/app_localizations.dart';
 /// The features built into the app. A feature is added or removed here only.
 final List<FeatureModule> builtInModules = [
   protocolsModule,
+  planningModule,
   gearModule,
   nutritionModule,
 ];

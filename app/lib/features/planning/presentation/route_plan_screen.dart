@@ -1,0 +1,661 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/format.dart';
+import '../../../core/map/elevation_profile.dart';
+import '../../../core/map/geo.dart';
+import '../../../core/map/map_view.dart';
+import '../../../core/network/api_exception.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/error_text.dart';
+import '../../../l10n/app_localizations.dart';
+import '../data/route_models.dart';
+import '../data/route_repository.dart';
+
+/// Plans a route: taps on the map set the waypoints, the server connects
+/// them along paths or as straight lines and returns line and key figures.
+class RoutePlanScreen extends ConsumerStatefulWidget {
+  const RoutePlanScreen({super.key, this.routeId});
+
+  /// null: a new route.
+  final String? routeId;
+
+  @override
+  ConsumerState<RoutePlanScreen> createState() => _RoutePlanScreenState();
+}
+
+class _RoutePlanScreenState extends ConsumerState<RoutePlanScreen> {
+  final _title = TextEditingController();
+  final _description = TextEditingController();
+  String? _plannedDate;
+  String _profile = 'hiking';
+  int _difficulty = 3;
+  bool _viaFerrata = false;
+  List<RouteWaypoint> _waypoints = [];
+
+  PlannedRoute? _existing;
+  bool _loaded = false;
+  Object? _loadError;
+
+  RouteResult? _result;
+  bool _computing = false;
+
+  /// Why there is no line: an error code of the API, or null.
+  String? _problem;
+  int _request = 0;
+
+  /// The waypoint the next tap on the map moves, if any.
+  int? _moving;
+  double? _highlightDistance;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(_load);
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _description.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final repository = ref.read(routeRepositoryProvider);
+    try {
+      final info = await repository.info();
+      final id = widget.routeId;
+      final route = id == null ? null : (await repository.get(id)).value;
+      if (!mounted) return;
+      setState(() {
+        _loaded = true;
+        _existing = route;
+        if (route != null) {
+          final draft = route.draft;
+          _title.text = draft.title;
+          _description.text = draft.description ?? '';
+          _plannedDate = draft.plannedDate;
+          _profile = draft.profile;
+          _difficulty = draft.maxDifficulty;
+          _viaFerrata = draft.viaFerrata;
+          _waypoints = List.of(draft.waypoints);
+          _result = route.result;
+        } else if (!info.routingAvailable) {
+          _profile = 'direct';
+        }
+      });
+      // Drafted offline: ask for the line now, if the server can be reached.
+      if (route != null && route.result == null) _compute();
+    } catch (error) {
+      if (mounted) setState(() => _loadError = error);
+    }
+  }
+
+  RouteDraft get _draft => RouteDraft(
+    title: _title.text.trim(),
+    description: _description.text.trim().isEmpty
+        ? null
+        : _description.text.trim(),
+    plannedDate: _plannedDate,
+    profile: _profile,
+    maxDifficulty: _difficulty,
+    viaFerrata: _viaFerrata,
+    waypoints: _waypoints,
+  );
+
+  /// Asks the server for the line after a change of the course.
+  Future<void> _compute() async {
+    final current = ++_request;
+    if (_waypoints.length < 2) {
+      setState(() {
+        _result = null;
+        _problem = null;
+        _computing = false;
+      });
+      return;
+    }
+    setState(() => _computing = true);
+    RouteResult? result;
+    String? problem;
+    try {
+      result = await ref.read(routeRepositoryProvider).preview(_draft);
+    } on ApiException catch (error) {
+      problem = error.code;
+    }
+    // A newer change is already on its way: this answer is outdated.
+    if (!mounted || current != _request) return;
+    setState(() {
+      _result = result;
+      _problem = problem;
+      _computing = false;
+      _highlightDistance = null;
+    });
+  }
+
+  void _change(VoidCallback change) {
+    setState(change);
+    _compute();
+  }
+
+  void _tapMap(GeoPoint point) {
+    final moving = _moving;
+    final position = GeoPoint(
+      double.parse(point.lat.toStringAsFixed(6)),
+      double.parse(point.lon.toStringAsFixed(6)),
+    );
+    _change(() {
+      if (moving != null) {
+        _waypoints[moving] = _waypoints[moving].copyWith(position: position);
+        _moving = null;
+      } else {
+        _waypoints.add(RouteWaypoint(position: position));
+      }
+    });
+  }
+
+  Future<void> _rename(int index) async {
+    final l10n = AppLocalizations.of(context);
+    final controller = TextEditingController(text: _waypoints[index].name);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.planWaypointName),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 200,
+          decoration: InputDecoration(labelText: l10n.name),
+          onSubmitted: (text) => Navigator.pop(context, text),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: Text(l10n.save),
+          ),
+        ],
+      ),
+    );
+    if (name == null || !mounted) return;
+    // A name does not change the course: no new line needed.
+    setState(
+      () => _waypoints[index] = _waypoints[index].copyWith(name: name.trim()),
+    );
+  }
+
+  void _reverse() => _change(() {
+    // The mark for a straight leg belongs to the leg: it moves to its other end.
+    final marks = [for (final point in _waypoints) point.direct];
+    final reversed = _waypoints.reversed.toList();
+    _waypoints = [
+      for (var i = 0; i < reversed.length; i++)
+        reversed[i].copyWith(direct: i > 0 && marks[reversed.length - i]),
+    ];
+    _moving = null;
+  });
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.tryParse(_plannedDate ?? '') ?? now,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 10),
+    );
+    if (picked != null && mounted) {
+      setState(() => _plannedDate = picked.toIso8601String().substring(0, 10));
+    }
+  }
+
+  Future<void> _save() async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    if (_title.text.trim().isEmpty) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.planTitleMissing)));
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final saved = await ref
+          .read(routeRepositoryProvider)
+          .save(_draft, existing: _existing);
+      ref.invalidate(routeListProvider);
+      if (!mounted) return;
+      setState(() {
+        _existing = saved;
+        _result = saved.result ?? _result;
+        _busy = false;
+      });
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            saved.result == null ? l10n.planSavedOffline : l10n.saved,
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      showError(context, error);
+      setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _delete() async {
+    final existing = _existing;
+    if (existing == null || !await confirmDelete(context, existing.title)) {
+      return;
+    }
+    if (!mounted) return;
+    final router = GoRouter.of(context);
+    try {
+      await ref.read(routeRepositoryProvider).delete(existing.id);
+      ref.invalidate(routeListProvider);
+      router.pop();
+    } catch (error) {
+      if (mounted) showError(context, error);
+    }
+  }
+
+  String _problemText(AppLocalizations l10n, String code) => switch (code) {
+    'no_route' => l10n.errorNoRoute,
+    'routing_unavailable' => l10n.errorRoutingUnavailable,
+    ApiException.network => l10n.planOffline,
+    _ => l10n.planFailed,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final title = _existing?.title ?? l10n.planNew;
+    if (_loadError != null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(title)),
+        body: CenteredForm(children: [ErrorText(_loadError!)]),
+      );
+    }
+    if (!_loaded) {
+      return Scaffold(
+        appBar: AppBar(title: Text(title)),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final info = ref.watch(planningInfoProvider).asData?.value;
+    final routing = info?.routingAvailable ?? true;
+    final result = _result;
+    // Without a line from the server the waypoints are joined directly, as a sketch.
+    final line =
+        result?.points ?? [for (final point in _waypoints) point.position];
+    final highlight = _highlightDistance != null && result != null
+        ? result.pointAt(_highlightDistance!)
+        : null;
+    final elevations = result?.elevations;
+    final canSave = !_busy && _waypoints.length >= 2;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          IconButton(
+            tooltip: l10n.planUndo,
+            icon: const Icon(Icons.undo),
+            onPressed: _waypoints.isEmpty
+                ? null
+                : () => _change(() {
+                    _waypoints.removeLast();
+                    _moving = null;
+                  }),
+          ),
+          TextButton(onPressed: canSave ? _save : null, child: Text(l10n.save)),
+          PopupMenuButton<VoidCallback>(
+            onSelected: (action) => action(),
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                enabled: _waypoints.length > 1,
+                value: _reverse,
+                child: Text(l10n.planReverse),
+              ),
+              PopupMenuItem(
+                enabled: _waypoints.isNotEmpty,
+                value: () => _change(() {
+                  _waypoints = [];
+                  _moving = null;
+                }),
+                child: Text(l10n.planClear),
+              ),
+              if (_existing != null)
+                PopupMenuItem(value: _delete, child: Text(l10n.delete)),
+            ],
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+        children: [
+          SizedBox(
+            height: 340,
+            child: HikerMap(
+              content: MapContent(
+                track: line,
+                highlight: highlight,
+                onTap: _tapMap,
+                markers: [
+                  for (var i = 0; i < _waypoints.length; i++)
+                    MapMarker(
+                      id: 'waypoint-$i',
+                      position: _waypoints[i].position,
+                      size: 28,
+                      onTap: () =>
+                          setState(() => _moving = _moving == i ? null : i),
+                      child: _NumberMarker(
+                        label: i == 0 ? 'S' : '${i + 1}',
+                        color: _moving == i ? scheme.tertiary : scheme.error,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.m),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  _moving != null
+                      ? l10n.planMoveHint(
+                          _moving == 0 ? 'S' : '${_moving! + 1}',
+                        )
+                      : _waypoints.isEmpty
+                      ? l10n.planHintStart
+                      : l10n.planHint,
+                  style: theme.textTheme.bodySmall,
+                ),
+                if (_computing) ...[
+                  const SizedBox(height: AppSpacing.s),
+                  const LinearProgressIndicator(),
+                ],
+                if (_problem != null && !_computing) ...[
+                  const SizedBox(height: AppSpacing.s),
+                  Text(
+                    _problemText(l10n, _problem!),
+                    style: TextStyle(color: scheme.error),
+                  ),
+                ],
+                if (result != null) ...[
+                  const SizedBox(height: AppSpacing.s),
+                  _Figures(result: result),
+                ],
+              ],
+            ),
+          ),
+          if (result != null && elevations != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s),
+              child: ElevationProfile(
+                distancesM: result.distances,
+                elevationsM: elevations,
+                highlightDistanceM: _highlightDistance,
+                onDistanceChanged: (distance) =>
+                    setState(() => _highlightDistance = distance),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.m),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(l10n.planConnection, style: theme.textTheme.titleSmall),
+                const SizedBox(height: AppSpacing.xs),
+                SegmentedButton<String>(
+                  segments: [
+                    ButtonSegment(
+                      value: 'hiking',
+                      enabled: routing,
+                      label: Text(l10n.planProfileHiking),
+                      icon: const Icon(Icons.hiking),
+                    ),
+                    ButtonSegment(
+                      value: 'direct',
+                      label: Text(l10n.planProfileDirect),
+                      icon: const Icon(Icons.straight),
+                    ),
+                  ],
+                  selected: {_profile},
+                  onSelectionChanged: (selection) =>
+                      _change(() => _profile = selection.first),
+                ),
+                if (!routing)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.xs),
+                    child: Text(
+                      l10n.planNoRouting,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                const SizedBox(height: AppSpacing.m),
+                DropdownButtonFormField<int>(
+                  initialValue: _difficulty,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: l10n.planDifficulty,
+                    helperText: l10n.planDifficultyHint,
+                    helperMaxLines: 2,
+                  ),
+                  items: [
+                    for (var level = 1; level <= 6; level++)
+                      DropdownMenuItem(
+                        value: level,
+                        child: Text(
+                          l10n.planDifficultyLevel('$level'),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: _profile == 'direct'
+                      ? null
+                      : (level) => _change(() => _difficulty = level!),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(l10n.planViaFerrata),
+                  value: _viaFerrata,
+                  onChanged: _profile == 'direct'
+                      ? null
+                      : (value) => _change(() => _viaFerrata = value),
+                ),
+                const Divider(),
+                Text(l10n.planWaypoints, style: theme.textTheme.titleSmall),
+                for (var i = 0; i < _waypoints.length; i++)
+                  _WaypointTile(
+                    index: i,
+                    waypoint: _waypoints[i],
+                    moving: _moving == i,
+                    onRename: () => _rename(i),
+                    onMove: () => setState(() => _moving = i),
+                    onDirect: (value) => _change(
+                      () =>
+                          _waypoints[i] = _waypoints[i].copyWith(direct: value),
+                    ),
+                    onRemove: () => _change(() {
+                      _waypoints.removeAt(i);
+                      _moving = null;
+                    }),
+                  ),
+                const Divider(),
+                TextField(
+                  controller: _title,
+                  maxLength: 200,
+                  decoration: InputDecoration(labelText: l10n.planRouteTitle),
+                ),
+                TextField(
+                  controller: _description,
+                  maxLength: 5000,
+                  minLines: 2,
+                  maxLines: 5,
+                  decoration: InputDecoration(labelText: l10n.planDescription),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.event),
+                  title: Text(l10n.planDate),
+                  subtitle: Text(
+                    _plannedDate == null
+                        ? '–'
+                        : Format.date(DateTime.parse(_plannedDate!)),
+                  ),
+                  trailing: _plannedDate == null
+                      ? null
+                      : IconButton(
+                          tooltip: l10n.delete,
+                          icon: const Icon(Icons.clear),
+                          onPressed: () => setState(() => _plannedDate = null),
+                        ),
+                  onTap: _pickDate,
+                ),
+                const SizedBox(height: AppSpacing.s),
+                FilledButton(
+                  onPressed: canSave ? _save : null,
+                  child: Text(l10n.save),
+                ),
+                if (info?.attribution != null) ...[
+                  const SizedBox(height: AppSpacing.m),
+                  Text(info!.attribution!, style: theme.textTheme.bodySmall),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Distance, ascent, descent and the estimated walking time of a route.
+class _Figures extends StatelessWidget {
+  const _Figures({required this.result});
+
+  final RouteResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    Widget figure(String label, String value) => Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: theme.textTheme.bodySmall),
+          Text(value, style: theme.textTheme.titleMedium),
+        ],
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            figure(l10n.planDistance, Format.distance(result.distanceM)),
+            figure(l10n.planAscent, Format.meters(result.ascentM)),
+            figure(l10n.planDescent, Format.meters(result.descentM)),
+            figure(
+              l10n.planDuration,
+              Format.duration((result.durationS / 60).round()),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        // The walking time is always an estimate and is named as one.
+        Text(l10n.planDurationNote, style: theme.textTheme.bodySmall),
+      ],
+    );
+  }
+}
+
+class _NumberMarker extends StatelessWidget {
+  const _NumberMarker({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: color,
+      shape: BoxShape.circle,
+      border: Border.all(color: Colors.white, width: 2),
+      boxShadow: const [BoxShadow(blurRadius: 3, color: Colors.black38)],
+    ),
+    child: Center(
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    ),
+  );
+}
+
+class _WaypointTile extends StatelessWidget {
+  const _WaypointTile({
+    required this.index,
+    required this.waypoint,
+    required this.moving,
+    required this.onRename,
+    required this.onMove,
+    required this.onDirect,
+    required this.onRemove,
+  });
+
+  final int index;
+  final RouteWaypoint waypoint;
+  final bool moving;
+  final VoidCallback onRename;
+  final VoidCallback onMove;
+  final ValueChanged<bool> onDirect;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final position = waypoint.position;
+    final coordinates =
+        '${position.lat.toStringAsFixed(5)}, ${position.lon.toStringAsFixed(5)}';
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      selected: moving,
+      leading: CircleAvatar(
+        radius: 14,
+        child: Text(index == 0 ? 'S' : '${index + 1}'),
+      ),
+      title: Text(waypoint.name.isEmpty ? coordinates : waypoint.name),
+      subtitle: index > 0 && waypoint.direct ? Text(l10n.planDirectLeg) : null,
+      onTap: onRename,
+      trailing: PopupMenuButton<VoidCallback>(
+        tooltip: l10n.planWaypointMenu('${index + 1}'),
+        onSelected: (action) => action(),
+        itemBuilder: (context) => [
+          PopupMenuItem(value: onRename, child: Text(l10n.planWaypointName)),
+          PopupMenuItem(value: onMove, child: Text(l10n.planWaypointMove)),
+          if (index > 0)
+            CheckedPopupMenuItem(
+              checked: waypoint.direct,
+              value: () => onDirect(!waypoint.direct),
+              child: Text(l10n.planDirectLeg),
+            ),
+          PopupMenuItem(value: onRemove, child: Text(l10n.planWaypointRemove)),
+        ],
+      ),
+    );
+  }
+}

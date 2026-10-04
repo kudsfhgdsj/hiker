@@ -2451,6 +2451,246 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'gelöscht'**
   String get syncDeleted;
+
+  /// No description provided for @syncCollectionRoute.
+  ///
+  /// In de, this message translates to:
+  /// **'Route'**
+  String get syncCollectionRoute;
+
+  /// No description provided for @planTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Planung'**
+  String get planTitle;
+
+  /// No description provided for @planNew.
+  ///
+  /// In de, this message translates to:
+  /// **'Neue Route'**
+  String get planNew;
+
+  /// No description provided for @planEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch keine geplanten Routen.'**
+  String get planEmpty;
+
+  /// No description provided for @planPending.
+  ///
+  /// In de, this message translates to:
+  /// **'Linie wird beim nächsten Abgleich berechnet'**
+  String get planPending;
+
+  /// No description provided for @planHintStart.
+  ///
+  /// In de, this message translates to:
+  /// **'Tippe auf die Karte, um den Start zu setzen.'**
+  String get planHintStart;
+
+  /// No description provided for @planHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Jeder Tipp auf die Karte setzt den nächsten Punkt. Ein Tipp auf einen Punkt wählt ihn zum Versetzen.'**
+  String get planHint;
+
+  /// No description provided for @planMoveHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Tippe auf die Karte, um Punkt {label} zu versetzen.'**
+  String planMoveHint(String label);
+
+  /// No description provided for @planUndo.
+  ///
+  /// In de, this message translates to:
+  /// **'Letzten Punkt entfernen'**
+  String get planUndo;
+
+  /// No description provided for @planReverse.
+  ///
+  /// In de, this message translates to:
+  /// **'Richtung umkehren'**
+  String get planReverse;
+
+  /// No description provided for @planClear.
+  ///
+  /// In de, this message translates to:
+  /// **'Alle Punkte entfernen'**
+  String get planClear;
+
+  /// No description provided for @planConnection.
+  ///
+  /// In de, this message translates to:
+  /// **'Verbindung der Punkte'**
+  String get planConnection;
+
+  /// No description provided for @planProfileHiking.
+  ///
+  /// In de, this message translates to:
+  /// **'Den Wegen folgen'**
+  String get planProfileHiking;
+
+  /// No description provided for @planProfileDirect.
+  ///
+  /// In de, this message translates to:
+  /// **'Luftlinie'**
+  String get planProfileDirect;
+
+  /// No description provided for @planNoRouting.
+  ///
+  /// In de, this message translates to:
+  /// **'Auf diesem Server ist keine Wegführung eingerichtet: Die Punkte werden als Luftlinie verbunden.'**
+  String get planNoRouting;
+
+  /// No description provided for @planDifficulty.
+  ///
+  /// In de, this message translates to:
+  /// **'Schwierigkeit bis'**
+  String get planDifficulty;
+
+  /// No description provided for @planDifficultyHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Leichtere Wege sind eingeschlossen, schwerere werden nicht benutzt.'**
+  String get planDifficultyHint;
+
+  /// No description provided for @planDifficultyLevel.
+  ///
+  /// In de, this message translates to:
+  /// **'{level, select, 1{T1 – Wanderung} 2{T2 – Anspruchsvolle Bergwanderung} 3{T3 – Bergtour} 4{T4 – Schwere Bergtour} 5{T5 – Sehr schwere Bergtour} other{T6 – Äußerst schwierige Bergtour}}'**
+  String planDifficultyLevel(String level);
+
+  /// No description provided for @planViaFerrata.
+  ///
+  /// In de, this message translates to:
+  /// **'Klettersteige benutzen'**
+  String get planViaFerrata;
+
+  /// No description provided for @planWaypoints.
+  ///
+  /// In de, this message translates to:
+  /// **'Wegpunkte'**
+  String get planWaypoints;
+
+  /// No description provided for @planWaypointMenu.
+  ///
+  /// In de, this message translates to:
+  /// **'Punkt {label}'**
+  String planWaypointMenu(String label);
+
+  /// No description provided for @planWaypointName.
+  ///
+  /// In de, this message translates to:
+  /// **'Benennen'**
+  String get planWaypointName;
+
+  /// No description provided for @planWaypointMove.
+  ///
+  /// In de, this message translates to:
+  /// **'Versetzen'**
+  String get planWaypointMove;
+
+  /// No description provided for @planWaypointRemove.
+  ///
+  /// In de, this message translates to:
+  /// **'Entfernen'**
+  String get planWaypointRemove;
+
+  /// No description provided for @planDirectLeg.
+  ///
+  /// In de, this message translates to:
+  /// **'Luftlinie hierher'**
+  String get planDirectLeg;
+
+  /// No description provided for @planDistance.
+  ///
+  /// In de, this message translates to:
+  /// **'Strecke'**
+  String get planDistance;
+
+  /// No description provided for @planAscent.
+  ///
+  /// In de, this message translates to:
+  /// **'Aufstieg'**
+  String get planAscent;
+
+  /// No description provided for @planDescent.
+  ///
+  /// In de, this message translates to:
+  /// **'Abstieg'**
+  String get planDescent;
+
+  /// No description provided for @planDuration.
+  ///
+  /// In de, this message translates to:
+  /// **'Gehzeit'**
+  String get planDuration;
+
+  /// No description provided for @planDurationNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Gehzeit geschätzt nach DIN 33466, ohne Pausen.'**
+  String get planDurationNote;
+
+  /// No description provided for @planRouteTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Titel'**
+  String get planRouteTitle;
+
+  /// No description provided for @planTitleMissing.
+  ///
+  /// In de, this message translates to:
+  /// **'Bitte einen Titel eingeben.'**
+  String get planTitleMissing;
+
+  /// No description provided for @planDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Beschreibung'**
+  String get planDescription;
+
+  /// No description provided for @planDate.
+  ///
+  /// In de, this message translates to:
+  /// **'Geplant für'**
+  String get planDate;
+
+  /// No description provided for @planSavedOffline.
+  ///
+  /// In de, this message translates to:
+  /// **'Auf dem Gerät gespeichert. Die Linie wird beim nächsten Abgleich berechnet.'**
+  String get planSavedOffline;
+
+  /// No description provided for @planOffline.
+  ///
+  /// In de, this message translates to:
+  /// **'Ohne Verbindung lässt sich die Linie nicht berechnen. Die Punkte sind vorläufig direkt verbunden.'**
+  String get planOffline;
+
+  /// No description provided for @planFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Route konnte nicht berechnet werden.'**
+  String get planFailed;
+
+  /// No description provided for @errorNoRoute.
+  ///
+  /// In de, this message translates to:
+  /// **'Zwischen diesen Punkten gibt es keinen Weg bis zur gewählten Schwierigkeit. Höhere Stufe wählen, einen Punkt versetzen oder den Abschnitt als Luftlinie planen.'**
+  String get errorNoRoute;
+
+  /// No description provided for @errorRoutingUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Wegführung ist gerade nicht erreichbar. Luftlinien lassen sich trotzdem planen.'**
+  String get errorRoutingUnavailable;
+
+  /// No description provided for @errorVersionConflict.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Eintrag wurde inzwischen geändert. Bitte neu laden.'**
+  String get errorVersionConflict;
 }
 
 class _AppLocalizationsDelegate

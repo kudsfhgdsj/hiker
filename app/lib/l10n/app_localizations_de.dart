@@ -1288,4 +1288,147 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get syncDeleted => 'gelöscht';
+
+  @override
+  String get syncCollectionRoute => 'Route';
+
+  @override
+  String get planTitle => 'Planung';
+
+  @override
+  String get planNew => 'Neue Route';
+
+  @override
+  String get planEmpty => 'Noch keine geplanten Routen.';
+
+  @override
+  String get planPending => 'Linie wird beim nächsten Abgleich berechnet';
+
+  @override
+  String get planHintStart => 'Tippe auf die Karte, um den Start zu setzen.';
+
+  @override
+  String get planHint =>
+      'Jeder Tipp auf die Karte setzt den nächsten Punkt. Ein Tipp auf einen Punkt wählt ihn zum Versetzen.';
+
+  @override
+  String planMoveHint(String label) {
+    return 'Tippe auf die Karte, um Punkt $label zu versetzen.';
+  }
+
+  @override
+  String get planUndo => 'Letzten Punkt entfernen';
+
+  @override
+  String get planReverse => 'Richtung umkehren';
+
+  @override
+  String get planClear => 'Alle Punkte entfernen';
+
+  @override
+  String get planConnection => 'Verbindung der Punkte';
+
+  @override
+  String get planProfileHiking => 'Den Wegen folgen';
+
+  @override
+  String get planProfileDirect => 'Luftlinie';
+
+  @override
+  String get planNoRouting =>
+      'Auf diesem Server ist keine Wegführung eingerichtet: Die Punkte werden als Luftlinie verbunden.';
+
+  @override
+  String get planDifficulty => 'Schwierigkeit bis';
+
+  @override
+  String get planDifficultyHint =>
+      'Leichtere Wege sind eingeschlossen, schwerere werden nicht benutzt.';
+
+  @override
+  String planDifficultyLevel(String level) {
+    String _temp0 = intl.Intl.selectLogic(level, {
+      '1': 'T1 – Wanderung',
+      '2': 'T2 – Anspruchsvolle Bergwanderung',
+      '3': 'T3 – Bergtour',
+      '4': 'T4 – Schwere Bergtour',
+      '5': 'T5 – Sehr schwere Bergtour',
+      'other': 'T6 – Äußerst schwierige Bergtour',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get planViaFerrata => 'Klettersteige benutzen';
+
+  @override
+  String get planWaypoints => 'Wegpunkte';
+
+  @override
+  String planWaypointMenu(String label) {
+    return 'Punkt $label';
+  }
+
+  @override
+  String get planWaypointName => 'Benennen';
+
+  @override
+  String get planWaypointMove => 'Versetzen';
+
+  @override
+  String get planWaypointRemove => 'Entfernen';
+
+  @override
+  String get planDirectLeg => 'Luftlinie hierher';
+
+  @override
+  String get planDistance => 'Strecke';
+
+  @override
+  String get planAscent => 'Aufstieg';
+
+  @override
+  String get planDescent => 'Abstieg';
+
+  @override
+  String get planDuration => 'Gehzeit';
+
+  @override
+  String get planDurationNote =>
+      'Gehzeit geschätzt nach DIN 33466, ohne Pausen.';
+
+  @override
+  String get planRouteTitle => 'Titel';
+
+  @override
+  String get planTitleMissing => 'Bitte einen Titel eingeben.';
+
+  @override
+  String get planDescription => 'Beschreibung';
+
+  @override
+  String get planDate => 'Geplant für';
+
+  @override
+  String get planSavedOffline =>
+      'Auf dem Gerät gespeichert. Die Linie wird beim nächsten Abgleich berechnet.';
+
+  @override
+  String get planOffline =>
+      'Ohne Verbindung lässt sich die Linie nicht berechnen. Die Punkte sind vorläufig direkt verbunden.';
+
+  @override
+  String get planFailed => 'Die Route konnte nicht berechnet werden.';
+
+  @override
+  String get errorNoRoute =>
+      'Zwischen diesen Punkten gibt es keinen Weg bis zur gewählten Schwierigkeit. Höhere Stufe wählen, einen Punkt versetzen oder den Abschnitt als Luftlinie planen.';
+
+  @override
+  String get errorRoutingUnavailable =>
+      'Die Wegführung ist gerade nicht erreichbar. Luftlinien lassen sich trotzdem planen.';
+
+  @override
+  String get errorVersionConflict =>
+      'Der Eintrag wurde inzwischen geändert. Bitte neu laden.';
 }

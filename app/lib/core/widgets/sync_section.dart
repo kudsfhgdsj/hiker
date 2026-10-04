@@ -18,6 +18,7 @@ class SyncSection extends ConsumerWidget {
       'gear_items' => l10n.syncCollectionGear,
       'foods' => l10n.syncCollectionFood,
       'tours' => l10n.syncCollectionTour,
+      'routes' => l10n.syncCollectionRoute,
       _ => change.collection,
     };
     if (change.data == null) return '$kind (${l10n.syncDeleted})';
