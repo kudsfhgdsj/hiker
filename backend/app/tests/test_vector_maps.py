@@ -1,4 +1,6 @@
 import gzip
+import json
+import re
 import sqlite3
 
 import pytest
@@ -136,6 +138,8 @@ def test_style_is_a_hiking_map_from_own_layers():
     # Every layer reads the one source, and no icon sprite is needed.
     assert all(layer.get("source", "hiker") == "hiker" for layer in style["layers"])
     assert "sprite" not in style
+    # Colours in a form every MapLibre reads: the app's library knows no "#rrggbbaa".
+    assert not re.search(r'"#[0-9a-fA-F]{8}"', json.dumps(style))
     # Only fonts the server has, one per label.
     fonts = {
         tuple(layer["layout"]["text-font"])

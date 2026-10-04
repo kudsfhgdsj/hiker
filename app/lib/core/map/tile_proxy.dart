@@ -80,8 +80,12 @@ class TileProxy extends Notifier<int?> {
     }
   }
 
-  Future<void> start() async {
-    if (_server != null) return;
+  /// Starting twice at the same time must not open two servers.
+  Future<void>? _starting;
+
+  Future<void> start() => _starting ??= _start();
+
+  Future<void> _start() async {
     unawaited(_prune());
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     _server = server;
@@ -94,6 +98,7 @@ class TileProxy extends Notifier<int?> {
     _client?.close(force: true);
     _server = null;
     _client = null;
+    _starting = null;
   }
 
   /// Hands out a file of the server, from the device if it is known there.
@@ -137,9 +142,12 @@ class TileProxy extends Notifier<int?> {
     final HttpClientResponse upstream;
     try {
       final request = await client.getUrl(Uri.parse('$baseUrl$apiPath'));
-      if (gzipped) {
-        request.headers.set(HttpHeaders.acceptEncodingHeader, 'gzip');
-      }
+      // Tiles are stored compressed and passed on that way; everything else
+      // must arrive as it is, or a proxy on the way would compress it.
+      request.headers.set(
+        HttpHeaders.acceptEncodingHeader,
+        gzipped ? 'gzip' : 'identity',
+      );
       upstream = await request.close();
     } on Exception {
       // No network: an older copy is better than no map.

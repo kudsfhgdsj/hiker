@@ -9,13 +9,16 @@ BOLD = ["Noto Sans Bold"]
 ITALIC = ["Noto Sans Italic"]
 
 # German names where the data has them, then names in Latin script.
-NAME = ["coalesce", ["get", "name:de"], ["get", "name:latin"], ["get", "name"]]
+# Wrapped in "to-string": the map library of the app otherwise turns a missing name into
+# an empty text before "coalesce" can skip it, and no label would be drawn.
+NAME = ["to-string", ["coalesce", ["get", "name:de"], ["get", "name:latin"], ["get", "name"]]]
 
 LAND = "#f3f0e8"
 WATER = "#a8d0ea"
 WATER_LINE = "#7db4d8"
 PATH = "#b5342a"
-HALO = "#ffffffcc"
+# Not "#ffffffcc": the map library of the app does not read colours with eight digits.
+HALO = "rgba(255, 255, 255, 0.8)"
 
 
 def _width(*stops: tuple[int, float]) -> list:
