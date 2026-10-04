@@ -11,6 +11,7 @@ from app.core.config import get_settings
 from app.core.errors import NotFoundError, error_responses
 from app.core.ratelimit import rate_limit
 from app.modules.auth.deps import CurrentUser
+from app.modules.maps.contours import CONTOUR_MAX_ZOOM, CONTOUR_MIN_ZOOM
 from app.modules.maps.layers import (
     SLOPE_MAX_ZOOM,
     SLOPE_MIN_ZOOM,
@@ -23,6 +24,7 @@ from app.modules.maps.tiles import OSM_ATTRIBUTION, Cache, Tiles
 from app.modules.maps.vector import REGION_NAME, VECTOR_ATTRIBUTION, Vectors
 
 router = APIRouter()
+PROTOBUF = "application/x-protobuf"
 
 # Above this zoom the tile source has nothing.
 MAX_ZOOM = 19
@@ -80,7 +82,6 @@ def read_tile(
 
 FONTS = FilePath(__file__).parent / "fonts"
 GLYPH_RANGE = r"^\d{1,5}-\d{1,5}$"
-PROTOBUF = "application/x-protobuf"
 
 
 class RegionInfo(BaseModel):
@@ -113,6 +114,9 @@ def read_style(vectors: Vectors, layers: MapLayers) -> dict:
             f"{base}/raster/satellite/{{z}}/{{x}}/{{y}}"
             if "satellite" in layers.available()
             else None
+        ),
+        contour_url=(
+            f"{base}/contours/{{z}}/{{x}}/{{y}}.pbf" if "contours" in layers.available() else None
         ),
         attributions=attributions(layers.available()),
     )
@@ -162,6 +166,28 @@ def read_layer_tile(
         layers.raster(layer, z, x, y),
         media_type=media_type(layer),
         headers={"Cache-Control": "public, max-age=604800"},
+    )
+
+
+@router.get(
+    "/contours/{z}/{x}/{y}.pbf",
+    response_class=Response,
+    responses={200: {"content": {PROTOBUF: {}}}, **error_responses(404, 502)},
+    dependencies=[Depends(rate_limit("tiles", limit=1500))],
+)
+def read_contour_tile(
+    z: Annotated[int, Path(ge=CONTOUR_MIN_ZOOM, le=CONTOUR_MAX_ZOOM)],
+    x: Annotated[int, Path(ge=0)],
+    y: Annotated[int, Path(ge=0)],
+    layers: MapLayers,
+):
+    """Contour lines as a vector tile (layer `contour`), computed from the elevation tiles."""
+    if x >= 2**z or y >= 2**z:
+        raise NotFoundError("No such tile")
+    return Response(
+        layers.contours(z, x, y),
+        media_type=PROTOBUF,
+        headers={"Content-Encoding": "gzip", "Cache-Control": "public, max-age=604800"},
     )
 
 

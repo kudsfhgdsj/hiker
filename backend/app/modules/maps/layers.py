@@ -26,6 +26,7 @@ from PIL import Image
 from app import __version__
 from app.core.config import get_settings
 from app.core.errors import NotFoundError
+from app.modules.maps.contours import contour_tile
 from app.modules.maps.tiles import (
     FetchedTile,
     HttpTileSource,
@@ -194,13 +195,13 @@ class Layers:
         self._sources: dict[str, TileSource] = sources
         self._caches = {
             name: TileCache(Path(cache_path) / "_layers" / name, cache_days, max_bytes)
-            for name in (*sources, "slope")
+            for name in (*sources, "slope", "contours")
         }
 
     def available(self) -> set[str]:
         names = set(self._sources)
         if "terrain" in names:
-            names.add("slope")
+            names.update(("slope", "contours"))
         return names
 
     def raster(self, layer: str, z: int, x: int, y: int) -> bytes:
@@ -219,6 +220,18 @@ class Layers:
                 return FetchedTile(slope_tile(layers.raster("terrain", z, x, y), z, y))
 
         return self._caches["slope"].get(_Computed(), z, x, y)
+
+    def contours(self, z: int, x: int, y: int) -> bytes:
+        """Gzip-compressed vector tile with contour lines, computed once and kept."""
+        if "terrain" not in self._sources:
+            raise NotFoundError("No such layer")
+        layers = self
+
+        class _Computed:
+            def fetch(self, z: int, x: int, y: int, etag: str | None) -> FetchedTile | None:
+                return FetchedTile(contour_tile(layers.raster("terrain", z, x, y), z))
+
+        return self._caches["contours"].get(_Computed(), z, x, y)
 
 
 def media_type(layer: str) -> str:

@@ -1529,6 +1529,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get mapBaseMap => 'Karte';
 
   @override
+  String get mapBaseWinter => 'Winter';
+
+  @override
   String get mapBaseSatellite => 'Luftbild';
 
   @override

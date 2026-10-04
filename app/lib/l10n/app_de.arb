@@ -566,6 +566,7 @@
   "offlineSegments": "Wegdaten für die Planung",
   "mapLayers": "Ebenen",
   "mapBaseMap": "Karte",
+  "mapBaseWinter": "Winter",
   "mapBaseSatellite": "Luftbild",
   "mapOverlaySlope": "Hangneigung",
   "mapSlopeLegend": "Gelb ab 30°, orange ab 35°, rot ab 40°, violett ab 45°"

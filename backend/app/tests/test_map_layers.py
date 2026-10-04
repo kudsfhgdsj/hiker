@@ -1,3 +1,4 @@
+import gzip
 import io
 import math
 
@@ -5,6 +6,7 @@ import pytest
 from PIL import Image
 
 from app.core.config import get_settings
+from app.modules.maps.contours import _grid, contour_tile, interval_for, trace
 from app.modules.maps.layers import (
     SATELLITE,
     Layers,
@@ -192,14 +194,22 @@ def test_style_offers_the_layers_the_server_has(client, layers, tmp_path, monkey
     assert style["sources"]["satellite"]["tiles"] == [f"{base}/raster/satellite/{{z}}/{{x}}/{{y}}"]
     assert "swisstopo" in style["sources"]["satellite"]["attribution"]
     hiker = style["metadata"]["hiker"]
-    assert [entry["id"] for entry in hiker["bases"]] == ["map", "satellite"]
+    assert [entry["id"] for entry in hiker["bases"]] == ["map", "winter", "satellite"]
+    assert style["sources"]["contours"]["tiles"] == [f"{base}/contours/{{z}}/{{x}}/{{y}}.pbf"]
     assert [entry["id"] for entry in hiker["overlays"]] == ["slope"]
     assert hiker["terrain"] == {"source": "terrain-3d", "exaggeration": 1.3}
 
 
 def test_switchable_layers_start_hidden_and_keep_their_place():
     style = build_style(
-        "t", "g", "©", 14, terrain_url="dem", slope_url="slope", satellite_url="sat"
+        "t",
+        "g",
+        "©",
+        14,
+        terrain_url="dem",
+        slope_url="slope",
+        satellite_url="sat",
+        contour_url="contours",
     )
     order = [layer["id"] for layer in style["layers"]]
     layers = {layer["id"]: layer for layer in style["layers"]}
@@ -214,7 +224,14 @@ def test_switchable_layers_start_hidden_and_keep_their_place():
     assert "visibility" not in layers["hillshade"].get("layout", {})
 
     # The aerial image replaces the drawn ground and the shading, not paths and names.
-    satellite = hiker["bases"][1]
+    # Winter is a white veil under the shading; contour lines lie on the ground too.
+    assert order.index("wood") < order.index("winter-snow") < order.index("hillshade")
+    assert layers["winter-snow"]["layout"]["visibility"] == "none"
+    assert hiker["bases"][1] == {"id": "winter", "show": ["winter-snow"], "hide": []}
+    assert order.index("hillshade") < order.index("contour") < order.index("waterway")
+    assert layers["contour"]["source-layer"] == "contour"
+    assert layers["contour-label"]["filter"] == ["==", ["get", "index"], 1]
+    satellite = hiker["bases"][2]
     assert satellite["show"] == ["satellite"]
     assert {"wood", "rock", "water", "hillshade"} <= set(satellite["hide"])
     assert not {"background", "path", "peak-name", "waterway"} & set(satellite["hide"])
@@ -226,3 +243,106 @@ def test_switchable_layers_start_hidden_and_keep_their_place():
         "bases": [{"id": "map", "show": [], "hide": []}],
         "overlays": [],
     }
+
+
+# --- Contour lines ---
+
+
+def read_varint(data: bytes, at: int) -> tuple[int, int]:
+    value = shift = 0
+    while True:
+        byte = data[at]
+        value |= (byte & 0x7F) << shift
+        at += 1
+        if not byte & 0x80:
+            return value, at
+        shift += 7
+
+
+def read_message(data: bytes) -> list[tuple[int, object]]:
+    """The fields of a protobuf message: (number, int or bytes)."""
+    fields, at = [], 0
+    while at < len(data):
+        key, at = read_varint(data, at)
+        if key & 7 == 0:
+            value, at = read_varint(data, at)
+        else:
+            length, at = read_varint(data, at)
+            value, at = data[at : at + length], at + length
+        fields.append((key >> 3, value))
+    return fields
+
+
+def read_contours(tile: bytes) -> dict[int, dict]:
+    """elevation → {"index": 0 or 1, "points": number of points} of a contour tile."""
+    ((number, layer),) = read_message(gzip.decompress(tile))
+    assert number == 3
+    fields = read_message(layer)
+    assert [value for key, value in fields if key == 1] == [b"contour"]
+    assert [value for key, value in fields if key == 3] == [b"ele", b"index"]
+    assert [value for key, value in fields if key == 5] == [4096]
+    values = []
+    for key, value in fields:
+        if key == 4:
+            ((kind, number),) = read_message(value)
+            values.append((number >> 1) ^ -(number & 1) if kind == 6 else number)
+    result = {}
+    for key, value in fields:
+        if key != 2:
+            continue
+        feature = dict(read_message(value))
+        assert feature[3] == 2  # LINESTRING
+        tags = feature[2]
+        result[values[tags[1]]] = {"index": values[tags[3]], "bytes": len(feature[4])}
+    return result
+
+
+def test_contour_lines_follow_the_elevation():
+    # A slope from 1000 m in the west to 1630 m in the east.
+    tile = contour_tile(terrain_png(lambda c, r: 1000 + c * 10), 12)
+
+    lines = read_contours(tile)
+
+    # Every 50 m at zoom 12; every fifth line (250 m) is an index line.
+    assert sorted(lines) == list(range(1050, 1650, 50))
+    assert [level for level, line in lines.items() if line["index"]] == [1250, 1500]
+    assert interval_for(13) == 20 and interval_for(9) == 200
+
+
+def test_contour_lines_are_joined_and_reach_the_tile_edge():
+    grid, count = _grid(terrain_png(lambda c, r: 1000 + c * 10))
+
+    lines = trace(grid, count, 50)[1300]
+
+    # One line from the top edge to the bottom edge, not hundreds of pieces.
+    assert len(lines) == 1
+    rows = [row for _column, row in lines[0]]
+    assert min(rows) == 0 and max(rows) == count - 1
+    assert {round(column, 3) for column, _row in lines[0]} == {15.0}
+
+
+def test_flat_ground_has_no_contour_lines():
+    assert read_contours(contour_tile(terrain_png(lambda c, r: 1234), 13)) == {}
+
+
+def test_a_summit_gets_closed_rings():
+    def cone(column, row):
+        return 2000 - 12 * math.hypot(column - 32, row - 32)
+
+    grid, count = _grid(terrain_png(cone))
+    rings = trace(grid, count, 100)[1900]
+
+    assert len(rings) == 1
+    first, last = rings[0][0], rings[0][-1]
+    assert math.isclose(first[0], last[0]) and math.isclose(first[1], last[1])
+
+
+def test_contour_tiles_are_computed_once_and_served_compressed(client, layers):
+    first = client.get("/api/v1/maps/contours/12/2153/1436.pbf")
+
+    assert first.status_code == 200
+    assert first.headers["content-type"] == "application/x-protobuf"
+    assert first.headers["content-encoding"] == "gzip"
+    client.get("/api/v1/maps/contours/12/2153/1436.pbf")
+    assert layers["terrain"].calls == [(12, 2153, 1436)]
+    assert client.get("/api/v1/maps/contours/15/1/1.pbf").status_code == 422

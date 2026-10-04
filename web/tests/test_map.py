@@ -114,6 +114,12 @@ def test_raster_layers_and_slope_are_passed_on(browser, fake_api):
     assert browser.get("/map/slope/12/2153/1436.png").mimetype == "image/png"
     assert browser.get("/map/raster/other/12/2153/1436").status_code == 404
 
+    fake_api.route(
+        "GET", "/maps/contours/12/2153/1436.pbf", lambda r: httpx2.Response(200, content=b"lines")
+    )
+    contours = browser.get("/map/contours/12/2153/1436.pbf")
+    assert contours.data == b"lines" and contours.mimetype == "application/x-protobuf"
+
 
 def test_pages_carry_the_texts_of_the_layer_control(user, fake_api):
     planning_api(fake_api, INFO)
@@ -122,6 +128,6 @@ def test_pages_carry_the_texts_of_the_layer_control(user, fake_api):
     page = user.get("/routes/new").get_data(as_text=True)
 
     texts = plan_data(page)["layerTexts"]
-    assert texts["base"] == {"map": "Karte", "satellite": "Luftbild"}
+    assert texts["base"] == {"map": "Karte", "winter": "Winter", "satellite": "Luftbild"}
     assert texts["overlay"]["slope"] == "Hangneigung" and texts["terrain"] == "3D-Gelände"
     assert "map_layers.js" in page

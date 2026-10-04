@@ -202,6 +202,7 @@ class MapLayerSheet extends ConsumerWidget {
         .cast<Map<String, dynamic>>();
     String baseLabel(String id) => switch (id) {
       'map' => l10n.mapBaseMap,
+      'winter' => l10n.mapBaseWinter,
       'satellite' => l10n.mapBaseSatellite,
       _ => id,
     };

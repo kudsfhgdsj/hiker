@@ -35,7 +35,11 @@ def map_config(attribution: str) -> dict:
         "attribution": attribution,
         "layerTexts": {
             "title": t("map.layers"),
-            "base": {"map": t("map.base.map"), "satellite": t("map.base.satellite")},
+            "base": {
+                "map": t("map.base.map"),
+                "winter": t("map.base.winter"),
+                "satellite": t("map.base.satellite"),
+            },
             "overlay": {"slope": t("map.overlay.slope")},
             "terrain": t("map.terrain"),
             "from": t("map.from"),

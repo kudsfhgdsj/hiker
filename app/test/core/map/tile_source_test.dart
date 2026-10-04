@@ -345,11 +345,13 @@ void main() {
       expect((await get('/raster/terrain/12/2153/1436')).$2, [1, 2, 3]);
       expect((await get('/raster/satellite/12/2153/1436')).$2, [1, 2, 3]);
       expect((await get('/slope/12/2153/1436.png')).$2, [1, 2, 3]);
+      expect((await get('/contours/12/2153/1436.pbf')).$1, 204);
       expect((await get('/raster/other/12/2153/1436')).$1, 404);
       expect(asked.sublist(3), [
         '/api/v1/maps/raster/terrain/12/2153/1436',
         '/api/v1/maps/raster/satellite/12/2153/1436',
         '/api/v1/maps/slope/12/2153/1436.png',
+        '/api/v1/maps/contours/12/2153/1436.pbf',
       ]);
       asked.removeRange(3, asked.length);
 

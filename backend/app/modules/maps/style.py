@@ -118,6 +118,7 @@ def build_style(
     terrain_url: str | None = None,
     slope_url: str | None = None,
     satellite_url: str | None = None,
+    contour_url: str | None = None,
     attributions: dict[str, str] | None = None,
 ) -> dict:
     """The MapLibre style; the `*_url` arguments are URL templates.
@@ -428,6 +429,63 @@ def build_style(
             },
         )
         hiker["terrain"] = {"source": "terrain-3d", "exaggeration": 1.3}
+        # Winter: snow on the ground. A white veil over the drawn land; the shading above
+        # it keeps the relief, and water, paths and names stay as they are.
+        insert_before(
+            "hillshade",
+            {
+                "id": "winter-snow",
+                "type": "background",
+                "layout": {"visibility": "none"},
+                "paint": {"background-color": "#ffffff", "background-opacity": 0.78},
+            },
+        )
+        hiker["bases"].append({"id": "winter", "show": ["winter-snow"], "hide": []})
+    if contour_url:
+        sources["contours"] = {
+            "type": "vector",
+            "tiles": [contour_url],
+            "minzoom": 9,
+            "maxzoom": 13,
+            "attribution": notes.get("terrain", ""),
+        }
+        insert_before(
+            "waterway",
+            {
+                "id": "contour",
+                "type": "line",
+                "source": "contours",
+                "source-layer": "contour",
+                "minzoom": 11,
+                "paint": {
+                    "line-color": "#8a5a2b",
+                    "line-opacity": ["case", ["==", ["get", "index"], 1], 0.65, 0.35],
+                    "line-width": ["case", ["==", ["get", "index"], 1], 1.1, 0.6],
+                },
+            },
+        )
+        layers.append(
+            {
+                "id": "contour-label",
+                "type": "symbol",
+                "source": "contours",
+                "source-layer": "contour",
+                "minzoom": 12,
+                "filter": ["==", ["get", "index"], 1],
+                "layout": {
+                    "symbol-placement": "line",
+                    "text-field": ["to-string", ["get", "ele"]],
+                    "text-font": REGULAR,
+                    "text-size": 10,
+                    "symbol-spacing": 350,
+                },
+                "paint": {
+                    "text-color": "#7a4f26",
+                    "text-halo-color": HALO,
+                    "text-halo-width": 1.2,
+                },
+            }
+        )
     if slope_url:
         sources["slope"] = {
             "type": "raster",

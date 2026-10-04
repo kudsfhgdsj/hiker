@@ -286,6 +286,7 @@ TEXTS = {
     "tour.track_remove": "Track entfernen",
     "map.layers": "Ebenen",
     "map.base.map": "Karte",
+    "map.base.winter": "Winter",
     "map.base.satellite": "Luftbild",
     "map.overlay.slope": "Hangneigung",
     "map.terrain": "3D-Gelände",

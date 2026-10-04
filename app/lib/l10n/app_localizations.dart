@@ -2860,6 +2860,12 @@ abstract class AppLocalizations {
   /// **'Karte'**
   String get mapBaseMap;
 
+  /// No description provided for @mapBaseWinter.
+  ///
+  /// In de, this message translates to:
+  /// **'Winter'**
+  String get mapBaseWinter;
+
   /// No description provided for @mapBaseSatellite.
   ///
   /// In de, this message translates to:
