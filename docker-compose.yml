@@ -98,6 +98,7 @@ services:
       BROUTER_SEGMENTS_PATH: /data/brouter-segments
       # Eigene Karte (Vektorkacheln aus OSM-Daten), gebaut von deploy/build-map.sh.
       MAP_DATA_PATH: /data/maps
+      SATELLITE_ENABLED: ${SATELLITE_ENABLED:-true}
     volumes:
       - ${DATA_DIR:-./data}/files:/data/files
       - ${DATA_DIR:-./data}/tiles:/data/tiles
