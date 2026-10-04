@@ -329,6 +329,58 @@ def test_gpx_download_contains_the_line(client, anna):
     assert points[-1].find("gpx:ele", namespace).text == "1900.0"
 
 
+# --- Offline sync ---
+
+
+def push(client, headers, **operation):
+    body = {"operations": [{"collection": "routes", **operation}]}
+    response = client.post("/api/v1/sync/push", json=body, headers=headers)
+    assert response.status_code == 200, response.text
+    return response.json()["results"][0]
+
+
+def test_route_drafted_offline_gets_its_line_with_the_sync(client, anna, ben):
+    route_id = str(uuid.uuid4())
+    draft = {"title": "Offline geplant", "waypoints": [START, HUT], "max_difficulty": 4}
+
+    result = push(client, anna, op="upsert", id=route_id, data=draft)
+
+    assert result["status"] == "ok"
+    record = result["record"]
+    assert record["id"] == route_id and record["version"] == 1 and record["max_difficulty"] == 4
+    assert len(record["series"]["lat"]) == 3 and record["ascent_m"] == 200
+
+    changes = client.get("/api/v1/sync/changes", headers=anna).json()
+    assert [route["id"] for route in changes["collections"]["routes"]["changed"]] == [route_id]
+    # Routes are not shared: nobody else gets them.
+    others = client.get("/api/v1/sync/changes", headers=ben).json()
+    assert others["collections"]["routes"]["changed"] == []
+    assert push(client, ben, op="delete", id=route_id)["status"] == "ok"
+    assert client.get(f"{ROUTES}/{route_id}", headers=anna).status_code == 200
+
+
+def test_sync_reports_conflicts_missing_routes_and_deletes(client, anna, routing_engine):
+    route = create(client, anna)
+    since = client.get("/api/v1/sync/changes", headers=anna).json()["server_time"]
+    change = {"title": "Am Handy geändert", "waypoints": route["waypoints"]}
+
+    ok = push(client, anna, op="upsert", id=route["id"], base_version=1, data=change)
+    assert ok["status"] == "ok" and ok["record"]["version"] == 2
+
+    late = push(client, anna, op="upsert", id=route["id"], base_version=1, data=change)
+    assert late["status"] == "conflict" and late["current"]["title"] == "Am Handy geändert"
+
+    routing_engine.no_route = True
+    draft = {"title": "Unmöglich", "waypoints": [START, PEAK]}
+    failed = push(client, anna, op="upsert", id=str(uuid.uuid4()), data=draft)
+    assert failed["status"] == "error" and failed["code"] == "no_route"
+
+    assert push(client, anna, op="delete", id=route["id"])["status"] == "ok"
+    changes = client.get("/api/v1/sync/changes", params={"since": since}, headers=anna).json()
+    assert changes["collections"]["routes"]["deleted"] == [route["id"]]
+    assert changes["collections"]["routes"]["changed"] == []
+
+
 # --- BRouter adapter ---
 
 

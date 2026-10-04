@@ -88,6 +88,7 @@ def db(session_factory):
 
 @pytest.fixture
 def client(
+    monkeypatch,
     session_factory,
     storage,
     food_source,
@@ -103,6 +104,9 @@ def client(
     app.dependency_overrides[get_weather_source] = lambda: weather_source
     app.dependency_overrides[get_place_source] = lambda: place_source
     app.dependency_overrides[get_routing_engine] = lambda: routing_engine
+    # The offline sync has no request to take its dependencies from.
+    monkeypatch.setattr("app.modules.planning.sync.get_routing_engine", lambda: routing_engine)
+    monkeypatch.setattr("app.modules.planning.sync.get_elevation_source", lambda: elevation_source)
 
     def _get_db():
         with session_factory() as session:
