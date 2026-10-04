@@ -68,6 +68,7 @@ class Settings(BaseSettings):
     terrain_tiles_url: str = (
         "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
     )
+    terrain_enabled: bool = True
     # Aerial images from open sources (swisstopo, basemap.at, Sentinel-2 cloudless 2016).
     satellite_enabled: bool = True
 

@@ -264,7 +264,7 @@ def get_layers() -> Layers:
         settings.tile_cache_path,
         settings.tile_cache_days,
         settings.tile_cache_max_mb,
-        settings.terrain_tiles_url,
+        settings.terrain_tiles_url if settings.terrain_enabled else "",
         settings.satellite_enabled,
         settings.public_base_url,
     )
