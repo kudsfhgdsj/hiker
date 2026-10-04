@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiker/app.dart';
 import 'package:hiker/core/db/app_database.dart';
+import 'package:hiker/core/map/map_regions.dart';
 import 'package:hiker/core/map/map_view.dart';
 import 'package:hiker/core/modules/feature_module.dart';
 import 'package:hiker/core/map/tile_proxy.dart';
@@ -136,6 +137,9 @@ ProviderContainer createContainer({
       deviceRouterProvider.overrideWithValue(deviceRouter),
       tileCacheDirectoryProvider.overrideWith(
         (ref) => Directory.systemTemp.createTemp('hiker-tiles'),
+      ),
+      mapRegionDirectoryProvider.overrideWith(
+        (ref) => Directory.systemTemp.createTemp('hiker-maps'),
       ),
       routingDirectoryProvider.overrideWith(
         (ref) => Directory.systemTemp.createTemp('hiker-routing'),

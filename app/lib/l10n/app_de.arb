@@ -539,10 +539,10 @@
   "planGpx": "Als GPX speichern",
   "planGpxSaved": "GPX-Datei gespeichert.",
   "planOnDevice": "Ohne Verbindung auf dem Gerät berechnet. Der Server rechnet beim Abgleich neu; Luftlinien bekommen erst dann ihre Höhen.",
-  "planOfflineNoData": "Für dieses Gebiet sind keine Wegdaten auf dem Gerät. Unter Planung → Offline-Wegdaten laden oder den Abschnitt als Luftlinie planen.",
-  "offlineTitle": "Offline-Wegdaten",
+  "planOfflineNoData": "Für dieses Gebiet sind keine Wegdaten auf dem Gerät. Unter Planung → Offline-Daten laden oder den Abschnitt als Luftlinie planen.",
+  "offlineTitle": "Offline-Daten",
   "offlineIntro": "Mit den Wegdaten eines Gebiets plant die App Routen auch ohne Verbindung. Die Daten kommen von deinem Server und stammen aus OpenStreetMap (ODbL).",
-  "offlineMapNote": "Die Karte selbst zeigt ohne Verbindung nur Ausschnitte, die du vorher schon angesehen hast.",
+  "offlineMapNote": "Ohne geladene Karte zeigt die App ohne Verbindung nur Ausschnitte, die du vorher schon angesehen hast.",
   "offlineNone": "Dieser Server bietet keine Wegdaten an.",
   "offlineDownload": "Laden",
   "offlineUpdate": "Neu laden",
@@ -559,5 +559,9 @@
   "offlineRegionE10N45": "Österreich West und Mitte, Bayern, Südtirol, Dolomiten",
   "offlineRegionE15N45": "Österreich Ost, Slowenien",
   "offlineRegionE5N40": "Seealpen, Ligurien, Korsika",
-  "offlineRegionE10N40": "Mittelitalien"
+  "offlineRegionE10N40": "Mittelitalien",
+  "offlineMaps": "Karten",
+  "offlineMapsIntro": "Eine geladene Karte zeigt die App auch ohne Verbindung. Dein Server baut sie selbst aus OpenStreetMap-Daten (ODbL).",
+  "offlineMapsNone": "Dieser Server bietet keine Karten zum Herunterladen an.",
+  "offlineSegments": "Wegdaten für die Planung"
 }

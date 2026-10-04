@@ -2713,13 +2713,13 @@ abstract class AppLocalizations {
   /// No description provided for @planOfflineNoData.
   ///
   /// In de, this message translates to:
-  /// **'Für dieses Gebiet sind keine Wegdaten auf dem Gerät. Unter Planung → Offline-Wegdaten laden oder den Abschnitt als Luftlinie planen.'**
+  /// **'Für dieses Gebiet sind keine Wegdaten auf dem Gerät. Unter Planung → Offline-Daten laden oder den Abschnitt als Luftlinie planen.'**
   String get planOfflineNoData;
 
   /// No description provided for @offlineTitle.
   ///
   /// In de, this message translates to:
-  /// **'Offline-Wegdaten'**
+  /// **'Offline-Daten'**
   String get offlineTitle;
 
   /// No description provided for @offlineIntro.
@@ -2731,7 +2731,7 @@ abstract class AppLocalizations {
   /// No description provided for @offlineMapNote.
   ///
   /// In de, this message translates to:
-  /// **'Die Karte selbst zeigt ohne Verbindung nur Ausschnitte, die du vorher schon angesehen hast.'**
+  /// **'Ohne geladene Karte zeigt die App ohne Verbindung nur Ausschnitte, die du vorher schon angesehen hast.'**
   String get offlineMapNote;
 
   /// No description provided for @offlineNone.
@@ -2823,6 +2823,30 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Mittelitalien'**
   String get offlineRegionE10N40;
+
+  /// No description provided for @offlineMaps.
+  ///
+  /// In de, this message translates to:
+  /// **'Karten'**
+  String get offlineMaps;
+
+  /// No description provided for @offlineMapsIntro.
+  ///
+  /// In de, this message translates to:
+  /// **'Eine geladene Karte zeigt die App auch ohne Verbindung. Dein Server baut sie selbst aus OpenStreetMap-Daten (ODbL).'**
+  String get offlineMapsIntro;
+
+  /// No description provided for @offlineMapsNone.
+  ///
+  /// In de, this message translates to:
+  /// **'Dieser Server bietet keine Karten zum Herunterladen an.'**
+  String get offlineMapsNone;
+
+  /// No description provided for @offlineSegments.
+  ///
+  /// In de, this message translates to:
+  /// **'Wegdaten für die Planung'**
+  String get offlineSegments;
 }
 
 class _AppLocalizationsDelegate

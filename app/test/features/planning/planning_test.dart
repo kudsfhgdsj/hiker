@@ -637,9 +637,14 @@ void main() {
         modules: [planningModule],
         size: const Size(420, 1600),
       );
-      await tester.tap(find.byTooltip('Offline-Wegdaten'));
+      await tester.tap(find.byTooltip('Offline-Daten'));
       await tester.pumpAndSettle();
 
+      // This server offers path data, but no maps of its own.
+      expect(
+        find.textContaining('keine Karten zum Herunterladen'),
+        findsOneWidget,
+      );
       expect(find.text('E5_N45'), findsOneWidget);
       expect(find.textContaining('Schweiz'), findsOneWidget);
       expect(find.textContaining('5°–10° Ost, 45°–50° Nord'), findsOneWidget);

@@ -7,24 +7,37 @@ import 'package:path_provider/path_provider.dart';
 import '../config/app_config.dart';
 import '../network/trusted_certificates.dart';
 import '../session/session.dart';
+import 'map_regions.dart';
 
-/// Hands map tiles of the user's server to the map.
+/// The map server inside the app, on the loopback address.
 ///
-/// The map is drawn by a native library with its own network code, which knows
-/// nothing about a self-signed certificate the user chose to trust in the app.
-/// For such a server the map asks this small server on the loopback address
-/// instead; it fetches the tile over the connection the app trusts.
+/// The map is drawn by a native library with its own network code. It asks
+/// this small server for everything it shows:
 ///
-/// It keeps every tile it handed out as a file. A tile seen before is shown at
-/// once and also without network; after [_freshFor] the server is asked again.
-/// Only tiles the user looked at are kept, never tiles in advance.
+/// - `/{z}/{x}/{y}.png`: raster tiles of the user's server,
+/// - `/vector/{z}/{x}/{y}.pbf`: tiles of the own vector map, first from a map
+///   file on the device (see [MapRegionStore]), else from the user's server,
+/// - `/fonts/{font}/{range}.pbf`: the glyphs for the labels.
+///
+/// What comes from the server goes over the connection the app trusts (also
+/// with a certificate the user confirmed by hand) and is kept as a file. A
+/// file seen before is handed out at once and also without network; after
+/// [_freshFor] the server is asked again. Only what the user looked at is
+/// kept this way; whole regions come as map files the server built itself.
 class TileProxy extends Notifier<int?> {
+  static final _raster = RegExp(r'^/(\d{1,2})/(\d{1,7})/(\d{1,7})\.png$');
+  static final _vector = RegExp(
+    r'^/vector/(\d{1,2})/(\d{1,7})/(\d{1,7})\.pbf$',
+  );
+  static final _glyphs = RegExp(
+    r'^/fonts/([\w ,%-]{1,200})/(\d{1,5}-\d{1,5})\.pbf$',
+  );
   static const _freshFor = Duration(days: 7);
 
-  /// Above this size the tiles not used for the longest time are removed.
+  /// Above this size the files not used for the longest time are removed.
   static const _maxCacheBytes = 300 * 1024 * 1024;
-
-  static final _tilePath = RegExp(r'^/(\d{1,2})/(\d{1,7})/(\d{1,7})\.png$');
+  static final _png = ContentType('image', 'png');
+  static final _protobuf = ContentType('application', 'x-protobuf');
 
   HttpServer? _server;
   HttpClient? _client;
@@ -36,17 +49,17 @@ class TileProxy extends Notifier<int?> {
     return null;
   }
 
-  Future<File?> _cached(RegExpMatch tile) async {
+  Future<File?> _cacheFile(String name) async {
     try {
       final folder = await ref.read(tileCacheDirectoryProvider.future);
-      return File('${folder.path}/${tile[1]}/${tile[2]}/${tile[3]}.png');
+      return File('${folder.path}/$name');
     } on Object {
-      // No place to keep tiles: the map still works with the server.
+      // No place to keep files: the map still works with the server.
       return null;
     }
   }
 
-  /// Removes the tiles used least recently once the cache is too large.
+  /// Removes the files used least recently once the cache is too large.
   Future<void> _prune() async {
     try {
       final folder = await ref.read(tileCacheDirectoryProvider.future);
@@ -83,80 +96,139 @@ class TileProxy extends Notifier<int?> {
     _client = null;
   }
 
-  Future<void> _answer(HttpRequest request) async {
-    final response = request.response;
-    final tile = _tilePath.firstMatch(request.uri.path);
+  /// Hands out a file of the server, from the device if it is known there.
+  /// [gzipped]: the server sends the data compressed and it is kept that way.
+  Future<void> _fromServer(
+    HttpResponse response, {
+    required String apiPath,
+    required String cacheName,
+    required ContentType type,
+    bool gzipped = false,
+  }) async {
     final baseUrl = ref.read(sessionProvider).baseUrl;
-    try {
-      if (request.method != 'GET' || tile == null || baseUrl.isEmpty) {
-        response.statusCode = HttpStatus.notFound;
-        return;
+    final cached = await _cacheFile(cacheName);
+    final known = cached != null && cached.existsSync();
+    void send(List<int> bytes) {
+      response.statusCode = bytes.isEmpty && gzipped
+          ? HttpStatus.noContent
+          : HttpStatus.ok;
+      response.headers.contentType = type;
+      if (gzipped && bytes.isNotEmpty) {
+        response.headers.set(HttpHeaders.contentEncodingHeader, 'gzip');
       }
-      final cached = await _cached(tile);
-      final known = cached != null && cached.existsSync();
-      void sendCached() {
-        response.statusCode = HttpStatus.ok;
-        response.headers.contentType = ContentType('image', 'png');
-        response.add(cached!.readAsBytesSync());
-      }
+      response.add(bytes);
+    }
 
-      if (known &&
-          DateTime.now().difference(cached.lastModifiedSync()) < _freshFor) {
-        sendCached();
-        return;
+    if (known &&
+        DateTime.now().difference(cached.lastModifiedSync()) < _freshFor) {
+      send(cached.readAsBytesSync());
+      return;
+    }
+    if (baseUrl.isEmpty) {
+      response.statusCode = HttpStatus.notFound;
+      return;
+    }
+    final trusted = ref.read(trustedCertificatesProvider.notifier);
+    final client = _client ??= HttpClient()
+      ..badCertificateCallback = trusted.accepts
+      ..connectionTimeout = const Duration(seconds: 10)
+      // Compressed tiles are passed on as they are.
+      ..autoUncompress = false;
+    final HttpClientResponse upstream;
+    try {
+      final request = await client.getUrl(Uri.parse('$baseUrl$apiPath'));
+      if (gzipped) {
+        request.headers.set(HttpHeaders.acceptEncodingHeader, 'gzip');
       }
-      final trusted = ref.read(trustedCertificatesProvider.notifier);
-      final client = _client ??= HttpClient()
-        ..badCertificateCallback = trusted.accepts
-        ..connectionTimeout = const Duration(seconds: 10);
-      final path = AppConfig.serverTilePath
-          .replaceFirst('{z}', tile[1]!)
-          .replaceFirst('{x}', tile[2]!)
-          .replaceFirst('{y}', tile[3]!);
-      final HttpClientResponse upstream;
+      upstream = await request.close();
+    } on Exception {
+      // No network: an older copy is better than no map.
+      if (!known) rethrow;
+      send(cached.readAsBytesSync());
+      return;
+    }
+    final ok = upstream.statusCode == HttpStatus.ok;
+    if (ok || upstream.statusCode == HttpStatus.noContent) {
+      // "No content" (the map has nothing there) is remembered as an empty file.
+      final bytes = await upstream.fold<List<int>>(
+        [],
+        (all, chunk) => all..addAll(chunk),
+      );
       try {
-        upstream = await (await client.getUrl(Uri.parse('$baseUrl$path')))
-            .close();
-      } on Exception {
-        // No network: an older copy is better than no map.
-        if (!known) rethrow;
-        sendCached();
-        return;
+        cached?.parent.createSync(recursive: true);
+        cached?.writeAsBytesSync(bytes, flush: true);
+      } on FileSystemException {
+        // A full disk must not hide what just arrived.
       }
-      if (upstream.statusCode == HttpStatus.ok && cached != null) {
-        final bytes = await upstream.fold<List<int>>(
-          [],
-          (all, chunk) => all..addAll(chunk),
-        );
-        try {
-          cached.parent.createSync(recursive: true);
-          cached.writeAsBytesSync(bytes, flush: true);
-        } on FileSystemException {
-          // A full disk must not hide the tile that just arrived.
-        }
-        response.statusCode = HttpStatus.ok;
-        response.headers.contentType =
-            upstream.headers.contentType ?? ContentType('image', 'png');
-        final caching = upstream.headers.value(HttpHeaders.cacheControlHeader);
-        if (caching != null) {
-          response.headers.set(HttpHeaders.cacheControlHeader, caching);
-        }
-        response.add(bytes);
-        return;
-      }
-      if (upstream.statusCode >= 500 && known) {
-        await upstream.drain<void>();
-        sendCached();
-        return;
-      }
-      response.statusCode = upstream.statusCode;
-      response.headers.contentType =
-          upstream.headers.contentType ?? ContentType('image', 'png');
       final caching = upstream.headers.value(HttpHeaders.cacheControlHeader);
       if (caching != null) {
         response.headers.set(HttpHeaders.cacheControlHeader, caching);
       }
-      await upstream.pipe(response);
+      send(bytes);
+      return;
+    }
+    await upstream.drain<void>();
+    if (upstream.statusCode >= 500 && known) {
+      send(cached.readAsBytesSync());
+      return;
+    }
+    response.statusCode = upstream.statusCode;
+  }
+
+  Future<void> _answer(HttpRequest request) async {
+    final response = request.response;
+    final path = request.uri.path;
+    try {
+      if (request.method != 'GET') {
+        response.statusCode = HttpStatus.notFound;
+        return;
+      }
+      final raster = _raster.firstMatch(path);
+      final vector = _vector.firstMatch(path);
+      final glyphs = _glyphs.firstMatch(path);
+      if (raster != null) {
+        await _fromServer(
+          response,
+          apiPath: AppConfig.serverTilePath
+              .replaceFirst('{z}', raster[1]!)
+              .replaceFirst('{x}', raster[2]!)
+              .replaceFirst('{y}', raster[3]!),
+          cacheName: '${raster[1]}/${raster[2]}/${raster[3]}.png',
+          type: _png,
+        );
+      } else if (vector != null) {
+        final z = int.parse(vector[1]!);
+        final x = int.parse(vector[2]!);
+        final y = int.parse(vector[3]!);
+        // A map file on the device answers first: no network needed.
+        final local = await ref.read(mapRegionStoreProvider).tile(z, x, y);
+        if (local != null) {
+          response.statusCode = HttpStatus.ok;
+          response.headers.contentType = _protobuf;
+          response.headers.set(HttpHeaders.contentEncodingHeader, 'gzip');
+          response.add(local);
+          return;
+        }
+        await _fromServer(
+          response,
+          apiPath: '/api/v1/maps/vector/$z/$x/$y.pbf',
+          cacheName: 'vector/$z/$x/$y.pbf',
+          type: _protobuf,
+          gzipped: true,
+        );
+      } else if (glyphs != null) {
+        final font = Uri.decodeComponent(glyphs[1]!);
+        await _fromServer(
+          response,
+          apiPath:
+              '/api/v1/maps/fonts/${Uri.encodeComponent(font)}/${glyphs[2]}.pbf',
+          cacheName:
+              'fonts/${font.replaceAll(RegExp(r'[^\w ,-]'), '_')}/${glyphs[2]}.pbf',
+          type: _protobuf,
+        );
+      } else {
+        response.statusCode = HttpStatus.notFound;
+      }
     } on Exception {
       response.statusCode = HttpStatus.badGateway;
     } finally {
@@ -167,7 +239,7 @@ class TileProxy extends Notifier<int?> {
 
 final tileProxyProvider = NotifierProvider<TileProxy, int?>(TileProxy.new);
 
-/// Where the proxy keeps the tiles it handed out; tests use a temporary folder.
+/// Where the proxy keeps what it handed out; tests use a temporary folder.
 final tileCacheDirectoryProvider = FutureProvider<Directory>((ref) async {
   final cache = await getApplicationCacheDirectory();
   return Directory('${cache.path}/map-tiles');

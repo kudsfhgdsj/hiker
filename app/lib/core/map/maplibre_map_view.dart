@@ -15,12 +15,16 @@ class MapLibreMapView extends StatefulWidget {
     super.key,
     required this.content,
     required this.tileUrl,
+    this.styleJson,
   });
 
   final MapContent content;
 
   /// URL template of the raster tiles.
   final String tileUrl;
+
+  /// Style of the own vector map; null shows the raster tiles.
+  final String? styleJson;
 
   @override
   State<MapLibreMapView> createState() => _MapLibreMapViewState();
@@ -35,27 +39,29 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
   bool _styleLoaded = false;
   Map<String, math.Point<double>> _positions = const {};
 
-  /// A map of raster tiles only; styles and layers follow in Phase 2.
-  late final String _style = jsonEncode({
-    'version': 8,
-    'sources': {
-      'tiles': {
-        'type': 'raster',
-        'tiles': [widget.tileUrl],
-        'tileSize': 256,
-        'attribution': '© OpenStreetMap contributors',
-      },
-    },
-    'layers': [
-      // Shown while tiles load or if they cannot be loaded.
-      {
-        'id': 'background',
-        'type': 'background',
-        'paint': {'background-color': '#E4E9E6'},
-      },
-      {'id': 'tiles', 'type': 'raster', 'source': 'tiles'},
-    ],
-  });
+  /// The own vector map, or else a map of raster tiles only.
+  late final String _style =
+      widget.styleJson ??
+      jsonEncode({
+        'version': 8,
+        'sources': {
+          'tiles': {
+            'type': 'raster',
+            'tiles': [widget.tileUrl],
+            'tileSize': 256,
+            'attribution': '© OpenStreetMap contributors',
+          },
+        },
+        'layers': [
+          // Shown while tiles load or if they cannot be loaded.
+          {
+            'id': 'background',
+            'type': 'background',
+            'paint': {'background-color': '#E4E9E6'},
+          },
+          {'id': 'tiles', 'type': 'raster', 'source': 'tiles'},
+        ],
+      });
 
   static LatLng _latLng(GeoPoint point) => LatLng(point.lat, point.lon);
 
@@ -246,7 +252,9 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
               zoom: _everything.isEmpty ? 6 : 12,
             ),
             trackCameraPosition: true,
-            rotateGesturesEnabled: false,
+            // Rotating is for finding one's way; markers follow the camera.
+            rotateGesturesEnabled: widget.content.interactive,
+            compassEnabled: true,
             tiltGesturesEnabled: false,
             scrollGesturesEnabled: widget.content.interactive,
             zoomGesturesEnabled: widget.content.interactive,

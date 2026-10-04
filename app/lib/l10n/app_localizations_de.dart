@@ -1444,10 +1444,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get planOfflineNoData =>
-      'Für dieses Gebiet sind keine Wegdaten auf dem Gerät. Unter Planung → Offline-Wegdaten laden oder den Abschnitt als Luftlinie planen.';
+      'Für dieses Gebiet sind keine Wegdaten auf dem Gerät. Unter Planung → Offline-Daten laden oder den Abschnitt als Luftlinie planen.';
 
   @override
-  String get offlineTitle => 'Offline-Wegdaten';
+  String get offlineTitle => 'Offline-Daten';
 
   @override
   String get offlineIntro =>
@@ -1455,7 +1455,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get offlineMapNote =>
-      'Die Karte selbst zeigt ohne Verbindung nur Ausschnitte, die du vorher schon angesehen hast.';
+      'Ohne geladene Karte zeigt die App ohne Verbindung nur Ausschnitte, die du vorher schon angesehen hast.';
 
   @override
   String get offlineNone => 'Dieser Server bietet keine Wegdaten an.';
@@ -1507,4 +1507,18 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get offlineRegionE10N40 => 'Mittelitalien';
+
+  @override
+  String get offlineMaps => 'Karten';
+
+  @override
+  String get offlineMapsIntro =>
+      'Eine geladene Karte zeigt die App auch ohne Verbindung. Dein Server baut sie selbst aus OpenStreetMap-Daten (ODbL).';
+
+  @override
+  String get offlineMapsNone =>
+      'Dieser Server bietet keine Karten zum Herunterladen an.';
+
+  @override
+  String get offlineSegments => 'Wegdaten für die Planung';
 }

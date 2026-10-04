@@ -61,10 +61,10 @@ class HikerApp extends ConsumerStatefulWidget {
 
 class _HikerAppState extends ConsumerState<HikerApp>
     with WidgetsBindingObserver {
-  /// The map needs the tile proxy as soon as a certificate is trusted by hand.
+  /// The map asks the app's own map server: it knows the maps on the device
+  /// and reaches a server whose certificate was trusted by hand.
   void _startTileProxyIfNeeded() {
     if (!ref.read(tileProxyEnabledProvider)) return;
-    if (ref.read(trustedCertificatesProvider).isEmpty) return;
     ref.read(tileProxyProvider.notifier).start();
   }
 
