@@ -167,6 +167,8 @@ def _planner(route: dict, is_new: bool, status: int = 200):
         "planning/plan.html",
         route=route,
         is_new=is_new,
+        # The tours started from this route, to compare plan and walked track.
+        tours=[] if is_new else api().get(f"/planning/routes/{route['id']}/tours"),
         info=info,
         paces=api().get("/planning/paces"),
         plan_data=plan_data,
@@ -227,6 +229,50 @@ def preview():
         if error.status == 401:
             raise
         return jsonify({"error": error.code, "message": error_text(error)}), error.status
+
+
+@blueprint.post("/import")
+@route_page
+def route_import():
+    """A GPX file as a new route; the planner opens with it."""
+    files = forms.upload()
+    if not files:
+        flash(t("plan.import_missing"), "error")
+        return redirect(url_for("planning.route_list"))
+    try:
+        route = api().request("POST", "/planning/routes/import", files=files).json()
+    except ApiError as error:
+        if error.status in (401, 404):
+            raise
+        flash(error_text(error), "error")
+        return redirect(url_for("planning.route_list"))
+    flash(t("plan.imported", count=len(route["waypoints"])), "success")
+    return redirect(url_for("planning.route_plan", route_id=route["id"]))
+
+
+@blueprint.post("/<uuid:route_id>/tour")
+@route_page
+def route_tour(route_id):
+    """Start a tour from the route and open it."""
+    tour = api().send("POST", f"/planning/routes/{route_id}/tour")
+    flash(t("plan.tour_created"), "success")
+    return redirect(url_for("protocols.tour_detail", tour_id=tour["tour_id"]))
+
+
+@blueprint.get("/<uuid:route_id>/compare/<uuid:tour_id>")
+@route_page
+def route_compare(route_id, tour_id):
+    """Plan and walked track side by side."""
+    route = api().get(f"/planning/routes/{route_id}")
+    compared = api().get(f"/planning/routes/{route_id}/comparison/{tour_id}")
+    compare_data = {
+        **map_config(OSM_ATTRIBUTION),
+        "plan": {key: route["series"][key] for key in ("lat", "lon")},
+        "track": compared["track"] and {key: compared["track"][key] for key in ("lat", "lon")},
+    }
+    return render_template(
+        "planning/compare.html", route=route, compared=compared, compare_data=compare_data
+    )
 
 
 @blueprint.post("/paces")

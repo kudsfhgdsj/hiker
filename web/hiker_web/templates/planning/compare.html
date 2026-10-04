@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ t('plan.compare') }}: {{ route.title }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/maplibre-gl/maplibre-gl.css') }}">
+<div class="toolbar">
+  <h1>{{ t('plan.compare_title', title=route.title) }}</h1><span class="spacer"></span>
+  <a class="button" href="{{ url_for('planning.route_plan', route_id=route.id) }}">{{ t('action.back') }}</a>
+</div>
+<p class="meta">{{ t('plan.compare_tour') }}
+  <a href="{{ url_for('protocols.tour_detail', tour_id=compared.tour_id) }}">{{ compared.tour_title }}</a></p>
+{% set planned = compared.planned %}{% set actual = compared.actual %}
+<table class="table">
+  <thead><tr><th></th><th>{{ t('plan.compare_planned') }}</th><th>{{ t('plan.compare_actual') }}</th></tr></thead>
+  <tbody>
+    <tr><th>{{ t('plan.distance') }}</th><td>{{ planned.distance_m|distance }}</td>
+      <td>{{ actual.distance_m|distance if actual else '–' }}</td></tr>
+    <tr><th>{{ t('plan.ascent') }}</th><td>{{ planned.ascent_m|meters }}</td>
+      <td>{{ actual.ascent_m|meters if actual else '–' }}</td></tr>
+    <tr><th>{{ t('plan.descent') }}</th><td>{{ planned.descent_m|meters }}</td>
+      <td>{{ actual.descent_m|meters if actual else '–' }}</td></tr>
+    <tr><th>{{ t('plan.duration') }}</th>
+      <td>{{ (planned.duration_s / 60)|duration }} <span class="chip estimate">{{ t('plan.estimated') }}</span></td>
+      <td>{% if actual and actual.duration_s is not none %}{{ (actual.duration_s / 60)|duration }}{% else %}–{% endif %}</td></tr>
+    <tr><th>{{ t('plan.compare_total') }}</th><td>–</td>
+      <td>{% if actual and actual.total_time_s is not none %}{{ (actual.total_time_s / 60)|duration }}{% else %}–{% endif %}</td></tr>
+  </tbody>
+</table>
+{% if not actual %}
+<p class="flash">{{ t('plan.compare_no_track') }}</p>
+{% elif compared.deviation %}
+<p>{{ t('plan.compare_deviation', mean=compared.deviation.mean_m, max=compared.deviation.max_m, share=(compared.deviation.on_plan_share * 100)|round|int) }}</p>
+{% endif %}
+<p class="meta"><span class="swatch plan"></span> {{ t('plan.compare_planned') }}
+  <span class="swatch track"></span> {{ t('plan.compare_actual') }}</p>
+<div id="map" class="plan"></div>
+<script type="application/json" id="compare-data">{{ compare_data|tojson }}</script>
+<script src="{{ url_for('static', filename='vendor/maplibre-gl/maplibre-gl-csp.js') }}" defer></script>
+<script src="{{ url_for('static', filename='map_layers.js') }}" defer></script>
+<script src="{{ url_for('static', filename='compare.js') }}" defer></script>
+{% endblock %}

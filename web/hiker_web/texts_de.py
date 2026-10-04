@@ -378,6 +378,34 @@ TEXTS = {
     "plan.reverse": "Richtung umkehren",
     "plan.clear": "Alle entfernen",
     "plan.title": "Titel",
+    "plan.import": "GPX-Datei als Route importieren",
+    "plan.import_file": "GPX-Datei",
+    "plan.import_action": "Importieren",
+    "plan.import_hint": (
+        "Der Track wird auf höchstens 100 Punkte vereinfacht und als Luftlinien übernommen, "
+        "damit die Route der Datei folgt. Einzelne Abschnitte kannst du danach den Wegen "
+        "folgen lassen."
+    ),
+    "plan.import_missing": "Bitte eine GPX-Datei wählen.",
+    "plan.imported": "Route aus der Datei angelegt ({count} Punkte).",
+    "plan.tours": "Touren zu dieser Route",
+    "plan.tours_hint": (
+        "Lege aus der Route eine Tour an und lade dort später den gegangenen Track hoch. "
+        "Dann lassen sich Plan und Wirklichkeit vergleichen."
+    ),
+    "plan.tour_create": "Tour aus dieser Route anlegen",
+    "plan.tour_created": "Tour angelegt. Titel, Beschreibung und Start stammen aus der Route.",
+    "plan.compare": "Vergleichen",
+    "plan.compare_title": "Plan und Tour: {title}",
+    "plan.compare_tour": "Tour:",
+    "plan.compare_planned": "Geplant",
+    "plan.compare_actual": "Gegangen",
+    "plan.compare_total": "Gesamtzeit mit Pausen",
+    "plan.compare_no_track": "Die Tour hat noch keinen Track. Lade ihn bei der Tour hoch.",
+    "plan.compare_deviation": (
+        "Der gegangene Track liegt im Mittel {mean} m neben der geplanten Linie, höchstens "
+        "{max} m; {share} % verlaufen näher als 50 m am Plan."
+    ),
     "plan.tags": "Tags",
     "plan.tags_hint": "Durch Komma getrennt, z. B. Sommer, Gipfel, mit Kindern",
     "plan.tag_filter": "Routen mit dem Tag „{tag}“.",

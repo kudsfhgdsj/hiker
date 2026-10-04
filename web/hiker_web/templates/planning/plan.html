@@ -63,6 +63,25 @@
       </section>
     </form>
     {% if not is_new %}
+    <section class="card stack">
+      <h2>{{ t('plan.tours') }}</h2>
+      {% if tours %}
+      <ul class="list">
+        {% for tour in tours %}
+        <li>
+          <a class="grow" href="{{ url_for('protocols.tour_detail', tour_id=tour.tour_id) }}">{{ tour.title }}</a>
+          <a class="button" href="{{ url_for('planning.route_compare', route_id=route.id, tour_id=tour.tour_id) }}">{{ t('plan.compare') }}</a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="meta">{{ t('plan.tours_hint') }}</p>
+      {% endif %}
+      <form method="post" action="{{ url_for('planning.route_tour', route_id=route.id) }}">
+        {{ csrf() }}
+        <button>{{ t('plan.tour_create') }}</button>
+      </form>
+    </section>
     <p>{{ delete_form(url_for('planning.route_delete', route_id=route.id)) }}</p>
     {% endif %}
     {% if info.attribution %}<p class="meta">{{ info.attribution }}</p>{% endif %}

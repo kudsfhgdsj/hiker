@@ -188,6 +188,9 @@ body.full main { flex: 1; min-height: 0; max-width: none; width: 100%; padding: 
 .plan-side .toolbar { margin-bottom: 0; }
 .sun { font-size: .9rem; display: grid; gap: .25rem; }
 .sun[hidden] { display: none; }
+.swatch { display: inline-block; width: 1.6rem; height: .3rem; border-radius: 2px; vertical-align: middle; margin: 0 .2rem 0 .6rem; }
+.swatch.plan { background: #c62828; margin-left: 0; }
+.swatch.track { background: #1565c0; }
 .sun .warn { color: var(--error); font-weight: 600; }
 .pace-save { display: flex; gap: .35rem; }
 .pace-save input { flex: 1; min-width: 0; }

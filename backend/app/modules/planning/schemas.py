@@ -229,6 +229,43 @@ class RouteOut(RouteSummary):
     sun: SunOut | None = Field(description="Sunrise and sunset for the tour; null without start")
 
 
+class RouteTourOut(BaseModel):
+    """A tour that was started from the route."""
+
+    tour_id: uuid.UUID
+    title: str
+    start_time: datetime | None
+    has_track: bool = Field(description="False: nothing to compare the plan with yet")
+
+
+class ComparedFigures(BaseModel):
+    distance_m: float | None
+    ascent_m: float | None
+    descent_m: float | None
+    duration_s: float | None = Field(
+        description="Planned: estimated walking time. Walked: time in motion, without breaks"
+    )
+    total_time_s: float | None = Field(description="Walked only: from start to end")
+
+
+class Deviation(BaseModel):
+    """How far the walked track lies from the planned line."""
+
+    mean_m: int
+    max_m: int
+    on_plan_share: float = Field(description="Share of the track within 50 m of the plan")
+
+
+class ComparisonOut(BaseModel):
+    route_id: uuid.UUID
+    tour_id: uuid.UUID
+    tour_title: str
+    planned: ComparedFigures
+    actual: ComparedFigures | None = Field(description="Null: the tour has no track yet")
+    deviation: Deviation | None
+    track: RouteSeries | None = Field(description="The walked line, to draw it over the plan")
+
+
 class SegmentInfo(BaseModel):
     """Path data of one tile of 5° x 5°, named after its south-west corner (e.g. E5_N45)."""
 

@@ -10,6 +10,16 @@
     <input type="search" name="q" value="{{ query }}" placeholder="{{ t('plan.search_hint') }}"></label>
   <button>{{ t('action.search') }}</button>
 </form>
+<details class="card">
+  <summary>{{ t('plan.import') }}</summary>
+  <form method="post" action="{{ url_for('planning.route_import') }}" enctype="multipart/form-data" class="row">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="field"><span>{{ t('plan.import_file') }}</span>
+      <input type="file" name="file" accept=".gpx,application/gpx+xml" required></label>
+    <button>{{ t('plan.import_action') }}</button>
+  </form>
+  <p class="meta">{{ t('plan.import_hint') }}</p>
+</details>
 {% if tag %}<p class="meta">{{ t('plan.tag_filter', tag=tag) }} <a href="{{ url_for('planning.route_list') }}">{{ t('plan.tag_all') }}</a></p>{% endif %}
 {% if routes %}
 <ul class="list">

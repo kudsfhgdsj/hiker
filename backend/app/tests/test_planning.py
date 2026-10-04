@@ -673,3 +673,121 @@ def test_brouter_adapter_tells_no_route_from_an_unreachable_engine():
 
     with pytest.raises(RoutingUnavailableError):
         brouter(garbage).route([(47.0, 9.0), (47.01, 9.0)], "hiking", RouteOptions())
+
+
+# --- Routes and tours ---
+
+TOURS = "/api/v1/tours"
+
+
+def gpx(points) -> bytes:
+    body = "".join(f'<trkpt lat="{lat}" lon="{lon}"><ele>1000</ele></trkpt>' for lat, lon in points)
+    return (
+        '<?xml version="1.0"?><gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1">'
+        f"<trk><trkseg>{body}</trkseg></trk></gpx>"
+    ).encode()
+
+
+def test_a_tour_is_started_from_a_route(client, anna, ben):
+    route = create(
+        client, anna, description="Über die Hütte", start_time="2026-07-18T05:30:00+00:00"
+    )
+    links = f"{ROUTES}/{route['id']}/tours"
+    assert client.get(links, headers=anna).json() == []
+
+    made = client.post(f"{ROUTES}/{route['id']}/tour", headers=anna)
+
+    assert made.status_code == 201
+    tour = client.get(f"{TOURS}/{made.json()['tour_id']}", headers=anna).json()
+    assert tour["title"] == "Auf den Gipfel" and tour["summary"] == "Über die Hütte"
+    assert tour["start_time"].startswith("2026-07-18T05:30")
+    assert client.get(links, headers=anna).json() == [
+        {
+            "tour_id": tour["id"],
+            "title": "Auf den Gipfel",
+            "start_time": tour["start_time"],
+            "has_track": False,
+        }
+    ]
+    # Routes belong to their owner: nobody else starts a tour from them.
+    assert client.post(f"{ROUTES}/{route['id']}/tour", headers=ben).status_code == 404
+    assert client.get(links, headers=ben).status_code == 404
+    # A deleted tour is no longer listed.
+    assert client.delete(f"{TOURS}/{tour['id']}", headers=anna).status_code == 204
+    assert client.get(links, headers=anna).json() == []
+
+
+def test_plan_and_walked_track_are_compared(client, anna, ben):
+    route = create(client, anna, waypoints=[START, HUT], profile="direct")
+    tour_id = client.post(f"{ROUTES}/{route['id']}/tour", headers=anna).json()["tour_id"]
+    address = f"{ROUTES}/{route['id']}/comparison/{tour_id}"
+
+    before = client.get(address, headers=anna).json()
+    assert before["planned"]["distance_m"] == route["distance_m"]
+    assert before["planned"]["duration_s"] == route["duration_s"]
+    assert before["actual"] is None and before["deviation"] is None and before["track"] is None
+
+    # Walked: first on the plan, then about 150 m east of it.
+    walked = gpx([(47.0, 9.0), (47.003, 9.0), (47.006, 9.002), (47.01, 9.002)])
+    files = {"file": ("walk.gpx", walked, "application/gpx+xml")}
+    assert client.put(f"{TOURS}/{tour_id}/gpx", files=files, headers=anna).status_code == 200
+
+    after = client.get(address, headers=anna).json()
+    assert 1100 < after["actual"]["distance_m"] < 1300
+    assert after["tour_title"] == "Auf den Gipfel"
+    assert 140 < after["deviation"]["max_m"] < 165
+    assert 50 < after["deviation"]["mean_m"] < 110
+    assert after["deviation"]["on_plan_share"] == 0.5
+    assert after["track"]["lat"][0] == 47.0 and len(after["track"]["lon"]) == 4
+    assert client.get(f"{ROUTES}/{route['id']}/tours", headers=anna).json()[0]["has_track"] is True
+
+    # Neither a foreign route nor a foreign tour can be compared.
+    assert client.get(address, headers=ben).status_code == 404
+    other = create(client, ben)
+    assert (
+        client.get(f"{ROUTES}/{other['id']}/comparison/{tour_id}", headers=ben).status_code == 404
+    )
+
+
+def test_a_gpx_file_becomes_a_route(client, anna):
+    # A straight piece with many points and one bend.
+    points = [(47.0 + i * 0.0005, 9.0) for i in range(21)]
+    points += [(47.01, 9.0 + i * 0.0005) for i in range(1, 21)]
+    files = {"file": ("Runde am See.gpx", gpx(points), "application/gpx+xml")}
+
+    response = client.post(f"{ROUTES}/import", files=files, headers=anna)
+
+    assert response.status_code == 201, response.text
+    route = response.json()
+    assert route["title"] == "Runde am See" and route["profile"] == "direct"
+    # Only the points that carry the shape are kept: start, bend, end.
+    assert [(p["lat"], p["lon"]) for p in route["waypoints"]] == [
+        (47.0, 9.0),
+        (47.01, 9.0),
+        (47.01, 9.01),
+    ]
+    assert [p["direct"] for p in route["waypoints"]] == [False, True, True]
+    assert 1800 < route["distance_m"] < 1900
+
+    named = client.post(
+        f"{ROUTES}/import", files=files, data={"title": "Mein Import"}, headers=anna
+    )
+    assert named.json()["title"] == "Mein Import"
+    broken = {"file": ("x.gpx", b"not gpx", "application/gpx+xml")}
+    assert client.post(f"{ROUTES}/import", files=broken, headers=anna).status_code == 422
+    assert client.post(f"{ROUTES}/import", files=files).status_code == 401
+
+
+def test_a_winding_track_fits_into_one_route():
+    import math
+
+    from app.modules.planning.tours import waypoints_from_gpx
+
+    # 3000 points on a spiral: far more bends than a route has waypoints.
+    points = [
+        (47.0 + 0.00002 * i * math.cos(i / 5), 9.0 + 0.00002 * i * math.sin(i / 5))
+        for i in range(3000)
+    ]
+    waypoints = waypoints_from_gpx(gpx(points))
+    assert 10 < len(waypoints) <= 100
+    assert waypoints[0]["direct"] is False and all(point["direct"] for point in waypoints[1:])

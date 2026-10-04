@@ -95,3 +95,17 @@ class PaceProfile(TimestampMixin, Base):
     ascent_m_per_h: Mapped[float] = mapped_column(Float)
     descent_m_per_h: Mapped[float] = mapped_column(Float)
     distance_km_per_h: Mapped[float] = mapped_column(Float)
+
+
+class RouteTour(Base):
+    """A tour that was started from a route. The tour belongs to `protocols`; the link is
+    kept here, so that the tours know nothing of the planning."""
+
+    __tablename__ = "route_tour"
+
+    tour_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("tour.id", ondelete="CASCADE"), primary_key=True
+    )
+    route_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("planned_route.id", ondelete="CASCADE"), index=True
+    )

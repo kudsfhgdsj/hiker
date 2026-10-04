@@ -39,6 +39,8 @@ SAVED_PACE = {
     "descent_m_per_h": 400,
     "distance_km_per_h": 3,
 }
+TOUR_ID = "77777777-7777-4777-8777-777777777777"
+LINKED_TOUR = {"tour_id": TOUR_ID, "title": "Auf den Gipfel", "start_time": None, "has_track": True}
 ROUTE = {
     "id": ROUTE_ID,
     "title": "Auf den Gipfel",
@@ -83,6 +85,7 @@ def planning_api(fake_api, info=INFO):
     )
     fake_api.route("GET", "/planning/routes/*", ROUTE)
     fake_api.route("GET", "/planning/paces", [SAVED_PACE])
+    fake_api.route("GET", "/planning/routes/*/tours", [LINKED_TOUR])
 
 
 def plan_data(page: str) -> dict:
@@ -325,3 +328,85 @@ def test_delete_and_gpx_download(user, fake_api):
     response = user.post(f"/routes/{ROUTE_ID}/delete")
     assert response.status_code == 302 and response.headers["Location"] == "/routes/"
     assert f"DELETE /planning/routes/{ROUTE_ID}" in fake_api.requested()
+
+
+def test_a_tour_is_started_from_the_route_and_compared_with_it(user, fake_api):
+    planning_api(fake_api)
+    fake_api.route(
+        "POST", "/planning/routes/*/tour", lambda r: httpx2.Response(201, json=LINKED_TOUR)
+    )
+    compared = {
+        "route_id": ROUTE_ID,
+        "tour_id": TOUR_ID,
+        "tour_title": "Auf den Gipfel",
+        "planned": {
+            **{k: STATS[k] for k in ("distance_m", "ascent_m", "descent_m", "duration_s")},
+            "total_time_s": None,
+        },
+        "actual": {
+            "distance_m": 1300,
+            "ascent_m": 120,
+            "descent_m": 10,
+            "duration_s": 2400,
+            "total_time_s": 3000,
+        },
+        "deviation": {"mean_m": 35, "max_m": 150, "on_plan_share": 0.8},
+        "track": {
+            "distance_m": [0, 1300],
+            "lat": [47.0, 47.011],
+            "lon": [9.0, 9.001],
+            "elevation_m": None,
+        },
+    }
+    fake_api.route("GET", "/planning/routes/*/comparison/*", compared)
+
+    # The planner lists the tours of the route.
+    page = text(user.get(f"/routes/{ROUTE_ID}"))
+    assert "Touren zu dieser Route" in page
+    assert (
+        f'href="/routes/{ROUTE_ID}/compare/{TOUR_ID}"' in page
+        and f'href="/tours/{TOUR_ID}"' in page
+    )
+
+    made = user.post(f"/routes/{ROUTE_ID}/tour")
+    assert made.status_code == 302 and made.headers["Location"] == f"/tours/{TOUR_ID}"
+    assert f"POST /planning/routes/{ROUTE_ID}/tour" in fake_api.requested()
+
+    page = text(user.get(f"/routes/{ROUTE_ID}/compare/{TOUR_ID}"))
+    assert "Geplant" in page and "Gegangen" in page
+    assert "1,1 km" in page and "1,3 km" in page and "33 min" in page and "40 min" in page
+    assert "im Mittel 35 m" in page and "höchstens 150 m" in page and "80 %" in page
+    data = json.loads(re.search(r'id="compare-data">(.*?)</script>', page, re.S).group(1))
+    assert data["plan"] == {"lat": SERIES["lat"], "lon": SERIES["lon"]}
+    assert data["track"] == {"lat": [47.0, 47.011], "lon": [9.0, 9.001]}
+
+    # A tour without a track: only the plan, with a hint.
+    fake_api.route(
+        "GET",
+        "/planning/routes/*/comparison/*",
+        compared | {"actual": None, "deviation": None, "track": None},
+    )
+    page = text(user.get(f"/routes/{ROUTE_ID}/compare/{TOUR_ID}"))
+    assert "noch keinen Track" in page
+
+
+def test_a_gpx_file_is_imported_as_a_route(user, fake_api):
+    import io
+
+    planning_api(fake_api)
+    fake_api.route("POST", "/planning/routes/import", lambda r: httpx2.Response(201, json=ROUTE))
+
+    assert "GPX-Datei als Route importieren" in text(user.get("/routes/"))
+    upload = {"file": (io.BytesIO(b"<gpx/>"), "runde.gpx")}
+    response = user.post("/routes/import", upload, content_type="multipart/form-data")
+
+    assert response.status_code == 302 and response.headers["Location"] == f"/routes/{ROUTE_ID}"
+    sent = fake_api.last("POST", "/planning/routes/import")
+    assert b"runde.gpx" in sent.content and b"<gpx/>" in sent.content
+
+    # Not a GPX file: back to the list with the reason.
+    fake_api.route("POST", "/planning/routes/import", lambda r: error(422, "invalid_gpx"))
+    upload = {"file": (io.BytesIO(b"x"), "x.gpx")}
+    response = user.post("/routes/import", upload, content_type="multipart/form-data")
+    assert response.status_code == 302 and response.headers["Location"] == "/routes/"
+    assert user.post("/routes/import", {}).headers["Location"] == "/routes/"
