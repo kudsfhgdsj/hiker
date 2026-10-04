@@ -48,9 +48,40 @@ class PlannedRoute(TimestampMixin, Base):
     descent_m: Mapped[float | None] = mapped_column(Float)
     min_elevation_m: Mapped[float | None] = mapped_column(Float)
     max_elevation_m: Mapped[float | None] = mapped_column(Float)
-    # Estimated walking time without breaks (see estimate.py).
+    # Estimated walking time without breaks (see estimate.py), and the pace it was
+    # computed with: the preset and its values at that time.
     duration_s: Mapped[int] = mapped_column(Integer)
+    pace_preset: Mapped[str] = mapped_column(String(10), default="dav")
+    pace_name: Mapped[str | None] = mapped_column(String(100))
+    pace_ascent_m_per_h: Mapped[float] = mapped_column(Float, default=300)
+    pace_descent_m_per_h: Mapped[float] = mapped_column(Float, default=500)
+    pace_distance_km_per_h: Mapped[float] = mapped_column(Float, default=4)
     version: Mapped[int] = mapped_column(Integer, default=0)
 
     # Optimistic locking: an UPDATE only succeeds if the version is still the one we read.
     __mapper_args__ = {"version_id_col": version, "version_id_generator": False}
+
+    @property
+    def pace(self) -> dict:
+        return {
+            "preset": self.pace_preset,
+            "name": self.pace_name,
+            "ascent_m_per_h": self.pace_ascent_m_per_h,
+            "descent_m_per_h": self.pace_descent_m_per_h,
+            "distance_km_per_h": self.pace_distance_km_per_h,
+        }
+
+
+class PaceProfile(TimestampMixin, Base):
+    """A pace the user saved under a name, to use it again. Only its owner sees it."""
+
+    __tablename__ = "pace_profile"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(100))
+    ascent_m_per_h: Mapped[float] = mapped_column(Float)
+    descent_m_per_h: Mapped[float] = mapped_column(Float)
+    distance_km_per_h: Mapped[float] = mapped_column(Float)

@@ -74,6 +74,7 @@ def test_first_sync_delivers_everything_of_the_user(client, anna, bea):
         "foods",
         "tours",
         "routes",
+        "paces",
     }
     assert [item["id"] for item in collections["gear_items"]["changed"]] == [tent["id"]]
     assert [f["id"] for f in collections["foods"]["changed"]] == [food["id"]]

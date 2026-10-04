@@ -565,7 +565,16 @@ Entschieden am 04.10.2026: Phase 2 beginnt mit der Routenplanung; Kartenstile un
 
 **Datenmodell** `planned_route`: id, owner_id, title, description, planned_date, profile, max_difficulty, via_ferrata, waypoints (JSON: `lat`, `lon`, `name`, `direct`), series (JSON wie bei Tracks: `distance_m`, `lat`, `lon`, `elevation_m`), engine, distance_m, ascent_m, descent_m, min_elevation_m, max_elevation_m, duration_s (geschätzt), version, created_at, updated_at, deleted_at. Der Server berechnet Linie und Eckdaten beim Speichern selbst aus den Wegpunkten; der Client schickt keine Geometrie. Konfliktschutz über `version` wie bei Touren (409).
 
-**Gehzeit** (immer als `estimated` gekennzeichnet), nach DIN 33466: waagrecht 4 km/h, Aufstieg 300 Hm/h, Abstieg 500 Hm/h. Aus der Zeit für die Strecke und der Zeit für die Höhenmeter zählt der größere Wert ganz, der kleinere zur Hälfte. Pausen sind nicht enthalten. Ohne Höhen zählt nur die Strecke.
+**Gehzeit** (immer als `estimated` gekennzeichnet): Aus der Zeit für die Strecke und der Zeit für die Höhenmeter zählt der größere Wert ganz, der kleinere zur Hälfte (Regel der DIN 33466). Pausen sind nicht enthalten. Ohne Höhen zählt nur die Strecke. Die Leistung je Stunde ist wählbar (Vorgabe vom 04.10.2026, `planning/estimate.py`):
+
+| Vorgabe | Aufstieg | Abstieg | Strecke |
+|---|---|---|---|
+| `dav` (DAV, DIN 33466; Standard) | 300 Hm/h | 500 Hm/h | 4 km/h |
+| `sac` (SAC) | 400 Hm/h | 800 Hm/h | 4 km/h |
+| `pro` (Profi) | 600 Hm/h | 1000 Hm/h | 6 km/h |
+| `custom` (individuell) | frei | frei | frei |
+
+Eigene Vorgaben lassen sich unter einem Namen speichern und wiederverwenden (`pace_profile`, `GET|POST|PUT|DELETE /planning/paces`, Sammlung `paces` im Abgleich); nur der Ersteller sieht sie. Eine Route merkt sich Vorgabe und Werte, mit denen ihre Gehzeit berechnet wurde; eine andere Vorgabe ändert nur die Gehzeit, nicht die Linie.
 
 **Rechte**: Routen gehören ihrem Owner; fremde Routen antworten mit 404. Teilen von Routen ist nicht vorgesehen, bis es gewünscht wird.
 
@@ -683,6 +692,22 @@ Ziel: Ubuntu 26.04, Domain `hiker.lacasa.internal`, läuft auf dem bereits genut
 9. Optional: FIT-Import
 
 **Phase 3 – Berichte**: Backend-Dienst, der hikr.org-Berichte für Gipfel im Umkreis findet (Nutzungsbedingungen und robots.txt prüfen, Zwischenspeicherung, nur Verweise + kurze Auszüge, Quelle klar angeben).
+
+**Aufträge vom 04.10.2026, noch nicht umgesetzt** (Reihenfolge der Bearbeitung):
+1. Gehzeit-Vorgaben in Web und App wählbar machen (Server ist fertig).
+2. Planer: Karte füllt den Bildschirm; Ebenen-Auswahl als kleines Aufklappfeld oben, gegliedert in Ebenen, Darstellung, Schwierigkeit.
+3. Kartenmodus: Karte ansehen und Orte heraussuchen, ohne zu planen; in der App auch ohne Anmeldung.
+4. Knopf zum Umschalten zwischen 2D und 3D; das 3D-Gelände muss wirklich angehoben sein.
+5. Hangneigung: Regler von beiden Enden, ab und bis zu welcher Neigung eingefärbt wird.
+6. Lawinengefahr, Schneehöhe und Schneebedeckung für ein Datum in der Vergangenheit (bis etwa ein Jahr zurück).
+7. Web: Navigationsleiste in die Mitte.
+8. Regen- und Wolkenradar mit Zeitverlauf.
+9. Sonnenauf- und -untergang für Gipfel.
+10. Planer: Feld „Geplant für“ entfernen, stattdessen Tags.
+11. Planer: Startzeitpunkt eingeben; daraus und aus der Gehzeit-Vorgabe den Sonnenverlauf entlang der Tour berechnen.
+12. Karten und Wegdaten für Österreich, Bayern und Norditalien bauen; Kacheln an Gebietsgrenzen aus mehreren Gebieten zusammenführen.
+13. Schritt 5: aus einer Route eine Tour anlegen, GPX-Import.
+14. Beschriftungen der Vektorkarte in der App auf einem echten Gerät prüfen.
 
 ## 13. Regeln für Claude Code
 

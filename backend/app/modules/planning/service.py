@@ -9,10 +9,18 @@ from sqlalchemy.orm.exc import StaleDataError
 from app.core.db import utcnow
 from app.core.errors import ConflictError
 from app.modules.auth.models import User
-from app.modules.planning.estimate import walking_time_s
-from app.modules.planning.models import PROFILE_DIRECT, PlannedRoute
+from app.modules.planning.estimate import PRESETS, Pace, walking_time_s
+from app.modules.planning.models import PROFILE_DIRECT, PaceProfile, PlannedRoute
 from app.modules.planning.routing import RoutedPoint, RouteOptions, RoutingEngine
-from app.modules.planning.schemas import RouteCreate, RouteIn, RouteOut, RouteUpdate, RouteWaypoint
+from app.modules.planning.schemas import (
+    PaceProfileCreate,
+    PaceProfileIn,
+    RouteCreate,
+    RouteIn,
+    RouteOut,
+    RouteUpdate,
+    RouteWaypoint,
+)
 from app.modules.protocols.elevation import ElevationSource, ElevationSourceError, lookup_along
 from app.modules.protocols.track import (
     TrackPoint,
@@ -93,6 +101,7 @@ def compute_route(
     options: RouteOptions,
     engine: RoutingEngine,
     elevations: ElevationSource,
+    pace: Pace = PRESETS["dav"],
 ) -> ComputedRoute:
     """The line through all waypoints: along paths, except for legs marked as direct."""
     line: list[RoutedPoint] = []
@@ -128,7 +137,7 @@ def compute_route(
         descent_m=stats["descent_m"],
         min_elevation_m=stats["min_elevation_m"],
         max_elevation_m=stats["max_elevation_m"],
-        duration_s=walking_time_s(stats["distance_m"], stats["ascent_m"], stats["descent_m"]),
+        duration_s=walking_time_s(stats["distance_m"], stats["ascent_m"], stats["descent_m"], pace),
     )
 
 
@@ -160,6 +169,16 @@ def _apply(
             "duration_s",
         ):
             setattr(route, field, getattr(computed, field))
+    # The walking time follows the pace; a new pace needs no new line.
+    pace = data.pace.resolved()
+    route.pace_preset = pace.preset
+    route.pace_name = data.pace.name if pace.preset == "custom" else None
+    route.pace_ascent_m_per_h = pace.ascent_m_per_h
+    route.pace_descent_m_per_h = pace.descent_m_per_h
+    route.pace_distance_km_per_h = pace.distance_km_per_h
+    route.duration_s = walking_time_s(
+        route.distance_m, route.ascent_m, route.descent_m, data.pace.as_pace()
+    )
     route.title = data.title
     route.description = data.description
     route.planned_date = data.planned_date
@@ -237,3 +256,47 @@ def route_gpx(route: PlannedRoute) -> bytes:
         for lat, lon, ele in zip(series["lat"], series["lon"], elevations, strict=True)
     ]
     return points_to_gpx(points, route.title)
+
+
+# --- Saved paces ---
+
+
+def list_paces(db: Session, user: User) -> list[PaceProfile]:
+    query = (
+        select(PaceProfile)
+        .where(PaceProfile.owner_id == user.id, PaceProfile.deleted_at.is_(None))
+        .order_by(func.lower(PaceProfile.name))
+    )
+    return list(db.scalars(query))
+
+
+def get_pace(db: Session, user: User, pace_id) -> PaceProfile | None:
+    pace = db.get(PaceProfile, pace_id)
+    # Paces of others answer like missing ones.
+    if pace is None or pace.owner_id != user.id or pace.deleted_at is not None:
+        return None
+    return pace
+
+
+def create_pace(db: Session, user: User, data: PaceProfileCreate) -> PaceProfile:
+    if data.id is not None and db.get(PaceProfile, data.id) is not None:
+        raise ConflictError("A pace with this id already exists", code="id_taken")
+    pace = PaceProfile(owner_id=user.id, **data.model_dump(exclude={"id"}))
+    if data.id is not None:
+        pace.id = data.id
+    db.add(pace)
+    db.commit()
+    return pace
+
+
+def update_pace(db: Session, pace: PaceProfile, data: PaceProfileIn) -> PaceProfile:
+    for field, value in data.model_dump().items():
+        setattr(pace, field, value)
+    db.commit()
+    return pace
+
+
+def delete_pace(db: Session, pace: PaceProfile) -> None:
+    """Routes keep the values they were computed with; only the saved name goes."""
+    pace.deleted_at = utcnow()
+    db.commit()

@@ -1,4 +1,5 @@
 import re
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path as FilePath
 from typing import Annotated
@@ -14,11 +15,16 @@ from app.core.ratelimit import rate_limit
 from app.modules.auth.deps import CurrentUser
 from app.modules.planning import service
 from app.modules.planning.deps import OwnedRoute
-from app.modules.planning.models import PROFILE_DIRECT, PROFILES, SAC_SCALE
+from app.modules.planning.estimate import PRESETS
+from app.modules.planning.models import PROFILE_DIRECT, PROFILES, SAC_SCALE, PaceProfile
 from app.modules.planning.routing import ROUTING_ATTRIBUTION, RouteOptions, Routing
 from app.modules.planning.schemas import (
     MAX_WAYPOINTS,
     DifficultyInfo,
+    PacePreset,
+    PaceProfileCreate,
+    PaceProfileIn,
+    PaceProfileOut,
     PlanningInfo,
     ProfileInfo,
     RouteCreate,
@@ -47,6 +53,15 @@ def read_info(_user: CurrentUser, engine: Routing):
             ProfileInfo(id=profile, available=profile == PROFILE_DIRECT or engine.available)
             for profile in PROFILES
         ],
+        paces=[
+            PacePreset(
+                id=name,
+                ascent_m_per_h=pace.ascent_m_per_h,
+                descent_m_per_h=pace.descent_m_per_h,
+                distance_km_per_h=pace.distance_km_per_h,
+            )
+            for name, pace in PRESETS.items()
+        ],
         difficulties=[
             DifficultyInfo(level=level, code=f"T{level}", sac_scale=value)
             for level, value in enumerate(SAC_SCALE, start=1)
@@ -69,7 +84,9 @@ def preview(body: RoutePreviewIn, _user: CurrentUser, engine: Routing, elevation
     along paths is not set up or cannot be reached; straight lines still work.
     """
     options = RouteOptions(body.max_difficulty, body.via_ferrata)
-    return service.compute_route(body.waypoints, body.profile, options, engine, elevations)
+    return service.compute_route(
+        body.waypoints, body.profile, options, engine, elevations, body.pace.as_pace()
+    )
 
 
 @router.get("/routes", response_model=Page[RouteSummary])
@@ -135,6 +152,47 @@ def download_gpx(route: OwnedRoute):
         media_type=GPX_MIME,
         headers={"Content-Disposition": f'attachment; filename="route-{route.id}.gpx"'},
     )
+
+
+# --- Saved paces: only their owner sees them ---
+
+
+@router.get("/paces", response_model=list[PaceProfileOut])
+def list_paces(user: CurrentUser, db: DbSession):
+    """The user's own paces for the walking time, by name."""
+    return service.list_paces(db, user)
+
+
+@router.post(
+    "/paces",
+    response_model=PaceProfileOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(409),
+)
+def create_pace(body: PaceProfileCreate, user: CurrentUser, db: DbSession):
+    return service.create_pace(db, user, body)
+
+
+def _own_pace(pace_id: uuid.UUID, user: CurrentUser, db: DbSession):
+    pace = service.get_pace(db, user, pace_id)
+    if pace is None:
+        raise NotFoundError("Pace not found")
+    return pace
+
+
+OwnPace = Annotated[PaceProfile, Depends(_own_pace)]
+
+
+@router.put("/paces/{pace_id}", response_model=PaceProfileOut, responses=error_responses(404))
+def update_pace(body: PaceProfileIn, pace: OwnPace, db: DbSession):
+    return service.update_pace(db, pace, body)
+
+
+@router.delete(
+    "/paces/{pace_id}", status_code=status.HTTP_204_NO_CONTENT, responses=error_responses(404)
+)
+def delete_pace(pace: OwnPace, db: DbSession):
+    service.delete_pace(db, pace)
 
 
 # --- Path data for planning without network (the app routes on the device) ---

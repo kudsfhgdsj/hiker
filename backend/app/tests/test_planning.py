@@ -6,7 +6,7 @@ import pytest
 
 from app.core.config import get_settings
 from app.core.errors import UnprocessableError
-from app.modules.planning.estimate import walking_time_s
+from app.modules.planning.estimate import PRESETS, Pace, walking_time_s
 from app.modules.planning.routing import BRouterEngine, RouteOptions, RoutingUnavailableError
 from app.modules.protocols.track import haversine_m
 from app.tests.conftest import auth_header, register
@@ -45,6 +45,126 @@ def test_walking_time_follows_din_33466():
     assert walking_time_s(4000, 900, 500) == 4.5 * 3600
     # Without elevation only the distance counts.
     assert walking_time_s(6000, None, None) == 1.5 * 3600
+
+
+def test_walking_time_follows_the_pace():
+    # 8 km, 1200 m up, 400 m down.
+    assert walking_time_s(8000, 1200, 400, PRESETS["dav"]) == round((4.8 + 1.0) * 3600)
+    assert walking_time_s(8000, 1200, 400, PRESETS["sac"]) == round((3.5 + 1.0) * 3600)
+    # Trained walkers: 600 m up, 1000 m down, 6 km per hour.
+    assert walking_time_s(8000, 1200, 400, PRESETS["pro"]) == round((2.4 + 8 / 6 / 2) * 3600)
+    assert walking_time_s(8000, 1200, 400, Pace(1200, 800, 8)) == round((1.5 + 0.5) * 3600)
+
+
+# --- Pace ---
+
+SLOW = {
+    "preset": "custom",
+    "name": "Mit Kindern",
+    "ascent_m_per_h": 200,
+    "descent_m_per_h": 300,
+    "distance_km_per_h": 3,
+}
+
+
+def test_preview_and_route_use_the_chosen_pace(client, anna, routing_engine):
+    body = {"waypoints": [START, HUT, PEAK]}
+    dav = client.post(PREVIEW, json=body, headers=anna).json()
+    sac = client.post(PREVIEW, json=body | {"pace": {"preset": "sac"}}, headers=anna).json()
+    assert sac["duration_s"] == walking_time_s(sac["distance_m"], 400, 0, PRESETS["sac"])
+    assert sac["duration_s"] < dav["duration_s"]
+
+    route = create(client, anna, pace=SLOW)
+    assert route["pace"] == SLOW
+    assert route["duration_s"] == walking_time_s(route["distance_m"], 400, 0, Pace(200, 300, 3))
+
+    # A preset brings its own values, whatever else is sent; a new pace needs no new line.
+    calls = len(routing_engine.calls)
+    update = {
+        "title": route["title"],
+        "waypoints": route["waypoints"],
+        "version": 1,
+        "pace": {"preset": "pro", "ascent_m_per_h": 50},
+    }
+    changed = client.put(f"{ROUTES}/{route['id']}", json=update, headers=anna).json()
+    assert changed["pace"] == {
+        "preset": "pro",
+        "name": None,
+        "ascent_m_per_h": 600,
+        "descent_m_per_h": 1000,
+        "distance_km_per_h": 6,
+    }
+    assert changed["duration_s"] < route["duration_s"] and len(routing_engine.calls) == calls
+
+    # Without a word about the pace: the German standard.
+    assert create(client, anna)["pace"]["preset"] == "dav"
+    crawl = {"waypoints": [START, HUT], "pace": {"preset": "custom", "ascent_m_per_h": 10}}
+    assert client.post(PREVIEW, json=crawl, headers=anna).status_code == 422
+
+
+def test_info_lists_the_built_in_paces(client, anna):
+    info = client.get("/api/v1/planning/info", headers=anna).json()
+    paces = {pace["id"]: pace for pace in info["paces"]}
+    assert paces["dav"] == {
+        "id": "dav",
+        "ascent_m_per_h": 300,
+        "descent_m_per_h": 500,
+        "distance_km_per_h": 4,
+    }
+    assert paces["sac"]["ascent_m_per_h"] == 400 and paces["sac"]["descent_m_per_h"] == 800
+    assert paces["pro"]["ascent_m_per_h"] == 600 and paces["pro"]["distance_km_per_h"] == 6
+
+
+def test_own_paces_are_saved_under_a_name_and_stay_private(client, anna, ben):
+    paces = "/api/v1/planning/paces"
+    values = {"ascent_m_per_h": 250, "descent_m_per_h": 400, "distance_km_per_h": 3.5}
+    body = {"name": " Gemütlich ", **values}
+
+    created = client.post(paces, json=body, headers=anna)
+    assert created.status_code == 201 and created.json()["name"] == "Gemütlich"
+    pace_id = created.json()["id"]
+    client.post(paces, json=body | {"name": "Alpin"}, headers=anna)
+
+    names = [pace["name"] for pace in client.get(paces, headers=anna).json()]
+    assert names == ["Alpin", "Gemütlich"]
+    # Only the one who made it sees, changes or deletes it.
+    assert client.get(paces, headers=ben).json() == []
+    assert client.put(f"{paces}/{pace_id}", json=body, headers=ben).status_code == 404
+    assert client.delete(f"{paces}/{pace_id}", headers=ben).status_code == 404
+    assert client.get(paces).status_code == 401
+
+    changed = client.put(f"{paces}/{pace_id}", json=body | {"ascent_m_per_h": 280}, headers=anna)
+    assert changed.status_code == 200 and changed.json()["ascent_m_per_h"] == 280
+    assert client.post(paces, json=body | {"ascent_m_per_h": 5}, headers=anna).status_code == 422
+
+    # A route keeps the values it was computed with when the saved pace goes.
+    route = create(client, anna, pace={"preset": "custom", "name": "Gemütlich", **values})
+    assert client.delete(f"{paces}/{pace_id}", headers=anna).status_code == 204
+    assert [pace["name"] for pace in client.get(paces, headers=anna).json()] == ["Alpin"]
+    kept = client.get(f"{ROUTES}/{route['id']}", headers=anna).json()["pace"]
+    assert kept["name"] == "Gemütlich" and kept["ascent_m_per_h"] == 250
+
+
+def test_paces_are_part_of_the_offline_sync(client, anna, ben):
+    pace_id = str(uuid.uuid4())
+    data = {
+        "name": "Offline",
+        "ascent_m_per_h": 350,
+        "descent_m_per_h": 600,
+        "distance_km_per_h": 4,
+    }
+    body = {"operations": [{"collection": "paces", "op": "upsert", "id": pace_id, "data": data}]}
+
+    result = client.post("/api/v1/sync/push", json=body, headers=anna).json()["results"][0]
+    assert result["status"] == "ok" and result["record"]["name"] == "Offline"
+
+    changes = client.get("/api/v1/sync/changes", headers=anna).json()["collections"]["paces"]
+    assert [pace["id"] for pace in changes["changed"]] == [pace_id]
+    others = client.get("/api/v1/sync/changes", headers=ben).json()["collections"]["paces"]
+    assert others["changed"] == []
+    # Someone else cannot overwrite it through the sync.
+    foreign = client.post("/api/v1/sync/push", json=body, headers=ben).json()["results"][0]
+    assert foreign["status"] == "error"
 
 
 # --- Preview ---
