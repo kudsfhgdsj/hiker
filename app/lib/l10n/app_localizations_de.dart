@@ -59,7 +59,121 @@ class AppLocalizationsDe extends AppLocalizations {
   String get password => 'Passwort';
 
   @override
-  String get passwordTooShort => 'Mindestens 10 Zeichen';
+  String get passwordTooShort => 'Mindestens 8 Zeichen';
+
+  @override
+  String get passwordTooSimple =>
+      'Zu einfach: Groß- und Kleinbuchstaben, Ziffern und Sonderzeichen mischen (drei der vier Arten) – oder mindestens 20 Zeichen verwenden';
+
+  @override
+  String get passwordRules =>
+      'Mindestens 8 Zeichen mit drei der vier Arten Großbuchstaben, Kleinbuchstaben, Ziffern, Sonderzeichen – oder mindestens 20 Zeichen, z. B. mehrere Wörter.';
+
+  @override
+  String get passwordRepeat => 'Passwort wiederholen';
+
+  @override
+  String get passwordsDiffer => 'Die beiden Passwörter stimmen nicht überein';
+
+  @override
+  String get passwordChange => 'Passwort ändern';
+
+  @override
+  String get passwordCurrent => 'Bisheriges Passwort';
+
+  @override
+  String get passwordNew => 'Neues Passwort';
+
+  @override
+  String get passwordChanged => 'Das Passwort ist geändert.';
+
+  @override
+  String get passwordForced =>
+      'Dein Passwort wurde zurückgesetzt. Bitte wähle jetzt ein neues.';
+
+  @override
+  String get passwordSessions => 'Andere Geräte werden dabei abgemeldet.';
+
+  @override
+  String get mfaTitle => 'Zweiten Faktor einrichten';
+
+  @override
+  String get mfaRenew => 'Zweiten Faktor neu einrichten';
+
+  @override
+  String get mfaOn => 'Zweiter Faktor aktiv';
+
+  @override
+  String get mfaOff => 'Kein zweiter Faktor';
+
+  @override
+  String get mfaForced =>
+      'Auf diesem Server ist ein zweiter Faktor Pflicht. Erst danach geht es weiter.';
+
+  @override
+  String get mfaStepApp =>
+      '1. Eine Authenticator-App öffnen, z. B. Aegis oder FreeOTP+, und einen neuen Eintrag anlegen.';
+
+  @override
+  String get mfaStepSecret =>
+      '2. Diesen Schlüssel in der App eintragen (zeitbasiert, 6 Ziffern):';
+
+  @override
+  String get mfaCopySecret => 'Schlüssel kopieren';
+
+  @override
+  String get mfaCopyLink => 'Als Link kopieren';
+
+  @override
+  String get mfaStepCode =>
+      '3. Den sechsstelligen Code eingeben, den die App anzeigt.';
+
+  @override
+  String get mfaCode => 'Code der Authenticator-App';
+
+  @override
+  String get mfaCodeHint => 'Sechs Ziffern – oder ein Wiederherstellungscode';
+
+  @override
+  String get mfaEnable => 'Einrichten';
+
+  @override
+  String get mfaRecoveryTitle => 'Wiederherstellungscodes';
+
+  @override
+  String get mfaRecoveryIntro =>
+      'Mit jedem dieser Codes kannst du dich einmal anmelden, falls die Authenticator-App nicht zur Hand ist.';
+
+  @override
+  String get mfaRecoveryCopy => 'Alle kopieren';
+
+  @override
+  String get mfaRecoveryOnce =>
+      'Die Codes werden nur dieses eine Mal angezeigt. Bitte jetzt sicher aufbewahren.';
+
+  @override
+  String get mfaRecoveryDone => 'Ich habe die Codes gesichert';
+
+  @override
+  String get copied => 'Kopiert';
+
+  @override
+  String get errorMfaRequired =>
+      'Bitte auch den Code der Authenticator-App eingeben.';
+
+  @override
+  String get errorInvalidMfaCode =>
+      'Der Code stimmt nicht oder wurde schon benutzt.';
+
+  @override
+  String get errorWrongPassword => 'Das bisherige Passwort stimmt nicht.';
+
+  @override
+  String get errorPasswordPersonal =>
+      'Das Passwort darf weder den Namen noch die E-Mail-Adresse enthalten.';
+
+  @override
+  String get errorPasswordCommon => 'Dieses Passwort ist zu leicht zu erraten.';
 
   @override
   String get displayName => 'Anzeigename';

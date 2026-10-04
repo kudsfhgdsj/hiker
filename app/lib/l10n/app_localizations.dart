@@ -193,8 +193,212 @@ abstract class AppLocalizations {
   /// No description provided for @passwordTooShort.
   ///
   /// In de, this message translates to:
-  /// **'Mindestens 10 Zeichen'**
+  /// **'Mindestens 8 Zeichen'**
   String get passwordTooShort;
+
+  /// No description provided for @passwordTooSimple.
+  ///
+  /// In de, this message translates to:
+  /// **'Zu einfach: Groß- und Kleinbuchstaben, Ziffern und Sonderzeichen mischen (drei der vier Arten) – oder mindestens 20 Zeichen verwenden'**
+  String get passwordTooSimple;
+
+  /// No description provided for @passwordRules.
+  ///
+  /// In de, this message translates to:
+  /// **'Mindestens 8 Zeichen mit drei der vier Arten Großbuchstaben, Kleinbuchstaben, Ziffern, Sonderzeichen – oder mindestens 20 Zeichen, z. B. mehrere Wörter.'**
+  String get passwordRules;
+
+  /// No description provided for @passwordRepeat.
+  ///
+  /// In de, this message translates to:
+  /// **'Passwort wiederholen'**
+  String get passwordRepeat;
+
+  /// No description provided for @passwordsDiffer.
+  ///
+  /// In de, this message translates to:
+  /// **'Die beiden Passwörter stimmen nicht überein'**
+  String get passwordsDiffer;
+
+  /// No description provided for @passwordChange.
+  ///
+  /// In de, this message translates to:
+  /// **'Passwort ändern'**
+  String get passwordChange;
+
+  /// No description provided for @passwordCurrent.
+  ///
+  /// In de, this message translates to:
+  /// **'Bisheriges Passwort'**
+  String get passwordCurrent;
+
+  /// No description provided for @passwordNew.
+  ///
+  /// In de, this message translates to:
+  /// **'Neues Passwort'**
+  String get passwordNew;
+
+  /// No description provided for @passwordChanged.
+  ///
+  /// In de, this message translates to:
+  /// **'Das Passwort ist geändert.'**
+  String get passwordChanged;
+
+  /// No description provided for @passwordForced.
+  ///
+  /// In de, this message translates to:
+  /// **'Dein Passwort wurde zurückgesetzt. Bitte wähle jetzt ein neues.'**
+  String get passwordForced;
+
+  /// No description provided for @passwordSessions.
+  ///
+  /// In de, this message translates to:
+  /// **'Andere Geräte werden dabei abgemeldet.'**
+  String get passwordSessions;
+
+  /// No description provided for @mfaTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Zweiten Faktor einrichten'**
+  String get mfaTitle;
+
+  /// No description provided for @mfaRenew.
+  ///
+  /// In de, this message translates to:
+  /// **'Zweiten Faktor neu einrichten'**
+  String get mfaRenew;
+
+  /// No description provided for @mfaOn.
+  ///
+  /// In de, this message translates to:
+  /// **'Zweiter Faktor aktiv'**
+  String get mfaOn;
+
+  /// No description provided for @mfaOff.
+  ///
+  /// In de, this message translates to:
+  /// **'Kein zweiter Faktor'**
+  String get mfaOff;
+
+  /// No description provided for @mfaForced.
+  ///
+  /// In de, this message translates to:
+  /// **'Auf diesem Server ist ein zweiter Faktor Pflicht. Erst danach geht es weiter.'**
+  String get mfaForced;
+
+  /// No description provided for @mfaStepApp.
+  ///
+  /// In de, this message translates to:
+  /// **'1. Eine Authenticator-App öffnen, z. B. Aegis oder FreeOTP+, und einen neuen Eintrag anlegen.'**
+  String get mfaStepApp;
+
+  /// No description provided for @mfaStepSecret.
+  ///
+  /// In de, this message translates to:
+  /// **'2. Diesen Schlüssel in der App eintragen (zeitbasiert, 6 Ziffern):'**
+  String get mfaStepSecret;
+
+  /// No description provided for @mfaCopySecret.
+  ///
+  /// In de, this message translates to:
+  /// **'Schlüssel kopieren'**
+  String get mfaCopySecret;
+
+  /// No description provided for @mfaCopyLink.
+  ///
+  /// In de, this message translates to:
+  /// **'Als Link kopieren'**
+  String get mfaCopyLink;
+
+  /// No description provided for @mfaStepCode.
+  ///
+  /// In de, this message translates to:
+  /// **'3. Den sechsstelligen Code eingeben, den die App anzeigt.'**
+  String get mfaStepCode;
+
+  /// No description provided for @mfaCode.
+  ///
+  /// In de, this message translates to:
+  /// **'Code der Authenticator-App'**
+  String get mfaCode;
+
+  /// No description provided for @mfaCodeHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Sechs Ziffern – oder ein Wiederherstellungscode'**
+  String get mfaCodeHint;
+
+  /// No description provided for @mfaEnable.
+  ///
+  /// In de, this message translates to:
+  /// **'Einrichten'**
+  String get mfaEnable;
+
+  /// No description provided for @mfaRecoveryTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiederherstellungscodes'**
+  String get mfaRecoveryTitle;
+
+  /// No description provided for @mfaRecoveryIntro.
+  ///
+  /// In de, this message translates to:
+  /// **'Mit jedem dieser Codes kannst du dich einmal anmelden, falls die Authenticator-App nicht zur Hand ist.'**
+  String get mfaRecoveryIntro;
+
+  /// No description provided for @mfaRecoveryCopy.
+  ///
+  /// In de, this message translates to:
+  /// **'Alle kopieren'**
+  String get mfaRecoveryCopy;
+
+  /// No description provided for @mfaRecoveryOnce.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Codes werden nur dieses eine Mal angezeigt. Bitte jetzt sicher aufbewahren.'**
+  String get mfaRecoveryOnce;
+
+  /// No description provided for @mfaRecoveryDone.
+  ///
+  /// In de, this message translates to:
+  /// **'Ich habe die Codes gesichert'**
+  String get mfaRecoveryDone;
+
+  /// No description provided for @copied.
+  ///
+  /// In de, this message translates to:
+  /// **'Kopiert'**
+  String get copied;
+
+  /// No description provided for @errorMfaRequired.
+  ///
+  /// In de, this message translates to:
+  /// **'Bitte auch den Code der Authenticator-App eingeben.'**
+  String get errorMfaRequired;
+
+  /// No description provided for @errorInvalidMfaCode.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Code stimmt nicht oder wurde schon benutzt.'**
+  String get errorInvalidMfaCode;
+
+  /// No description provided for @errorWrongPassword.
+  ///
+  /// In de, this message translates to:
+  /// **'Das bisherige Passwort stimmt nicht.'**
+  String get errorWrongPassword;
+
+  /// No description provided for @errorPasswordPersonal.
+  ///
+  /// In de, this message translates to:
+  /// **'Das Passwort darf weder den Namen noch die E-Mail-Adresse enthalten.'**
+  String get errorPasswordPersonal;
+
+  /// No description provided for @errorPasswordCommon.
+  ///
+  /// In de, this message translates to:
+  /// **'Dieses Passwort ist zu leicht zu erraten.'**
+  String get errorPasswordCommon;
 
   /// No description provided for @displayName.
   ///

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/db/app_database.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/session/session.dart';
 import '../../../core/sync/sync_service.dart';
 import '../../../core/theme/app_theme.dart';
@@ -76,15 +78,39 @@ class ProfileScreen extends ConsumerWidget {
           initial: data,
           header: user == null
               ? null
-              : ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(child: Icon(Icons.person)),
-                  title: Text(l10n.signedInAs(user.displayName)),
-                  subtitle: Text(
-                    user.isAdmin
-                        ? '${user.email} · ${l10n.roleAdmin}'
-                        : user.email,
-                  ),
+              : Column(
+                  children: [
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const CircleAvatar(child: Icon(Icons.person)),
+                      title: Text(l10n.signedInAs(user.displayName)),
+                      subtitle: Text(
+                        user.isAdmin
+                            ? '${user.email} · ${l10n.roleAdmin}'
+                            : user.email,
+                      ),
+                    ),
+                    if (user.hasPassword)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.password),
+                        title: Text(l10n.passwordChange),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => context.push(AppRoutes.passwordChange),
+                      ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.phonelink_lock),
+                      title: Text(
+                        user.mfaEnabled ? l10n.mfaRenew : l10n.mfaTitle,
+                      ),
+                      subtitle: Text(
+                        user.mfaEnabled ? l10n.mfaOn : l10n.mfaOff,
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => context.push(AppRoutes.mfaSetup),
+                    ),
+                  ],
                 ),
         ),
       ),

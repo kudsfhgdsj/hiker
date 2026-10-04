@@ -41,7 +41,10 @@ class Profile {
   };
 }
 
-typedef AuthResult = ({Tokens tokens, User user});
+typedef AuthResult = ({Tokens tokens, User user, SessionPending pending});
+
+/// The secret of a second factor that waits for its first code.
+typedef MfaSetup = ({String secret, String otpauthUri});
 
 class AuthRepository {
   const AuthRepository(this._dio);
@@ -54,16 +57,75 @@ class AuthRepository {
       refresh: json['refresh_token'] as String,
     ),
     user: User.fromJson(json['user'] as Map<String, dynamic>),
+    pending: SessionPending.fromFlags(
+      mfaSetup: json['mfa_setup_required'] as bool? ?? false,
+      passwordChange: json['password_change_required'] as bool? ?? false,
+    ),
   );
 
+  /// [code] is the code of the authenticator app or a recovery code; the
+  /// server asks for it with `mfa_required` once a second factor is set up.
   Future<AuthResult> login({
     required String email,
     required String password,
+    String? code,
   }) async {
     final response = await apiCall(
       () => _dio.post<Map<String, dynamic>>(
         '/auth/login',
-        data: {'email': email, 'password': password},
+        data: {'email': email, 'password': password, 'code': ?code},
+      ),
+    );
+    return _result(response.data!);
+  }
+
+  /// The setup endpoints work while the sign-in is not complete, so the
+  /// token is sent although the paths start with `/auth/`.
+  Options _withToken(String access) =>
+      Options(headers: {'Authorization': 'Bearer $access'});
+
+  Future<MfaSetup> mfaSetup(String access) async {
+    final response = await apiCall(
+      () => _dio.post<Map<String, dynamic>>(
+        '/auth/mfa/setup',
+        options: _withToken(access),
+      ),
+    );
+    return (
+      secret: response.data!['secret'] as String,
+      otpauthUri: response.data!['otpauth_uri'] as String,
+    );
+  }
+
+  /// Confirms the setup; the answer carries new tokens and the recovery codes.
+  Future<({AuthResult auth, List<String> recoveryCodes})> mfaEnable(
+    String access,
+    String code,
+  ) async {
+    final response = await apiCall(
+      () => _dio.post<Map<String, dynamic>>(
+        '/auth/mfa/enable',
+        data: {'code': code},
+        options: _withToken(access),
+      ),
+    );
+    return (
+      auth: _result(response.data!),
+      recoveryCodes: (response.data!['recovery_codes'] as List<dynamic>)
+          .cast<String>(),
+    );
+  }
+
+  Future<AuthResult> changePassword(
+    String access, {
+    required String current,
+    required String next,
+  }) async {
+    final response = await apiCall(
+      () => _dio.post<Map<String, dynamic>>(
+        '/auth/password',
+        data: {'current_password': current, 'new_password': next},
+        options: _withToken(access),
       ),
     );
     return _result(response.data!);

@@ -13,12 +13,17 @@ class AuthInterceptor extends QueuedInterceptor {
     required this.readSession,
     required this.onTokens,
     required this.onSessionExpired,
+    required this.onPending,
     required this.plainDio,
   });
 
   final SessionState Function() readSession;
   final Future<void> Function(Tokens tokens) onTokens;
   final Future<void> Function() onSessionExpired;
+
+  /// The server refuses requests until the second factor is set up or a new
+  /// password is chosen.
+  final Future<void> Function(SessionPending pending) onPending;
 
   /// Without this interceptor; used for the refresh call and the retry.
   final Dio plainDio;
@@ -41,6 +46,16 @@ class AuthInterceptor extends QueuedInterceptor {
   ) async {
     final options = err.requestOptions;
     final tokens = readSession().tokens;
+    if (err.response?.statusCode == 403) {
+      final data = err.response?.data;
+      final detail = data is Map<String, dynamic> ? data['error'] : null;
+      final code = detail is Map<String, dynamic> ? detail['code'] : null;
+      final pending = SessionPending.fromFlags(
+        mfaSetup: code == 'mfa_setup_required',
+        passwordChange: code == 'password_change_required',
+      );
+      if (pending != SessionPending.none) await onPending(pending);
+    }
     final canRenew =
         err.response?.statusCode == 401 &&
         tokens != null &&
@@ -107,6 +122,7 @@ final dioProvider = Provider<Dio>((ref) {
       readSession: () => ref.read(sessionProvider),
       onTokens: session.updateTokens,
       onSessionExpired: session.signOut,
+      onPending: session.setPending,
       plainDio: plain,
     ),
   );

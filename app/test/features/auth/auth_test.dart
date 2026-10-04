@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hiker/core/network/api_exception.dart';
+import 'package:hiker/core/router/app_router.dart';
 import 'package:hiker/core/session/session.dart';
 import 'package:hiker/core/storage/key_value_store.dart';
 import 'package:hiker/features/auth/data/auth_repository.dart';
@@ -172,20 +173,38 @@ void main() {
       await tester.enterText(field('Server-Adresse'), 'https://hiker.test');
       await tester.enterText(field('E-Mail'), 'anna@example.org');
       await tester.enterText(field('Anzeigename'), 'Anna');
+      Future<void> submit() async {
+        final button = find.widgetWithText(FilledButton, 'Konto anlegen');
+        await tester.ensureVisible(button);
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+      }
+
       await tester.enterText(field('Passwort'), 'short');
-      await tester.tap(find.widgetWithText(FilledButton, 'Konto anlegen'));
-      await tester.pumpAndSettle();
-      expect(find.text('Mindestens 10 Zeichen'), findsOneWidget);
+      await submit();
+      expect(find.text('Mindestens 8 Zeichen'), findsOneWidget);
+
+      await tester.enterText(field('Passwort'), 'nurkleinbuchstaben');
+      await submit();
+      expect(find.textContaining('Zu einfach'), findsOneWidget);
+
+      // The password has to be typed twice.
+      await tester.enterText(field('Passwort'), 'Correct-Horse-7');
+      await tester.enterText(field('Passwort wiederholen'), 'Correct-Horse-8');
+      await submit();
+      expect(
+        find.text('Die beiden Passwörter stimmen nicht überein'),
+        findsOneWidget,
+      );
       expect(api.calls, isEmpty);
 
-      await tester.enterText(field('Passwort'), 'correct-horse-battery');
-      await tester.tap(find.widgetWithText(FilledButton, 'Konto anlegen'));
-      await tester.pumpAndSettle();
+      await tester.enterText(field('Passwort wiederholen'), 'Correct-Horse-7');
+      await submit();
 
       expect(api.calls.first.body, {
         'email': 'anna@example.org',
         'display_name': 'Anna',
-        'password': 'correct-horse-battery',
+        'password': 'Correct-Horse-7',
       });
       expect(container.read(sessionProvider).isSignedIn, isTrue);
     });
@@ -201,8 +220,11 @@ void main() {
       await tester.enterText(field('Server-Adresse'), 'https://hiker.test');
       await tester.enterText(field('E-Mail'), 'anna@example.org');
       await tester.enterText(field('Anzeigename'), 'Anna');
-      await tester.enterText(field('Passwort'), 'correct-horse-battery');
-      await tester.tap(find.widgetWithText(FilledButton, 'Konto anlegen'));
+      await tester.enterText(field('Passwort'), 'Correct-Horse-7');
+      await tester.enterText(field('Passwort wiederholen'), 'Correct-Horse-7');
+      final button = find.widgetWithText(FilledButton, 'Konto anlegen');
+      await tester.ensureVisible(button);
+      await tester.tap(button);
       await tester.pumpAndSettle();
 
       expect(
@@ -211,6 +233,181 @@ void main() {
         ),
         findsOneWidget,
       );
+    });
+  });
+
+  group('second factor and password change', () {
+    Future<void> signIn(WidgetTester tester) async {
+      await tester.enterText(field('Server-Adresse'), 'https://hiker.test');
+      await tester.enterText(field('E-Mail'), 'anna@example.org');
+      await tester.enterText(field('Passwort'), 'Correct-Horse-7');
+      await tester.tap(find.widgetWithText(FilledButton, 'Anmelden'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('login asks for the code when the account has one', (
+      tester,
+    ) async {
+      final api = FakeApi({
+        'POST /auth/login': (_, body) =>
+            (body! as Map<String, dynamic>)['code'] == '123456'
+            ? ok(authJson())
+            : apiError(401, 'mfa_required'),
+        'GET /modules': (_, _) => ok([]),
+        'GET /me/profile': (_, _) => ok(<String, dynamic>{}),
+      });
+      final container = await pumpApp(tester, api: api);
+
+      expect(find.text('Code der Authenticator-App'), findsNothing);
+      await signIn(tester);
+      expect(
+        find.text('Bitte auch den Code der Authenticator-App eingeben.'),
+        findsOneWidget,
+      );
+      await tester.enterText(field('Code der Authenticator-App'), '123456');
+      await tester.tap(find.widgetWithText(FilledButton, 'Anmelden'));
+      await tester.pumpAndSettle();
+
+      final logins = api.calls.where((c) => c.path == '/auth/login');
+      expect((logins.last.body! as Map)['code'], '123456');
+      expect(container.read(sessionProvider).isSignedIn, isTrue);
+    });
+
+    testWidgets('a session without second factor has to set it up first', (
+      tester,
+    ) async {
+      final api = FakeApi({
+        'POST /auth/login': (_, _) =>
+            ok({...authJson(), 'mfa_setup_required': true}),
+        'POST /auth/mfa/setup': (_, _) => ok({
+          'secret': 'JBSWY3DPEHPK3PXP',
+          'otpauth_uri': 'otpauth://totp/hiker:anna?secret=JBSWY3DPEHPK3PXP',
+        }),
+        'POST /auth/mfa/enable': (_, body) =>
+            (body! as Map<String, dynamic>)['code'] == '654321'
+            ? ok({
+                ...authJson(access: 'access-mfa', refresh: 'refresh-mfa'),
+                'mfa_setup_required': false,
+                'recovery_codes': ['abcde-12345', 'fghij-67890'],
+              })
+            : apiError(422, 'invalid_mfa_code'),
+        'GET /modules': (_, _) => ok([]),
+        'GET /me/profile': (_, _) => ok(<String, dynamic>{}),
+      });
+      final container = await pumpApp(tester, api: api);
+
+      await signIn(tester);
+
+      expect(find.text('Zweiten Faktor einrichten'), findsOneWidget);
+      expect(find.textContaining('zweiter Faktor Pflicht'), findsOneWidget);
+      expect(find.text('JBSWY3DPEHPK3PXP'), findsOneWidget);
+      expect(container.read(sessionProvider).pending, SessionPending.mfaSetup);
+      // The setup is sent with the token although the path starts with /auth/.
+      expect(
+        api.calls
+            .firstWhere((c) => c.path == '/auth/mfa/setup')
+            .headers['Authorization'],
+        'Bearer access-1',
+      );
+
+      await tester.enterText(find.byType(TextField).last, '000000');
+      await tester.tap(find.widgetWithText(FilledButton, 'Einrichten'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Der Code stimmt nicht oder wurde schon benutzt.'),
+        findsOneWidget,
+      );
+
+      await tester.enterText(find.byType(TextField).last, '654321');
+      final enable = find.widgetWithText(FilledButton, 'Einrichten');
+      await tester.ensureVisible(enable);
+      await tester.tap(enable);
+      await tester.pumpAndSettle();
+      expect(find.text('abcde-12345'), findsOneWidget);
+      expect(find.textContaining('nur dieses eine Mal'), findsOneWidget);
+
+      final done = find.widgetWithText(
+        FilledButton,
+        'Ich habe die Codes gesichert',
+      );
+      await tester.ensureVisible(done);
+      await tester.tap(done);
+      await tester.pumpAndSettle();
+
+      final session = container.read(sessionProvider);
+      expect(session.pending, SessionPending.none);
+      expect(session.tokens!.access, 'access-mfa');
+      expect(find.text('Zweiten Faktor einrichten'), findsNothing);
+    });
+
+    testWidgets('a reset password has to be replaced first', (tester) async {
+      Object? sent;
+      final api = FakeApi({
+        'POST /auth/login': (_, _) =>
+            ok({...authJson(), 'password_change_required': true}),
+        'POST /auth/password': (_, body) {
+          sent = body;
+          return ok(authJson(access: 'access-2', refresh: 'refresh-2'));
+        },
+        'GET /modules': (_, _) => ok([]),
+        'GET /me/profile': (_, _) => ok(<String, dynamic>{}),
+      });
+      final container = await pumpApp(tester, api: api);
+
+      await signIn(tester);
+      expect(find.textContaining('wurde zurückgesetzt'), findsOneWidget);
+
+      await tester.enterText(field('Bisheriges Passwort'), 'Temp-Pass-1');
+      await tester.enterText(field('Neues Passwort'), 'Ganz-Neu-9');
+      await tester.enterText(field('Passwort wiederholen'), 'Ganz-Neu-8');
+      final save = find.widgetWithText(FilledButton, 'Speichern');
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(sent, isNull);
+
+      await tester.enterText(field('Passwort wiederholen'), 'Ganz-Neu-9');
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+
+      expect(sent, {
+        'current_password': 'Temp-Pass-1',
+        'new_password': 'Ganz-Neu-9',
+      });
+      expect(container.read(sessionProvider).pending, SessionPending.none);
+      expect(container.read(sessionProvider).tokens!.access, 'access-2');
+    });
+
+    test('a refusal of the server leads to the screen that resolves it', () {
+      const home = '/tours';
+      String? go(String location, SessionPending pending) =>
+          redirectFor(SessionStatus.signedIn, location, home, pending: pending);
+
+      expect(go('/tours', SessionPending.mfaSetup), '/account/mfa');
+      expect(go('/account/mfa', SessionPending.mfaSetup), isNull);
+      expect(
+        go('/profile', SessionPending.passwordChange),
+        '/account/password',
+      );
+      expect(go('/account/password', SessionPending.none), isNull);
+    });
+
+    test('a 403 of the API marks the session as incomplete', () async {
+      final api = FakeApi({
+        'GET /me/profile': (_, _) => apiError(403, 'mfa_setup_required'),
+      });
+      final container = createContainer(
+        api: api,
+        store: MemoryKeyValueStore(signedInStore),
+      );
+      await container.read(sessionProvider.notifier).restore();
+
+      await expectLater(
+        container.read(authRepositoryProvider).fetchProfile(),
+        throwsA(isA<ApiException>()),
+      );
+
+      expect(container.read(sessionProvider).pending, SessionPending.mfaSetup);
     });
   });
 

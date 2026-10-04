@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/session/session.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/error_text.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/auth_repository.dart';
+import 'account_security_screens.dart';
 
 /// Login and registration share one form; registration adds the display name.
 class AuthFormScreen extends ConsumerStatefulWidget {
@@ -26,6 +28,11 @@ class _AuthFormScreenState extends ConsumerState<AuthFormScreen> {
   final _email = TextEditingController();
   final _name = TextEditingController();
   final _password = TextEditingController();
+  final _repeat = TextEditingController();
+  final _code = TextEditingController();
+
+  /// The server asked for the code of the second factor.
+  bool _needsCode = false;
   bool _busy = false;
   Object? _error;
 
@@ -37,6 +44,8 @@ class _AuthFormScreenState extends ConsumerState<AuthFormScreen> {
     _email.dispose();
     _name.dispose();
     _password.dispose();
+    _repeat.dispose();
+    _code.dispose();
     super.dispose();
   }
 
@@ -59,10 +68,21 @@ class _AuthFormScreenState extends ConsumerState<AuthFormScreen> {
           : await repository.login(
               email: _email.text.trim(),
               password: _password.text,
+              code: _code.text.trim().isEmpty ? null : _code.text.trim(),
             );
-      await session.signIn(result.tokens, result.user);
+      await session.signIn(result.tokens, result.user, pending: result.pending);
     } catch (error) {
-      if (mounted) setState(() => _error = error);
+      if (mounted) {
+        setState(() {
+          _error = error;
+          // The account has a second factor: show the field for its code.
+          if (error is ApiException &&
+              (error.code == 'mfa_required' ||
+                  error.code == 'invalid_mfa_code')) {
+            _needsCode = true;
+          }
+        });
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -122,22 +142,54 @@ class _AuthFormScreenState extends ConsumerState<AuthFormScreen> {
               gap,
               TextFormField(
                 controller: _password,
-                decoration: InputDecoration(labelText: l10n.password),
+                decoration: InputDecoration(
+                  labelText: l10n.password,
+                  helperText: widget.register ? l10n.passwordRules : null,
+                  helperMaxLines: 4,
+                ),
                 obscureText: true,
                 autofillHints: [
                   widget.register
                       ? AutofillHints.newPassword
                       : AutofillHints.password,
                 ],
-                onFieldSubmitted: (_) => _submit(),
+                textInputAction: widget.register || _needsCode
+                    ? TextInputAction.next
+                    : TextInputAction.done,
+                onFieldSubmitted: widget.register || _needsCode
+                    ? null
+                    : (_) => _submit(),
                 validator: (value) {
                   if ((value ?? '').isEmpty) return l10n.requiredField;
-                  if (widget.register && value!.length < 10) {
-                    return l10n.passwordTooShort;
-                  }
-                  return null;
+                  return widget.register ? passwordProblem(l10n, value!) : null;
                 },
               ),
+              if (widget.register) ...[
+                gap,
+                TextFormField(
+                  controller: _repeat,
+                  decoration: InputDecoration(labelText: l10n.passwordRepeat),
+                  obscureText: true,
+                  autofillHints: const [AutofillHints.newPassword],
+                  onFieldSubmitted: (_) => _submit(),
+                  validator: (value) =>
+                      value == _password.text ? null : l10n.passwordsDiffer,
+                ),
+              ],
+              if (_needsCode && !widget.register) ...[
+                gap,
+                TextFormField(
+                  controller: _code,
+                  decoration: InputDecoration(
+                    labelText: l10n.mfaCode,
+                    helperText: l10n.mfaCodeHint,
+                    helperMaxLines: 2,
+                  ),
+                  autofillHints: const [AutofillHints.oneTimeCode],
+                  autofocus: true,
+                  onFieldSubmitted: (_) => _submit(),
+                ),
+              ],
               if (_error != null) ...[gap, ErrorText(_error!)],
               const SizedBox(height: AppSpacing.l),
               FilledButton(

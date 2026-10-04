@@ -12,11 +12,15 @@ class AuthScreens {
     required this.login,
     required this.register,
     required this.profile,
+    required this.mfaSetup,
+    required this.passwordChange,
   });
 
   final WidgetBuilder login;
   final WidgetBuilder register;
   final WidgetBuilder profile;
+  final WidgetBuilder mfaSetup;
+  final WidgetBuilder passwordChange;
 }
 
 final authScreensProvider = Provider<AuthScreens>(
@@ -29,11 +33,18 @@ class AppRoutes {
   static const splash = '/';
   static const login = '/login';
   static const register = '/register';
+  static const mfaSetup = '/account/mfa';
+  static const passwordChange = '/account/password';
   static const profile = AppShell.profilePath;
 }
 
 /// Where to go for the current session state, or null to stay.
-String? redirectFor(SessionStatus status, String location, String home) {
+String? redirectFor(
+  SessionStatus status,
+  String location,
+  String home, {
+  SessionPending pending = SessionPending.none,
+}) {
   final onAuthScreen =
       location == AppRoutes.login || location == AppRoutes.register;
   switch (status) {
@@ -42,6 +53,13 @@ String? redirectFor(SessionStatus status, String location, String home) {
     case SessionStatus.signedOut:
       return onAuthScreen ? null : AppRoutes.login;
     case SessionStatus.signedIn:
+      // An incomplete sign-in only reaches the screen that completes it.
+      final step = switch (pending) {
+        SessionPending.passwordChange => AppRoutes.passwordChange,
+        SessionPending.mfaSetup => AppRoutes.mfaSetup,
+        SessionPending.none => null,
+      };
+      if (step != null) return location == step ? null : step;
       return onAuthScreen || location == AppRoutes.splash ? home : null;
   }
 }
@@ -51,7 +69,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   final modules = ref.watch(featureModulesProvider);
   final refresh = ValueNotifier<int>(0);
   ref.listen(
-    sessionProvider.select((s) => s.status),
+    sessionProvider.select((s) => (s.status, s.pending)),
     (_, _) => refresh.value++,
   );
   ref.listen(activeModulesProvider, (_, _) => refresh.value++);
@@ -63,10 +81,12 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final active = ref.read(activeModulesProvider);
       final home = active.isEmpty ? AppRoutes.profile : active.first.rootPath;
+      final session = ref.read(sessionProvider);
       return redirectFor(
-        ref.read(sessionProvider).status,
+        session.status,
         state.matchedLocation,
         home,
+        pending: session.pending,
       );
     },
     routes: [
@@ -77,6 +97,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: AppRoutes.login, builder: (c, s) => screens.login(c)),
       GoRoute(path: AppRoutes.register, builder: (c, s) => screens.register(c)),
+      GoRoute(path: AppRoutes.mfaSetup, builder: (c, s) => screens.mfaSetup(c)),
+      GoRoute(
+        path: AppRoutes.passwordChange,
+        builder: (c, s) => screens.passwordChange(c),
+      ),
       ShellRoute(
         builder: (context, state, child) =>
             AppShell(location: state.matchedLocation, child: child),

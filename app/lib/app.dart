@@ -8,6 +8,7 @@ import 'core/router/app_router.dart';
 import 'core/session/session.dart';
 import 'core/sync/sync_service.dart';
 import 'core/theme/app_theme.dart';
+import 'features/auth/presentation/account_security_screens.dart';
 import 'features/auth/presentation/auth_form_screen.dart';
 import 'features/auth/presentation/profile_screen.dart';
 import 'features/gear/gear_module.dart';
@@ -31,6 +32,8 @@ List<Override> appOverrides({List<FeatureModule>? modules}) => [
       login: (_) => const AuthFormScreen(register: false),
       register: (_) => const AuthFormScreen(register: true),
       profile: (_) => const ProfileScreen(),
+      mfaSetup: (_) => const MfaSetupScreen(),
+      passwordChange: (_) => const PasswordChangeScreen(),
     ),
   ),
   // Offline sync: tours merge field by field; files go through the tour API.
