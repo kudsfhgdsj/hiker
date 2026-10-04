@@ -520,7 +520,9 @@ Das Web-Frontend ist ein eigenes Projekt in `web/` und ersetzt die früher gepla
 - **Karte**: MapLibre GL JS 5.24.0 in der CSP-Variante unter `static/vendor/maplibre-gl/`; Kacheln standardmäßig vom eigenen Server: `/tiles/{z}/{x}/{y}.png` reicht die Kacheln des Moduls `maps` durch (`MAP_TILE_URL` leer); eine fremde Quelle lässt sich weiterhin eintragen. Höhenprofil als SVG ohne weitere Bibliothek, mit der Karte gekoppelt (Position unter dem Zeiger, Foto-Marker).
 - **Sicherheits-Header**: `Content-Security-Policy` (Skripte und Stile nur vom eigenen Server, Kacheln nur von der Kachelquelle), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` – auch auf der öffentlichen Seite: fremde Server erfahren nur die Herkunft, nie den Pfad mit dem Token. `no-referrer` scheidet aus, weil der Kachelserver von OpenStreetMap Anfragen ohne Referer blockiert.
 - **Öffentliche Seite**: `/p/<token>`, `/p/<token>/track.json`, `/p/<token>/photos/<index>`; Token mit falscher Form erreichen die API nicht. gunicorn schreibt kein Zugriffs-Log.
-- **Noch nicht im Web** (in der App vorhanden oder später): Track zeichnen, Fotoposition verschieben, Wegpunkte von Hand, eigener Wetterpunkt, Packlisten, Start-/Endpunkt von Hand. Zeiten lassen sich nur mit JavaScript bearbeiten (Umrechnung der Ortszeit im Browser); alles andere funktioniert auch ohne.
+- **Auf der Karte bearbeiten** (`/tours/<id>/map`, ergänzt am 04.10.2026): Wegpunkte von Hand, Fotoposition korrigieren oder wieder automatisch setzen, Start und Ende, Track zeichnen, Wetter für einen eigenen Punkt. Jede Position lässt sich eintippen oder per Klick in die Karte übernehmen; ohne JavaScript bleibt das Eintippen. Wegpunkte und Fotos stehen auch mit `edit` offen, der Rest nur dem Besitzer.
+- **Packlisten** (`/gear/lists`): anlegen, bearbeiten, löschen. Beim Bearbeiten einer Tour lässt sich eine Liste komplett übernehmen; Gegenstände, die schon in der Tour sind, kommen nicht doppelt hinzu.
+- Zeiten lassen sich nur mit JavaScript bearbeiten (Umrechnung der Ortszeit im Browser); alles andere funktioniert auch ohne.
 
 ## 10. Sicherheit und Datenschutz
 

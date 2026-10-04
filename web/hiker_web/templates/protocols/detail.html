@@ -6,6 +6,7 @@
 <div class="toolbar">
   <h1>{{ tour.title }}</h1><span class="spacer"></span>
   {% if can_edit %}<a class="button primary" href="{{ url_for('protocols.tour_edit', tour_id=tour.id) }}">{{ t('action.edit') }}</a>{% endif %}
+  {% if can_edit %}<a class="button" href="{{ url_for('protocols.map_edit', tour_id=tour.id) }}">{{ t('map.title') }}</a>{% endif %}
   <a class="button" href="{{ url_for('protocols.history', tour_id=tour.id) }}">{{ t('tour.history') }}</a>
   {% if is_owner %}<a class="button" href="{{ url_for('protocols.sharing', tour_id=tour.id) }}">{{ t('tour.sharing') }}</a>{% endif %}
   <a class="button" href="{{ url_for('protocols.tour_export', tour_id=tour.id) }}">{{ t('tour.export') }}</a>

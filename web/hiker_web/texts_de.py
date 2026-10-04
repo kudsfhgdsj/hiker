@@ -286,6 +286,37 @@ TEXTS = {
     "tour.discard": "Eigene Eingaben verwerfen",
     "tour.public_note": "Öffentlich geteilte Tour",
     "tour.approximate": "ungefähr",
+    # --- editing on the map ---
+    "map.title": "Auf der Karte bearbeiten",
+    "map.intro": (
+        "Positionen lassen sich eintippen oder mit „Auf der Karte wählen“ per Klick in die "
+        "Karte übernehmen."
+    ),
+    "map.lat": "Breite",
+    "map.lon": "Länge",
+    "map.pick": "Auf der Karte wählen",
+    "map.pick_hint": "Jetzt in die Karte klicken, um die Position zu übernehmen.",
+    "map.waypoints": "Wegpunkte",
+    "map.waypoint_new": "Neuer Wegpunkt",
+    "map.photo_positions": "Position der Fotos",
+    "map.photo_hint": "Eine von Hand gesetzte Position bleibt, bis du wieder „automatisch“ wählst.",
+    "map.photo_auto": "Wieder automatisch",
+    "map.points": "Start und Ende",
+    "map.points_from_track": (
+        "Start und Ende folgen dem aufgezeichneten Track; nur die Namen lassen sich ändern."
+    ),
+    "map.draw": "Track zeichnen",
+    "map.draw_intro": (
+        "Für Touren ohne Aufzeichnung: Punkte der Reihe nach in die Karte klicken. "
+        "Die Höhen ergänzt der Server."
+    ),
+    "map.draw_replaces": "Der gezeichnete Track ersetzt den vorhandenen Track.",
+    "map.draw_points": "Punkte (je Zeile: Breite, Länge)",
+    "map.draw_start": "In der Karte zeichnen",
+    "map.draw_hint": "Jeder Klick in die Karte setzt den nächsten Punkt des Tracks.",
+    "map.draw_undo": "Letzten Punkt entfernen",
+    "map.draw_save": "Track speichern",
+    "map.weather_point": "Wetter für einen eigenen Punkt",
     # --- history ---
     "history.title": "Verlauf",
     "history.version": "Version {version}",

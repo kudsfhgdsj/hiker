@@ -911,3 +911,90 @@ def test_contacts(user, fake_api):
     assert plain == {"display_name": "Dora"}
     assert linked == {"display_name": "Cleo", "linked_user_id": OTHER_ID}
     assert "DELETE /contacts/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" in fake_api.requested()
+
+
+# --- Editing on the map ---
+
+
+def test_map_page_offers_the_tools_by_permission(user, fake_api):
+    tour_api(fake_api, track_source="none", points_source="manual")
+    as_owner = text(user.get(f"/tours/{TOUR_ID}/map"))
+    tour_api(fake_api, permission="edit")
+    with_edit = text(user.get(f"/tours/{TOUR_ID}/map"))
+    tour_api(fake_api, permission="read")
+
+    assert "Neuer Wegpunkt" in as_owner and "Position der Fotos" in as_owner
+    assert "Track zeichnen" in as_owner and "Wetter für einen eigenen Punkt" in as_owner
+    assert 'name="start_lat" value="47.28"' in as_owner and "Rotsteinpass" in as_owner
+    assert "/static/map_edit.js" in as_owner
+    # With edit permission: waypoints and photos, but not track, points and weather.
+    assert "Neuer Wegpunkt" in with_edit and "Position der Fotos" in with_edit
+    assert "Track zeichnen" not in with_edit and "Start und Ende" not in with_edit
+    assert user.get(f"/tours/{TOUR_ID}/map").status_code == 403
+
+
+def test_recorded_track_fixes_start_and_end(user, fake_api):
+    tour_api(fake_api)
+
+    page_text = text(user.get(f"/tours/{TOUR_ID}/map"))
+
+    assert "folgen dem aufgezeichneten Track" in page_text
+    assert 'name="start_lat" value="47.28" inputmode="decimal" readonly' in page_text
+    assert "Der gezeichnete Track ersetzt den vorhandenen Track." in page_text
+
+
+def test_waypoint_photo_position_and_points(user, fake_api):
+    fake_api.route("POST", "/tours/*/waypoints", lambda r: httpx2.Response(201, json=WAYPOINT))
+    fake_api.route("PATCH", "/tours/*/photos/*", PHOTO)
+    fake_api.route("PUT", "/tours/*/points", TOUR)
+    base = f"/tours/{TOUR_ID}"
+
+    created = user.post(
+        f"{base}/waypoints", {"name": "Hütte", "description": "", "lat": "47,25", "lon": "9.35"}
+    )
+    waypoint = json.loads(fake_api.last("POST", f"{base}/waypoints").content)
+    user.post(f"{base}/photos/{PHOTO_ID}/position", {"lat": "47.26", "lon": "9.33"})
+    moved = json.loads(fake_api.last("PATCH", f"{base}/photos/{PHOTO_ID}").content)
+    user.post(f"{base}/photos/{PHOTO_ID}/position", {"lat": "", "lon": "", "auto": "1"})
+    automatic = json.loads(fake_api.last("PATCH", f"{base}/photos/{PHOTO_ID}").content)
+    user.post(
+        f"{base}/points",
+        {
+            "start_name": "Wasserauen",
+            "start_lat": "47.28",
+            "start_lon": "9.31",
+            "end_name": "",
+            "end_lat": "",
+            "end_lon": "",
+        },
+    )
+    points = json.loads(fake_api.last("PUT", f"{base}/points").content)
+
+    assert created.headers["location"] == f"{base}/map#waypoints"
+    assert waypoint == {"name": "Hütte", "description": None, "lat": 47.25, "lon": 9.35}
+    assert moved == {"lat": 47.26, "lon": 9.33} and automatic == {"auto_position": True}
+    assert points == {"start": {"lat": 47.28, "lon": 9.31, "name": "Wasserauen"}, "end": None}
+    assert (
+        user.post(f"{base}/waypoints", {"name": "x", "lat": "abc", "lon": "1"}).status_code == 400
+    )
+
+
+def test_drawn_track_and_weather_for_an_own_point(user, fake_api):
+    fake_api.route("POST", "/tours/*/track/drawn", TOUR)
+    fake_api.route("POST", "/tours/*/weather/fetch", TOUR)
+    base = f"/tours/{TOUR_ID}"
+
+    drawn = user.post(f"{base}/track/drawn", {"points": "47.1, 9.1\n\n47,2; 9,2\n47.3,9.3\n"})
+    track = json.loads(fake_api.last("POST", f"{base}/track/drawn").content)
+    user.post(f"{base}/weather", {"lat": "47.25", "lon": "9.34", "time": "2026-07-01T09:00:00Z"})
+    manual = json.loads(fake_api.last("POST", f"{base}/weather/fetch").content)
+    user.post(f"{base}/weather")
+    plain = fake_api.last("POST", f"{base}/weather/fetch").content
+
+    assert drawn.headers["location"] == f"{base}#track"
+    assert track == {
+        "points": [{"lat": 47.1, "lon": 9.1}, {"lat": 47.2, "lon": 9.2}, {"lat": 47.3, "lon": 9.3}]
+    }
+    assert manual == {"manual": {"lat": 47.25, "lon": 9.34, "time": "2026-07-01T09:00:00Z"}}
+    assert plain in (b"", b"null")
+    assert user.post(f"{base}/track/drawn", {"points": "47.1 9.1"}).status_code == 400

@@ -13,8 +13,11 @@ und Schätzungen kommen von der API (siehe `DESIGN.md`, Abschnitt 9a).
   Wiederherstellen, Teilen, öffentliche Links, Kontakte, Export
 - Öffentliche Linkseite `/p/<token>` ohne Anmeldung, `noindex`
 
-Nicht im Web: Kamera-Scanner, Offline-Betrieb, Track zeichnen, Fotoposition von Hand verschieben
-(das kann die Android-App bzw. folgt später).
+- Auf der Karte bearbeiten: Wegpunkte, Fotoposition, Start und Ende, Track zeichnen, Wetter für
+  einen eigenen Punkt
+- Packlisten, die sich in eine Tour übernehmen lassen
+
+Nicht im Web: Kamera-Scanner und Offline-Betrieb (das kann die Android-App).
 
 ## Lokal starten
 
@@ -54,7 +57,7 @@ hiker_web/
   texts_de.py     alle Texte der Oberfläche
   views/          je Modul ein Blueprint: auth, gear, nutrition, protocols, public
   templates/      Jinja2-Vorlagen
-  static/         style.css, site.js, tour.js, vendor/maplibre-gl
+  static/         style.css, site.js, tour.js, map_edit.js, vendor/maplibre-gl
 ```
 
 Seiten eines Moduls gibt es nur, wenn die API es unter `/modules` meldet.

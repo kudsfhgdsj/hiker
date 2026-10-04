@@ -414,8 +414,118 @@ def track_places(tour_id):
 @blueprint.post("/<uuid:tour_id>/weather")
 @tour_page
 def weather_fetch(tour_id):
-    api().send("POST", f"/tours/{tour_id}/weather/fetch")
+    """Fetch the weather again; with a position and a time also for a point of one's own."""
+    body = None
+    if forms.text("lat") or forms.text("lon") or forms.text("time"):
+        try:
+            body = {
+                "manual": {
+                    "lat": forms.number("lat"),
+                    "lon": forms.number("lon"),
+                    "time": forms.text("time"),
+                }
+            }
+        except forms.FormError:
+            abort(400)
+    api().send("POST", f"/tours/{tour_id}/weather/fetch", body)
     return _back(tour_id, "weather")
+
+
+# --- Editing on the map ---
+
+
+def _to_map(tour_id, anchor: str | None = None):
+    return redirect(url_for("protocols.map_edit", tour_id=tour_id, _anchor=anchor))
+
+
+def _position(prefix: str = "") -> dict:
+    try:
+        return {"lat": forms.number(f"{prefix}lat"), "lon": forms.number(f"{prefix}lon")}
+    except forms.FormError:
+        abort(400)
+
+
+@blueprint.get("/<uuid:tour_id>/map")
+@tour_page
+def map_edit(tour_id):
+    client = api()
+    tour = client.get(f"/tours/{tour_id}")
+    if tour["permission"] not in ("owner", "edit"):
+        abort(403)
+    photos = client.get(f"/tours/{tour_id}/photos")
+    waypoints = client.get(f"/tours/{tour_id}/waypoints")
+
+    def urls(kind, photo=None, size=None):
+        if kind == "track":
+            return url_for("protocols.tour_track", tour_id=tour_id, v=tour["version"])
+        return url_for("protocols.photo_image", tour_id=tour_id, photo_id=photo["id"], size=size)
+
+    return render_template(
+        "protocols/map_edit.html",
+        tour=tour,
+        photos=photos,
+        waypoints=waypoints,
+        map_data=map_data(tour, photos, waypoints, urls),
+        is_owner=tour["permission"] == "owner",
+    )
+
+
+@blueprint.post("/<uuid:tour_id>/waypoints")
+@tour_page
+def waypoint_create(tour_id):
+    body = {
+        "name": forms.text("name") or "",
+        "description": forms.text("description"),
+        **_position(),
+    }
+    api().send("POST", f"/tours/{tour_id}/waypoints", body)
+    flash(t("common.saved"), "success")
+    return _to_map(tour_id, "waypoints")
+
+
+@blueprint.post("/<uuid:tour_id>/photos/<uuid:photo_id>/position")
+@tour_page
+def photo_position(tour_id, photo_id):
+    """Correct where a photo was taken, or go back to the automatic position."""
+    change = {"auto_position": True} if "auto" in request.form else _position()
+    api().send("PATCH", f"/tours/{tour_id}/photos/{photo_id}", change)
+    flash(t("common.saved"), "success")
+    return _to_map(tour_id, "photos")
+
+
+@blueprint.post("/<uuid:tour_id>/points")
+@tour_page
+def points_set(tour_id):
+    def point(prefix: str) -> dict | None:
+        position = _position(f"{prefix}_")
+        if position["lat"] is None or position["lon"] is None:
+            return None
+        return {**position, "name": forms.text(f"{prefix}_name")}
+
+    api().send("PUT", f"/tours/{tour_id}/points", {"start": point("start"), "end": point("end")})
+    flash(t("common.saved"), "success")
+    return _to_map(tour_id, "points")
+
+
+@blueprint.post("/<uuid:tour_id>/track/drawn")
+@tour_page
+def track_drawn(tour_id):
+    """A track drawn on the map: one pair of latitude and longitude per line."""
+    points = []
+    for line in (request.form.get("points") or "").splitlines():
+        # "47.2, 9.3" or, with decimal commas, "47,2; 9,3".
+        parts = line.split(";") if ";" in line else line.split(",")
+        if not line.strip():
+            continue
+        try:
+            if len(parts) != 2:
+                raise forms.FormError("points")
+            points.append({"lat": forms.to_number(parts[0]), "lon": forms.to_number(parts[1])})
+        except forms.FormError:
+            abort(400)
+    api().send("POST", f"/tours/{tour_id}/track/drawn", {"points": points})
+    flash(t("tour.gpx_uploaded"), "success")
+    return _back(tour_id, "track")
 
 
 @blueprint.post("/<uuid:tour_id>/calories")
