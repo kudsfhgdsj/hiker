@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/router/app_router.dart';
 import '../../../core/session/session.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/error_text.dart';
@@ -30,9 +31,14 @@ Future<void> _signOut(WidgetRef ref) async {
 }
 
 /// Leaves a screen that completes the sign-in: back if it was opened from the
-/// profile, otherwise the router moves on by itself.
+/// profile, otherwise on to the first screen of the app (the start route sends
+/// a complete session there).
 void _leave(BuildContext context) {
-  if (context.canPop()) context.pop();
+  if (context.canPop()) {
+    context.pop();
+  } else {
+    context.go(AppRoutes.splash);
+  }
 }
 
 /// Sets up the second factor: the secret for the authenticator app, the first

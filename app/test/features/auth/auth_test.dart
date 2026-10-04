@@ -440,7 +440,10 @@ void main() {
       final session = container.read(sessionProvider);
       expect(session.pending, SessionPending.none);
       expect(session.tokens!.access, 'access-mfa');
-      expect(find.text('Zweiten Faktor einrichten'), findsNothing);
+      // The app moves on to its first screen.
+      expect(find.text('Wiederherstellungscodes'), findsNothing);
+      expect(find.text('abcde-12345'), findsNothing);
+      expect(find.text('Profil'), findsWidgets);
     });
 
     testWidgets('a reset password has to be replaced first', (tester) async {
@@ -479,6 +482,9 @@ void main() {
       });
       expect(container.read(sessionProvider).pending, SessionPending.none);
       expect(container.read(sessionProvider).tokens!.access, 'access-2');
+      // The app moves on to its first screen.
+      expect(find.text('Bisheriges Passwort'), findsNothing);
+      expect(find.text('Profil'), findsWidgets);
     });
 
     test('a refusal of the server leads to the screen that resolves it', () {
