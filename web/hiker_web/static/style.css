@@ -136,6 +136,8 @@ del { color: #c62828; } ins { color: #2e7d32; text-decoration: none; }
 .map-result span { color: #666; font-size: .78rem; }
 .search-pin { background: #1565c0; width: 1rem; height: 1rem; }
 .map-key { display: grid; gap: .3rem; justify-items: start; }
+/* On narrow windows the attribution of the map spans the lower edge: stay above it. */
+@media (max-width: 62rem) { .map-key { margin-bottom: 2.8rem !important; } }
 .map-key-panel { display: grid; gap: .2rem; padding: .5rem .7rem; border-radius: .5rem; background: #fffffff2; color: #222;
   box-shadow: 0 2px 10px #0004; font-size: .8rem; max-height: min(60vh, 30rem); overflow: auto; width: max-content; max-width: 16rem; }
 .map-key-panel[hidden] { display: none; }
