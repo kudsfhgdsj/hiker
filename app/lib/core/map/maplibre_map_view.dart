@@ -23,6 +23,7 @@ class MapLibreMapView extends StatefulWidget {
     this.layerOptions,
     this.layerChoice = const MapLayerChoice(),
     this.layerSheet,
+    this.keySheet,
     this.onSearch,
     this.on3D,
   });
@@ -41,6 +42,9 @@ class MapLibreMapView extends StatefulWidget {
 
   /// Builds the sheets for choosing layers and looks; null hides the fields.
   final Widget Function(BuildContext context, MapSheetPart part)? layerSheet;
+
+  /// Builds the sheet with the key of the map; null hides the field.
+  final WidgetBuilder? keySheet;
 
   /// Looks for places by name near a point; null hides the search.
   final Future<List<FoundPlace>> Function(String query, GeoPoint near)?
@@ -738,6 +742,42 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
                   ],
                   ...widget.content.controls,
                 ],
+              ),
+            ),
+          if (widget.keySheet != null && widget.content.interactive)
+            Positioned(
+              left: 8,
+              // Above what covers the lower edge: a sheet, or the time slider.
+              bottom:
+                  8 +
+                  widget.content.coveredBottom +
+                  (widget.layerChoice.radar.isNotEmpty ? 60 : 0),
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(18),
+                elevation: 2,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.sizeOf(context).height * 0.7,
+                    ),
+                    builder: widget.keySheet!,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      AppLocalizations.of(context).mapKey,
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                  ),
+                ),
               ),
             ),
           if (widget.layerChoice.radar.isNotEmpty &&

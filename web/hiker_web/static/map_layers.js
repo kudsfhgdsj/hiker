@@ -81,6 +81,91 @@ window.hikerMapLayers = (map, texts, options = {}) => {
     const meta = (style.metadata || {}).hiker;
     const original = style.sources;
 
+    // --- The key of the map, bottom left: what its signs, lines and colours mean ---
+    const active = {};
+    let look = "map";
+    let drawKey = () => {};
+    if (meta && meta.key && texts.key) {
+      const words = texts.key;
+      const holder = element("div", "maplibregl-ctrl map-key");
+      for (const name of ["click", "dblclick", "mousedown", "touchstart", "wheel"]) {
+        holder.addEventListener(name, (event) => event.stopPropagation());
+      }
+      const button = element("button", "map-drop-button", words.title);
+      button.type = "button";
+      button.setAttribute("aria-expanded", "false");
+      const panel = element("div", "map-key-panel");
+      panel.hidden = true;
+      button.addEventListener("click", () => {
+        panel.hidden = !panel.hidden;
+        button.setAttribute("aria-expanded", String(!panel.hidden));
+        remember("key", panel.hidden ? "closed" : "open");
+      });
+      // The symbols come as one image; where each one lies is listed next to it.
+      let places = null;
+      const spriteUrl = style.sprite;
+      if (spriteUrl) {
+        fetch(`${spriteUrl}.json`)
+          .then((response) => response.json())
+          .then((index) => {
+            places = index;
+            drawKey();
+          })
+          .catch(() => {});
+      }
+      const sample = (item) => {
+        const box = element("span", "map-key-sample");
+        if (item.kind === "fill") {
+          box.classList.add("fill");
+          box.style.background = item.color;
+        } else if (item.kind === "icon") {
+          const place = places && places[item.icon];
+          if (place) {
+            const icon = element("i", "map-key-icon");
+            icon.style.backgroundImage = `url("${spriteUrl}.png")`;
+            icon.style.backgroundPosition = `-${place.x}px -${place.y}px`;
+            icon.style.width = `${place.width}px`;
+            icon.style.height = `${place.height}px`;
+            box.append(icon);
+          }
+        } else {
+          const stroke = element("i", "map-key-line");
+          stroke.style.setProperty("--colour", item.color);
+          if (item.casing) stroke.style.outline = `1px solid ${item.casing}`;
+          if (item.dash) stroke.classList.add("dash");
+          if (item.dots) stroke.classList.add("dots");
+          if (item.rungs) stroke.classList.add("rungs");
+          box.append(stroke);
+        }
+        return box;
+      };
+      const entry = (item, label) => {
+        const row = element("div", "map-key-row");
+        row.append(sample(item), element("span", "", label));
+        return row;
+      };
+      drawKey = () => {
+        const sections = meta.key[look] || meta.key.map;
+        panel.replaceChildren();
+        for (const section of sections) {
+          panel.append(element("strong", "map-group", words.sections[section.id] || section.id));
+          for (const item of section.items) panel.append(entry(item, words.items[item.id] || item.id));
+        }
+        // What the switched-on layers add: classes of slope, levels of avalanche danger.
+        for (const overlay of meta.overlays) {
+          if (!active[overlay.id] || !overlay.legend) continue;
+          panel.append(element("strong", "map-group", texts.overlay[overlay.id] || overlay.id));
+          for (const step of overlay.legend) {
+            const label = step.from != null ? `${words.from} ${step.from}°` : `${words.level} ${step.level}`;
+            panel.append(entry({ kind: "fill", color: step.color }, label));
+          }
+        }
+      };
+      holder.append(panel, button);
+      map.addControl({ onAdd: () => holder, onRemove: () => holder.remove() }, "bottom-left");
+      if (stored("key", "closed") === "open") button.click();
+    }
+
     if (meta) {
       // --- Ebenen ---
       const layers = dropdown(texts.title);
@@ -111,6 +196,8 @@ window.hikerMapLayers = (map, texts, options = {}) => {
         const apply = (visible) => {
           for (const layer of overlay.layers) show(layer, visible);
           remember(`overlay-${overlay.id}`, visible ? "on" : "off");
+          active[overlay.id] = visible;
+          drawKey();
         };
         const row = option(layers, "checkbox", "", overlay.id, texts.overlay[overlay.id] || overlay.id, on, apply);
         if (overlay.legend) {
@@ -339,6 +426,8 @@ window.hikerMapLayers = (map, texts, options = {}) => {
         }
         for (const layer of chosen.hide) show(layer, false);
         remember("base", chosen.id);
+        look = chosen.id;
+        drawKey();
       };
       const current = stored("base", meta.bases[0].id);
       for (const base of meta.bases) {

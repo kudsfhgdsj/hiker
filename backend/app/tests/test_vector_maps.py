@@ -600,3 +600,53 @@ def test_the_path_layer_of_the_map_build_takes_ladders_along():
         assert f"- key: {attribute}" in lines
     # Ladders that are a single point on the path.
     assert "highway: ladder" in points and "ladder: 'yes'" in points
+
+
+def test_the_style_carries_the_key_of_the_map_for_every_look():
+    style = build_style("t", "g", "©", 14, sprite_url="s", terrain_url="dem", contour_url="c")
+    key = style["metadata"]["hiker"]["key"]
+
+    assert set(key) == {"map", "topo", "alpenverein", "outdooractive", "kompass"}
+    usual = {section["id"]: section["items"] for section in key["map"]}
+    assert list(usual) == ["paths", "signs", "lines", "areas"]
+    # Paths by their grade, the plain path dashed, the via ferrata with rungs.
+    assert [(item["id"], item["color"]) for item in usual["paths"]] == [
+        ("grade_easy", "#d92323"),
+        ("grade_t5", "#111111"),
+        ("grade_t6", "#7b2fbf"),
+        ("path", "#b5342a"),
+        ("via_ferrata", "#111111"),
+    ]
+    assert usual["paths"][3]["dash"] is True and usual["paths"][4]["rungs"] is True
+    assert [item["icon"] for item in usual["signs"]] == [
+        "peak",
+        "saddle",
+        "hut",
+        "shelter",
+        "viewpoint",
+        "parking",
+        "cable-car",
+        "ladder",
+    ]
+    assert [item["id"] for item in usual["lines"]] == [
+        "track",
+        "road",
+        "rail",
+        "aerialway",
+        "boundary",
+        "contour",
+    ]
+    assert [item["id"] for item in usual["areas"]] == ["wood", "grass", "rock", "ice", "water"]
+
+    # Another look: its own colours, one kind of path, or marked paths next to plain ones.
+    topo = {section["id"]: section["items"] for section in key["topo"]}
+    assert [item["id"] for item in topo["paths"]] == ["path", "via_ferrata"]
+    assert topo["paths"][0]["color"] == "#d0182b" and topo["areas"][0]["color"] == "#7fb069"
+    outdoor = {section["id"]: section["items"] for section in key["outdooractive"]}
+    assert [item["id"] for item in outdoor["paths"]] == ["path_marked", "path", "via_ferrata"]
+    assert outdoor["paths"][0]["dots"] is True
+
+    # Without symbols and contour lines the key leaves them out.
+    plain = build_style("t", "g", "©", 14)["metadata"]["hiker"]["key"]["map"]
+    assert [section["id"] for section in plain] == ["paths", "lines", "areas"]
+    assert "contour" not in [item["id"] for item in plain[1]["items"]]

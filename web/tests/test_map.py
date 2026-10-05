@@ -165,6 +165,11 @@ def test_pages_carry_the_texts_of_the_layer_control(user, fake_api):
         "weather": "Wetter",
     }
     assert texts["overlay"]["satellite"] == "Luftbild" and texts["opacity"] == "Deckkraft"
+    # The key of the map: its words for sections and entries.
+    key = texts["key"]
+    assert key["title"] == "Legende" and key["sections"]["paths"] == "Wege"
+    assert key["items"]["via_ferrata"] == "Klettersteig" and key["items"]["ladder"] == "Leiter"
+    assert key["items"]["grade_easy"].endswith("(T1–T4)") and key["items"]["ice"] == "Gletscher"
     assert texts["overlay"]["avalanche"] == "Lawinengefahr"
     assert "Bulletin" in texts["note"]["avalanche"]
     assert "map_layers.js" in page

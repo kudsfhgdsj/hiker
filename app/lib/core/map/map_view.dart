@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -706,6 +707,222 @@ class _SlopeRangeState extends ConsumerState<_SlopeRange> {
   }
 }
 
+/// Where each symbol lies in the image that comes with the app
+/// (`assets/sprite/sprite@2x.json`).
+final spriteIndexProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final text = await rootBundle.loadString('assets/sprite/sprite@2x.json');
+  return jsonDecode(text) as Map<String, dynamic>;
+});
+
+/// The key of the map: what its lines, signs and colours mean in the chosen
+/// look, and what the switched-on layers add (classes of slope, levels of
+/// avalanche danger). The style of the server describes it (`metadata.hiker.key`).
+class MapKeySheet extends ConsumerWidget {
+  const MapKeySheet({super.key, required this.options});
+
+  final Map<String, dynamic> options;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final choice = ref.watch(mapLayerChoiceProvider);
+    final places = ref.watch(spriteIndexProvider).asData?.value;
+    final key = options['key'] as Map<String, dynamic>? ?? const {};
+    final sections =
+        ((key[choice.base] ?? key['map']) as List<dynamic>? ?? const [])
+            .cast<Map<String, dynamic>>();
+
+    Widget sample(Map<String, dynamic> item) {
+      final colour = _hexColor(item['color'] as String? ?? '');
+      switch (item['kind']) {
+        case 'fill':
+          return Container(
+            width: 30,
+            height: 14,
+            decoration: BoxDecoration(
+              color: colour,
+              borderRadius: BorderRadius.circular(2),
+              border: Border.all(color: Colors.black12),
+            ),
+          );
+        case 'icon':
+          final place = places?[item['icon']] as Map<String, dynamic>?;
+          if (place == null) return const SizedBox(width: 30, height: 22);
+          // The symbols lie side by side in one image: show the piece of it.
+          return SizedBox(
+            width: 30,
+            height: 22,
+            child: Center(
+              child: ClipRect(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: OverflowBox(
+                    alignment: Alignment.topLeft,
+                    maxWidth: double.infinity,
+                    child: Transform.translate(
+                      offset: Offset(-(place['x'] as num) / 2, 0),
+                      child: Image.asset(
+                        'assets/sprite/sprite@2x.png',
+                        height: 22,
+                        fit: BoxFit.fitHeight,
+                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        default:
+          return SizedBox(
+            width: 30,
+            height: 14,
+            child: CustomPaint(
+              painter: _KeyLinePainter(
+                colour: colour,
+                casing: item['casing'] == null
+                    ? null
+                    : _hexColor(item['casing'] as String),
+                dashed: item['dash'] == true,
+                dotted: item['dots'] == true,
+                rungs: item['rungs'] == true,
+              ),
+            ),
+          );
+      }
+    }
+
+    Widget row(Map<String, dynamic> item, String label) => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+      child: Row(
+        children: [
+          sample(item),
+          const SizedBox(width: 12),
+          Expanded(child: Text(label)),
+        ],
+      ),
+    );
+    Widget heading(String text) => Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
+      child: Text(
+        text,
+        style: theme.textTheme.labelLarge?.copyWith(
+          color: theme.colorScheme.primary,
+        ),
+      ),
+    );
+    final overlays = (options['overlays'] as List<dynamic>? ?? const [])
+        .cast<Map<String, dynamic>>();
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Text(l10n.mapKey, style: theme.textTheme.titleMedium),
+            ),
+            for (final section in sections) ...[
+              heading(l10n.mapKeySection(section['id'] as String)),
+              for (final item
+                  in (section['items'] as List<dynamic>)
+                      .cast<Map<String, dynamic>>())
+                row(
+                  item,
+                  l10n.mapKeyItem((item['id'] as String).replaceAll('-', '_')),
+                ),
+            ],
+            for (final overlay in overlays)
+              if (choice.overlays.contains(overlay['id']))
+                if (overlay['legend'] case final List<dynamic> legend) ...[
+                  heading(switch (overlay['id']) {
+                    'slope' => l10n.mapOverlaySlope,
+                    'avalanche' => l10n.mapOverlayAvalanche,
+                    _ => '${overlay['id']}',
+                  }),
+                  for (final step in legend.cast<Map<String, dynamic>>())
+                    row(
+                      {'kind': 'fill', 'color': step['color']},
+                      step['from'] != null
+                          ? l10n.mapKeyFrom('${step['from']}')
+                          : l10n.mapKeyLevel('${step['level']}'),
+                    ),
+                ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A short piece of a line as it is drawn on the map: solid, dashed, dotted
+/// or with the cross strokes of a via ferrata.
+class _KeyLinePainter extends CustomPainter {
+  const _KeyLinePainter({
+    required this.colour,
+    this.casing,
+    this.dashed = false,
+    this.dotted = false,
+    this.rungs = false,
+  });
+
+  final Color colour;
+  final Color? casing;
+  final bool dashed;
+  final bool dotted;
+  final bool rungs;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final y = size.height / 2;
+    final paint = Paint()
+      ..color = colour
+      ..strokeWidth = 3
+      ..strokeCap = dotted ? StrokeCap.round : StrokeCap.butt;
+    if (casing != null) {
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(size.width, y),
+        Paint()
+          ..color = casing!
+          ..strokeWidth = 5,
+      );
+    }
+    if (dashed || dotted) {
+      final on = dotted ? 1.0 : 6.0, off = dotted ? 5.0 : 3.0;
+      for (var x = 0.0; x < size.width; x += on + off) {
+        canvas.drawLine(
+          Offset(x, y),
+          Offset((x + on).clamp(0, size.width), y),
+          paint,
+        );
+      }
+    } else {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+    if (rungs) {
+      final rung = Paint()
+        ..color = colour
+        ..strokeWidth = 1.6;
+      for (var x = 3.0; x < size.width; x += 6) {
+        canvas.drawLine(Offset(x, y - 5), Offset(x, y + 5), rung);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_KeyLinePainter old) =>
+      old.colour != colour ||
+      old.casing != casing ||
+      old.dashed != dashed ||
+      old.dotted != dotted ||
+      old.rungs != rungs;
+}
+
 /// The sheet of the search: a field and the places found while typing.
 class PlaceSearchSheet extends StatefulWidget {
   const PlaceSearchSheet({super.key, required this.search});
@@ -835,6 +1052,9 @@ final mapViewBuilderProvider = Provider<MapViewBuilder>((ref) {
     layerSheet: options == null
         ? null
         : (context, part) => MapLayerSheet(options: options, part: part),
+    keySheet: options?['key'] == null
+        ? null
+        : (context) => MapKeySheet(options: options!),
     // The 3D view is a page of the app's own map server.
     on3D: port == null
         ? null

@@ -3130,6 +3130,36 @@ abstract class AppLocalizations {
   /// **'Darstellung'**
   String get mapLooks;
 
+  /// No description provided for @mapKey.
+  ///
+  /// In de, this message translates to:
+  /// **'Legende'**
+  String get mapKey;
+
+  /// No description provided for @mapKeySection.
+  ///
+  /// In de, this message translates to:
+  /// **'{section, select, paths{Wege} signs{Zeichen} lines{Linien} areas{Flächen} other{Weiteres}}'**
+  String mapKeySection(String section);
+
+  /// No description provided for @mapKeyItem.
+  ///
+  /// In de, this message translates to:
+  /// **'{item, select, grade_easy{Wanderweg bis Bergtour (T1–T4)} grade_t5{Sehr schwere Bergtour (T5)} grade_t6{Äußerst schwierig (T6)} path{Weg} path_marked{Bergweg mit Schwierigkeitsangabe} via_ferrata{Klettersteig} peak{Gipfel} saddle{Sattel, Pass} hut{Hütte} shelter{Unterstand} viewpoint{Aussichtspunkt} parking{Parkplatz} cable_car{Seilbahnstation} ladder{Leiter} track{Forst- oder Feldweg} road{Straße} rail{Bahn} aerialway{Seilbahn, Lift} boundary{Grenze} contour{Höhenlinie} wood{Wald} grass{Wiese} rock{Fels, Geröll} ice{Gletscher} water{Gewässer} other{Sonstiges}}'**
+  String mapKeyItem(String item);
+
+  /// No description provided for @mapKeyFrom.
+  ///
+  /// In de, this message translates to:
+  /// **'ab {angle}°'**
+  String mapKeyFrom(String angle);
+
+  /// No description provided for @mapKeyLevel.
+  ///
+  /// In de, this message translates to:
+  /// **'Stufe {level}'**
+  String mapKeyLevel(String level);
+
   /// No description provided for @map3dTitle.
   ///
   /// In de, this message translates to:

@@ -7,6 +7,35 @@ from flask import current_app, url_for
 from hiker_web.api import ApiError, api
 from hiker_web.texts_de import t
 
+# The entries of the map's key, as the style of the server names them.
+KEY_ITEMS = (
+    "grade_easy",
+    "grade_t5",
+    "grade_t6",
+    "path",
+    "path_marked",
+    "via_ferrata",
+    "peak",
+    "saddle",
+    "hut",
+    "shelter",
+    "viewpoint",
+    "parking",
+    "cable-car",
+    "ladder",
+    "track",
+    "road",
+    "rail",
+    "aerialway",
+    "boundary",
+    "contour",
+    "wood",
+    "grass",
+    "rock",
+    "ice",
+    "water",
+)
+
 PLACE_KINDS = (
     "city",
     "town",
@@ -75,6 +104,16 @@ def map_config(attribution: str) -> dict:
                 "label": t("map.search"),
                 "none": t("map.search.none"),
                 "kinds": {kind: t(f"map.kind.{kind}") for kind in PLACE_KINDS},
+            },
+            "key": {
+                "title": t("map.key"),
+                "from": t("map.key.from"),
+                "level": t("map.key.level"),
+                "sections": {
+                    name: t(f"map.key.section.{name}")
+                    for name in ("paths", "signs", "lines", "areas")
+                },
+                "items": {name: t(f"map.key.item.{name}") for name in KEY_ITEMS},
             },
             "group": {
                 "terrain": t("map.group.terrain"),

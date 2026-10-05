@@ -331,6 +331,62 @@ LOOKS = (
 )
 
 
+def sources_of(layers: list[dict]) -> set[str]:
+    """Ids of all layers; used to ask whether an optional layer is part of the style."""
+    return {layer["id"] for layer in layers}
+
+
+def _key(look: Look | None, *, symbols: bool, contours: bool) -> list[dict]:
+    """What the signs of the map mean, for one look: sections with their entries. An
+    entry is a line (colour, dashed or with rungs), an area (colour) or a symbol; the
+    clients name it by its id and draw the sample themselves."""
+
+    def line(name: str, colour: str, **extra) -> dict:
+        return {"id": name, "kind": "line", "color": colour, **extra}
+
+    def area(name: str, colour: str) -> dict:
+        return {"id": name, "kind": "fill", "color": colour}
+
+    if look is None:
+        paths = [
+            line("grade_easy", RED),
+            line("grade_t5", BLACK),
+            line("grade_t6", VIOLET),
+            line("path", PATH, dash=True),
+        ]
+        ground = ("#c5dfb6", "#dfecc8", "#dcd6cd", "#eaf4fb", WATER)
+        contour = "#8a5a2b"
+    else:
+        colour, dashes, _factor = look.path
+        paths = [line("path", colour, dash=bool(dashes))]
+        if look.marked:
+            paths.insert(0, line("path_marked", look.marked[0], dots=True))
+        ground = (look.wood, look.grass, look.rock, look.ice, look.water)
+        contour = look.contour[0]
+    paths.append(line("via_ferrata", VIA_FERRATA, rungs=True))
+    lines = [
+        line("track", "#8a6a45", dash=True),
+        line("road", "#ffffff", casing="#b9b2a6"),
+        line("rail", "#7d7d7d"),
+        line("aerialway", "#4a4a4a"),
+        line("boundary", "#9a6fa8", dash=True),
+    ]
+    if contours:
+        lines.append(line("contour", contour))
+    sections = [{"id": "paths", "items": paths}]
+    if symbols:
+        signs = ("peak", "saddle", "hut", "shelter", "viewpoint", "parking", "cable-car", "ladder")
+        sections.append(
+            {"id": "signs", "items": [{"id": n, "kind": "icon", "icon": n} for n in signs]}
+        )
+    sections.append({"id": "lines", "items": lines})
+    names = ("wood", "grass", "rock", "ice", "water")
+    sections.append(
+        {"id": "areas", "items": [area(n, c) for n, c in zip(names, ground, strict=True)]}
+    )
+    return sections
+
+
 def _add_look(layers: list[dict], hiker: dict, insert_before, look: Look) -> None:
     """Adds the layers of a look and names it in the metadata.
 
@@ -1195,6 +1251,11 @@ def build_style(
         _use_symbols(layers)
     for look in LOOKS:
         _add_look(layers, hiker, insert_before, look)
+    # The key of the map, per look; looks without an entry (winter) use that of "map".
+    described = {"symbols": sprite_url is not None, "contours": "contour" in sources_of(layers)}
+    hiker["key"] = {"map": _key(None, **described)} | {
+        look.id: _key(look, **described) for look in LOOKS
+    }
     # The order and the groups in which the clients offer the overlays: what belongs to
     # the ground, then everything about snow, then the weather.
     for overlay in hiker["overlays"]:

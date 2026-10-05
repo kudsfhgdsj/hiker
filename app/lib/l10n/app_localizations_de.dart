@@ -1723,6 +1723,64 @@ class AppLocalizationsDe extends AppLocalizations {
   String get mapLooks => 'Darstellung';
 
   @override
+  String get mapKey => 'Legende';
+
+  @override
+  String mapKeySection(String section) {
+    String _temp0 = intl.Intl.selectLogic(section, {
+      'paths': 'Wege',
+      'signs': 'Zeichen',
+      'lines': 'Linien',
+      'areas': 'Flächen',
+      'other': 'Weiteres',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String mapKeyItem(String item) {
+    String _temp0 = intl.Intl.selectLogic(item, {
+      'grade_easy': 'Wanderweg bis Bergtour (T1–T4)',
+      'grade_t5': 'Sehr schwere Bergtour (T5)',
+      'grade_t6': 'Äußerst schwierig (T6)',
+      'path': 'Weg',
+      'path_marked': 'Bergweg mit Schwierigkeitsangabe',
+      'via_ferrata': 'Klettersteig',
+      'peak': 'Gipfel',
+      'saddle': 'Sattel, Pass',
+      'hut': 'Hütte',
+      'shelter': 'Unterstand',
+      'viewpoint': 'Aussichtspunkt',
+      'parking': 'Parkplatz',
+      'cable_car': 'Seilbahnstation',
+      'ladder': 'Leiter',
+      'track': 'Forst- oder Feldweg',
+      'road': 'Straße',
+      'rail': 'Bahn',
+      'aerialway': 'Seilbahn, Lift',
+      'boundary': 'Grenze',
+      'contour': 'Höhenlinie',
+      'wood': 'Wald',
+      'grass': 'Wiese',
+      'rock': 'Fels, Geröll',
+      'ice': 'Gletscher',
+      'water': 'Gewässer',
+      'other': 'Sonstiges',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String mapKeyFrom(String angle) {
+    return 'ab $angle°';
+  }
+
+  @override
+  String mapKeyLevel(String level) {
+    return 'Stufe $level';
+  }
+
+  @override
   String get map3dTitle => '3D-Ansicht';
 
   @override

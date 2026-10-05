@@ -122,6 +122,98 @@ void main() {
     );
   });
 
+  testWidgets('the key names what the chosen look and layers show', (
+    tester,
+  ) async {
+    final container = createContainer(api: FakeApi());
+    const options = <String, dynamic>{
+      'bases': <Map<String, dynamic>>[],
+      'overlays': [
+        {
+          'id': 'slope',
+          'layers': ['slope'],
+          'legend': [
+            {'from': 30, 'color': '#f5d73c'},
+            {'from': 40, 'color': '#c82828'},
+          ],
+        },
+      ],
+      'key': {
+        'map': [
+          {
+            'id': 'paths',
+            'items': [
+              {'id': 'grade_easy', 'kind': 'line', 'color': '#d92323'},
+              {
+                'id': 'via_ferrata',
+                'kind': 'line',
+                'color': '#111111',
+                'rungs': true,
+              },
+            ],
+          },
+          {
+            'id': 'signs',
+            'items': [
+              {'id': 'cable-car', 'kind': 'icon', 'icon': 'cable-car'},
+            ],
+          },
+          {
+            'id': 'areas',
+            'items': [
+              {'id': 'ice', 'kind': 'fill', 'color': '#eaf4fb'},
+            ],
+          },
+        ],
+        'topo': [
+          {
+            'id': 'paths',
+            'items': [
+              {'id': 'path', 'kind': 'line', 'color': '#d0182b', 'dash': true},
+            ],
+          },
+        ],
+      },
+    };
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: MapKeySheet(options: options)),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Legende'), findsOneWidget);
+    expect(find.text('Wege'), findsOneWidget);
+    expect(find.text('Wanderweg bis Bergtour (T1–T4)'), findsOneWidget);
+    expect(find.text('Klettersteig'), findsOneWidget);
+    expect(find.text('Zeichen'), findsOneWidget);
+    expect(find.text('Seilbahnstation'), findsOneWidget);
+    expect(find.text('Gletscher'), findsOneWidget);
+    // A switched-on layer adds its classes.
+    expect(find.text('ab 30°'), findsNothing);
+    container
+        .read(mapLayerChoiceProvider.notifier)
+        .setOverlay('slope', on: true);
+    await tester.pump();
+    expect(find.text('Hangneigung'), findsOneWidget);
+    expect(find.text('ab 30°'), findsOneWidget);
+    expect(find.text('ab 40°'), findsOneWidget);
+
+    // Another look has its own key; one without an entry uses the usual one.
+    container.read(mapLayerChoiceProvider.notifier).setBase('topo');
+    await tester.pump();
+    expect(find.text('Weg'), findsOneWidget);
+    expect(find.text('Klettersteig'), findsNothing);
+    container.read(mapLayerChoiceProvider.notifier).setBase('winter');
+    await tester.pump();
+    expect(find.text('Klettersteig'), findsOneWidget);
+  });
+
   test('chosen angles and day become part of the addresses of the map', () {
     const style =
         '{"metadata":{"hiker":{"history":{"sources":["snow","avalanche"]}}},'
