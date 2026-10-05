@@ -370,7 +370,8 @@ TEXTS = {
     "map.terrain": "Zwischen 2D und 3D-Gelände umschalten",
     "map.paths": "Wege:",
     "map.paths_note": (
-        "Schwierigkeit nach SAC-Wanderskala, wo OpenStreetMap sie nennt; KS = Klettersteig."
+        "Schwierigkeit nach SAC-Wanderskala, wo OpenStreetMap sie nennt. KS = Klettersteig: "
+        "schwarze Linie mit Querstrichen und Leiter."
     ),
     "map.from": "ab",
     "plan.new": "Neue Route",

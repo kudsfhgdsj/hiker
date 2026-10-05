@@ -3343,7 +3343,7 @@ abstract class AppLocalizations {
   /// No description provided for @mapPaths.
   ///
   /// In de, this message translates to:
-  /// **'Wege (SAC-Skala, KS = Klettersteig):'**
+  /// **'Wege (SAC-Skala; KS = Klettersteig, mit Querstrichen und Leiter):'**
   String get mapPaths;
 
   /// No description provided for @mapOverlayWeather0.

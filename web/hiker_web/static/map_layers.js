@@ -355,6 +355,8 @@ window.hikerMapLayers = (map, texts, options = {}) => {
         for (const entry of meta.legend) {
           const swatch = element("i");
           swatch.style.background = entry.color;
+          // Via ferratas are drawn with cross strokes: the sample shows them too.
+          if (entry.pattern === "rungs") swatch.className = "rungs";
           legend.append(swatch, entry.label);
         }
         looks.append(legend);

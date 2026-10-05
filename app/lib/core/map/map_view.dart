@@ -475,15 +475,29 @@ class MapLayerSheet extends ConsumerWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      width: 14,
-                      height: 14,
-                      margin: const EdgeInsets.only(right: 4),
-                      decoration: BoxDecoration(
-                        color: _hexColor(entry['color'] as String),
-                        borderRadius: BorderRadius.circular(3),
+                    if (entry['pattern'] == 'rungs')
+                      // Via ferratas are drawn with cross strokes.
+                      Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: Text(
+                          '┼┼┼',
+                          style: TextStyle(
+                            color: _hexColor(entry['color'] as String),
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -2,
+                          ),
+                        ),
+                      )
+                    else
+                      Container(
+                        width: 14,
+                        height: 14,
+                        margin: const EdgeInsets.only(right: 4),
+                        decoration: BoxDecoration(
+                          color: _hexColor(entry['color'] as String),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
                       ),
-                    ),
                     Text(entry['label'] as String),
                   ],
                 ),

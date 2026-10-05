@@ -1865,7 +1865,8 @@ class AppLocalizationsDe extends AppLocalizations {
       'Aus Satellitendaten, einige Stunden alt und grob.';
 
   @override
-  String get mapPaths => 'Wege (SAC-Skala, KS = Klettersteig):';
+  String get mapPaths =>
+      'Wege (SAC-Skala; KS = Klettersteig, mit Querstrichen und Leiter):';
 
   @override
   String get mapOverlayWeather0 => 'Wetter heute';

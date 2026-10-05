@@ -138,6 +138,8 @@ del { color: #c62828; } ins { color: #2e7d32; text-decoration: none; }
 .map-option { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; }
 .map-legend { display: inline-flex; align-items: center; gap: .2rem; margin-left: .5rem; color: #555; }
 .map-legend.paths { margin-left: 0; flex-wrap: wrap; }
+.map-legend i.rungs { width: 1.5rem; background: repeating-linear-gradient(90deg, #111 0 2px, transparent 2px 6px),
+  linear-gradient(#0000 42%, #111 42% 58%, #0000 58%) !important; }
 .map-legend i { width: .8rem; height: .8rem; border-radius: 2px; display: inline-block; margin-left: .2rem; }
 .map-range { display: grid; grid-template-columns: auto 1fr; gap: .15rem .5rem; align-items: center; margin-left: 1.4rem; }
 .map-range span:last-child { grid-column: 1 / -1; color: #555; }

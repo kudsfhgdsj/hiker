@@ -21,9 +21,11 @@ WATER_LINE = "#7db4d8"
 PATH = "#b5342a"
 # Not "#ffffffcc": the map library of the app does not read colours with eight digits.
 # T1 … T6 on the SAC scale, and via ferratas.
-# Light blue, dark blue, yellow, orange, red, black: the harder, the warmer and darker.
-DIFFICULTY = ["#38b6ff", "#1d3fa8", "#f2c200", "#f28c1e", "#d92323", "#111111"]
-VIA_FERRATA = "#6b21a8"
+# Colours that no water has: red for everything up to T4, black for T5, violet for T6.
+RED, BLACK, VIOLET = "#d92323", "#111111", "#7b2fbf"
+DIFFICULTY = [RED, RED, RED, RED, BLACK, VIOLET]
+# Via ferratas: a black line with cross strokes, like the rungs of a ladder.
+VIA_FERRATA = "#111111"
 HALO = "rgba(255, 255, 255, 0.8)"
 
 
@@ -178,6 +180,30 @@ def _use_symbols(layers: list[dict]) -> None:
     for index, layer in enumerate(layers):
         if layer["id"] in symbols:
             layers[index] = symbols[layer["id"]]
+    # A ladder next to via ferratas, again and again along the line.
+    at = next(i for i, layer in enumerate(layers) if layer["id"] == "via-ferrata-rungs")
+    layers.insert(
+        at + 1,
+        {
+            "id": "via-ferrata-ladder",
+            "type": "symbol",
+            "source": "hiker",
+            "source-layer": "hiking",
+            "minzoom": 13,
+            "filter": ["==", ["get", "highway"], "via_ferrata"],
+            "layout": {
+                "symbol-placement": "line",
+                "symbol-spacing": 140,
+                "icon-image": "ladder",
+                "icon-size": ["interpolate", ["linear"], ["zoom"], 13, 0.7, 16, 1],
+                # Upright next to the line, however the route turns.
+                "icon-rotation-alignment": "viewport",
+                "icon-offset": [16, 0],
+                "icon-allow-overlap": True,
+                "icon-ignore-placement": True,
+            },
+        },
+    )
 
 
 @dataclass(frozen=True)
@@ -543,8 +569,7 @@ def build_style(
             cap="butt",
         ),
         # The difficulty of a path on the SAC hiking scale, where the data names it:
-        # blue for hiking and mountain paths, yellow to red for mountain tours and alpine
-        # routes, black for the hardest.
+        # red up to T4, black for T5, violet for T6. None of them is a colour of water.
         _line(
             "path-difficulty",
             "hiking",
@@ -577,10 +602,22 @@ def build_style(
             ["==", ["get", "highway"], "via_ferrata"],
             {
                 "line-color": VIA_FERRATA,
-                "line-width": _width((11, 1.0), (14, 2.2), (18, 4.5)),
-                "line-dasharray": [1, 1.5],
+                "line-width": _width((11, 0.8), (14, 1.6), (18, 3.2)),
             },
             minzoom=11,
+            cap="butt",
+        ),
+        # The cross strokes: a wide line of which only short pieces are drawn.
+        _line(
+            "via-ferrata-rungs",
+            "hiking",
+            ["==", ["get", "highway"], "via_ferrata"],
+            {
+                "line-color": VIA_FERRATA,
+                "line-width": _width((12, 4), (14, 7), (18, 14)),
+                "line-dasharray": [0.18, 0.75],
+            },
+            minzoom=12,
             cap="butt",
         ),
         # Zoomed in closely the grade is written next to the path.
@@ -627,17 +664,11 @@ def build_style(
                     [
                         "match",
                         ["get", "sac_scale"],
-                        "hiking",
-                        "#1479c4",
-                        "mountain_hiking",
-                        DIFFICULTY[1],
-                        "demanding_mountain_hiking",
-                        "#8a6d00",
-                        "alpine_hiking",
-                        "#b55f00",
                         "demanding_alpine_hiking",
-                        DIFFICULTY[4],
-                        DIFFICULTY[5],
+                        BLACK,
+                        "difficult_alpine_hiking",
+                        VIOLET,
+                        "#b01818",
                     ],
                 ],
                 "text-halo-width": 1.8,
@@ -845,11 +876,11 @@ def build_style(
         "overlays": [],
         # What the colours of the paths mean.
         "legend": [
-            *(
-                {"label": f"T{level + 1}", "color": colour}
-                for level, colour in enumerate(DIFFICULTY)
-            ),
-            {"label": "KS", "color": VIA_FERRATA},
+            {"label": "T1–T4", "color": RED},
+            {"label": "T5", "color": BLACK},
+            {"label": "T6", "color": VIOLET},
+            # Drawn with cross strokes and marked with a ladder.
+            {"label": "KS", "color": VIA_FERRATA, "pattern": "rungs"},
         ],
     }
 

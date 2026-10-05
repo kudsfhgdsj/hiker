@@ -224,18 +224,23 @@ def test_paths_are_coloured_by_their_difficulty():
     assert layers["via-ferrata"]["filter"] == ["==", ["get", "highway"], "via_ferrata"]
     # What the colours mean travels with the style.
     legend = style["metadata"]["hiker"]["legend"]
-    assert [entry["label"] for entry in legend] == ["T1", "T2", "T3", "T4", "T5", "T6", "KS"]
-    # Light blue, dark blue, yellow, orange, red, black.
-    assert [entry["color"] for entry in legend[:6]] == [
-        "#38b6ff",
-        "#1d3fa8",
-        "#f2c200",
-        "#f28c1e",
-        "#d92323",
-        "#111111",
+    assert [(entry["label"], entry["color"]) for entry in legend] == [
+        ("T1–T4", "#d92323"),
+        ("T5", "#111111"),
+        ("T6", "#7b2fbf"),
+        ("KS", "#111111"),
     ]
-    assert colours[colours.index("hiking") + 1] == "#38b6ff"
-    assert colours[colours.index("difficult_alpine_hiking") + 1] == "#111111"
+    # Red up to T4, black for T5, violet for T6: none of them is a colour of water.
+    for scale in ("hiking", "mountain_hiking", "demanding_mountain_hiking", "alpine_hiking"):
+        assert colours[colours.index(scale) + 1] == "#d92323"
+    assert colours[colours.index("demanding_alpine_hiking") + 1] == "#111111"
+    assert colours[colours.index("difficult_alpine_hiking") + 1] == "#7b2fbf"
+    # Via ferratas: a solid black line with cross strokes over it.
+    assert "line-dasharray" not in layers["via-ferrata"]["paint"]
+    rungs = layers["via-ferrata-rungs"]
+    assert rungs["filter"] == layers["via-ferrata"]["filter"]
+    assert rungs["paint"]["line-dasharray"] == [0.18, 0.75]
+    assert order.index("via-ferrata") < order.index("via-ferrata-rungs")
 
     # Names of the paths: the path's own name with the number of its hiking route, or
     # the route alone; level at the path, in every look.
@@ -528,6 +533,7 @@ def test_symbols_are_served_and_used_by_the_topo_look(client, maps):
             "viewpoint",
             "parking",
             "cable-car",
+            "ladder",
         }
     )
     sheet = Image.open(io.BytesIO(client.get("/api/v1/maps/sprite.png").content))
@@ -554,7 +560,14 @@ def test_symbols_are_served_and_used_by_the_topo_look(client, maps):
     topo = next(base for base in style["metadata"]["hiker"]["bases"] if base["id"] == "topo")
     assert "peak" not in topo["hide"] and "hut" not in topo["hide"]
 
+    # A ladder stands next to via ferratas, upright along the line.
+    ladder = layers["via-ferrata-ladder"]
+    assert ladder["layout"]["icon-image"] == "ladder"
+    assert ladder["layout"]["symbol-placement"] == "line"
+    assert ladder["layout"]["icon-rotation-alignment"] == "viewport"
+
     # Without symbols the map keeps the dots.
     plain = build_style("t", "g", "©", 14)
     plain_layers = {layer["id"]: layer for layer in plain["layers"]}
     assert "sprite" not in plain and plain_layers["peak"]["type"] == "circle"
+    assert "via-ferrata-ladder" not in plain_layers

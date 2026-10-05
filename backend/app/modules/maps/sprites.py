@@ -1,5 +1,5 @@
-"""Draws the symbols of the map: summit, saddle, hut, shelter, viewpoint, parking and
-cable car. They are drawn here, not taken from anywhere.
+"""Draws the symbols of the map: summit, saddle, hut, shelter, viewpoint, parking,
+cable car and the ladder of via ferratas. They are drawn here, not taken from anywhere.
 
 The map library loads symbols as one image with a list of where each one lies
 ("sprite"), in single and double resolution. The files are part of the repository
@@ -116,6 +116,18 @@ def _cable_car() -> Image.Image:
     return image
 
 
+def _ladder() -> Image.Image:
+    image, draw, e = _canvas()
+    # Two rails and four rungs, black on a white edge.
+    for width, colour in ((e * 0.2, WHITE), (e * 0.09, BLACK)):
+        w = round(width)
+        for x in (0.33, 0.67):
+            draw.line((e * x, e * 0.08, e * x, e * 0.92), fill=colour, width=w)
+        for y in (0.22, 0.41, 0.6, 0.79):
+            draw.line((e * 0.33, e * y, e * 0.67, e * y), fill=colour, width=w)
+    return image
+
+
 SYMBOLS = {
     "peak": _peak,
     "saddle": _saddle,
@@ -124,6 +136,7 @@ SYMBOLS = {
     "viewpoint": _viewpoint,
     "parking": _parking,
     "cable-car": _cable_car,
+    "ladder": _ladder,
 }
 
 
