@@ -6,10 +6,14 @@
 # genauere Hangneigung und Höhenlinien.
 #
 #   deploy/build-terrain.sh austria
+#   deploy/build-terrain.sh bayern
 #
 # Quellen (offene Daten; die Nennung steht danach in der Karte):
 #   austria   BEV, Digitales Geländehöhenmodell, Höhenraster 5 m, CC BY 4.0
 #             https://data.bev.gv.at (eine Datei, rund 19 GB)
+#   bayern    LDBV (Bayerische Vermessungsverwaltung), DGM5, Gitterweite 5 m, CC BY 4.0
+#             https://geodaten.bayern.de/opengeodata (rund 72.000 Dateien, 13 GB;
+#             sie werden vorab zu einer Rasterdatei zusammengesetzt)
 #
 #   MAP_TERRAIN_ZOOM=14   tiefste Zoomstufe (14 sind rund 6,5 m je Bildpunkt)
 #   MAP_BUILD_CPUS=3      so viele Prozesse rechnen zugleich
@@ -25,10 +29,20 @@ area="$1"
 case "$area" in
   austria)
     url="https://data.bev.gv.at/download/DGM/Hoehenraster/DGM_R5.tif"
+    metalink=""
     file="DGM_R5.tif"
     attribution="Höhendaten Österreich: © BEV (DGM 5 m), CC BY 4.0"
     ;;
-  *) echo "Für '$area' ist noch kein Geländemodell hinterlegt (bisher: austria)." >&2; exit 1 ;;
+  bayern)
+    # Viele kleine Textdateien (x y z) je Quadratkilometer, UTM 32.
+    url=""
+    metalink="https://geodaten.bayern.de/odd/a/dgm/dgm5xyz/meta/metalink/09.meta4"
+    srs="EPSG:25832"
+    step=5
+    file="bayern-dgm5.tif"
+    attribution="Höhendaten Bayern: © Bayerische Vermessungsverwaltung (DGM5), CC BY 4.0"
+    ;;
+  *) echo "Für '$area' ist noch kein Geländemodell hinterlegt (bisher: austria, bayern)." >&2; exit 1 ;;
 esac
 
 DATA_DIR="${DATA_DIR:-$(sed -n 's/^DATA_DIR=//p' .env 2>/dev/null | tail -n 1)}"
@@ -39,7 +53,13 @@ WORKERS="${MAP_BUILD_CPUS:-3}"
 sources="$DATA_DIR/maps/build/sources"
 mkdir -p "$sources"
 
-if [ ! -f "$sources/$file" ]; then
+if [ ! -f "$sources/$file" ] && [ -n "$metalink" ]; then
+  echo "== Lade und setze zusammen: $file $(date '+%Y-%m-%d %H:%M') =="
+  # Schon geholte Dateien bleiben liegen; ein abgebrochener Lauf macht weiter.
+  docker compose --profile mapbuild run --rm --entrypoint python3 terrainbuild \
+    /tool/mosaic_xyz.py --metalink "$metalink" --dir "/data/build/sources/${file%.tif}" \
+    --out "/data/build/sources/$file" --srs "$srs" --step "$step" --workers "$WORKERS"
+elif [ ! -f "$sources/$file" ]; then
   echo "== Lade $file =="
   # Ein unterbrochener Download wird fortgesetzt; erst die ganze Datei bekommt den Namen.
   curl -fL --retry 5 -C - --no-progress-meter -o "$sources/$file.part" "$url"
