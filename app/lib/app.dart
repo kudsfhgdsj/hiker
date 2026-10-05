@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
@@ -53,6 +54,10 @@ List<Override> appOverrides({List<FeatureModule>? modules}) => [
   conflictResolversProvider.overrideWithValue({'tours': resolveTourConflict}),
   uploadHandlerProvider.overrideWith(tourUploadHandler),
 ];
+
+/// True in the build variant "hiker Test" (`--flavor staging`), which is installed
+/// next to the real app with its own data.
+const isTestApp = appFlavor == 'staging';
 
 /// Whether the app syncs by itself at start, after sign-in and when it comes
 /// back to the foreground. Tests switch it off.
@@ -130,6 +135,15 @@ class _HikerAppState extends ConsumerState<HikerApp>
     ref.listen(certificateChangedProvider, (_, _) => _sync());
     return MaterialApp.router(
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
+      // The test app says what it is, so that nobody enters real data by mistake.
+      builder: (context, child) => isTestApp
+          ? Banner(
+              message: 'TEST',
+              location: BannerLocation.topEnd,
+              color: const Color(0xFFD9641A),
+              child: child!,
+            )
+          : child!,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       routerConfig: ref.watch(routerProvider),

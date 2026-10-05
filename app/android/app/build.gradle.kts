@@ -39,6 +39,24 @@ android {
         versionName = flutter.versionName
     }
 
+    // Two apps from one code base, installed side by side:
+    // - production: the real app.
+    // - staging: "hiker Test" with its own id, so that a test version never replaces the
+    //   real app or touches its data. It has its own storage, session and maps.
+    flavorDimensions += "stage"
+    productFlavors {
+        create("production") {
+            dimension = "stage"
+            manifestPlaceholders["appLabel"] = "hiker"
+        }
+        create("staging") {
+            dimension = "stage"
+            applicationIdSuffix = ".test"
+            versionNameSuffix = "-test"
+            manifestPlaceholders["appLabel"] = "hiker Test"
+        }
+    }
+
     signingConfigs {
         if (hasReleaseKey) {
             create("release") {

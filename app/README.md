@@ -38,9 +38,29 @@ Dafür braucht es ein JDK (21) und das Android-SDK (Plattform 36, Build-Tools 36
 ```sh
 flutter config --android-sdk ~/Android/Sdk --jdk-dir ~/development/jdk
 export JAVA_HOME=~/development/jdk   # falls kein java im PATH liegt
-flutter build apk --debug      # build/app/outputs/flutter-apk/app-debug.apk
-flutter build apk --release    # build/app/outputs/flutter-apk/app-release.apk
+flutter build apk --debug      # build/app/outputs/flutter-apk/app-production-debug.apk
+flutter build apk --release    # build/app/outputs/flutter-apk/app-production-release.apk
 ```
+
+### Zwei Varianten: die echte App und „hiker Test“
+
+Aus demselben Code entstehen zwei Apps, die nebeneinander auf einem Gerät liegen können:
+
+| Variante | Befehl | Kennung | Name | Symbol |
+|---|---|---|---|---|
+| `production` (Standard) | `flutter build apk --release` | `internal.lacasa.hiker` | hiker | Berg auf Grün |
+| `staging` | `flutter build apk --release --flavor staging` | `internal.lacasa.hiker.test` | hiker Test | Berg auf Orange |
+
+Die Dateien heißen `build/app/outputs/flutter-apk/app-production-release.apk` und
+`app-staging-release.apk`. „hiker Test“ hat eigene Daten (Anmeldung, lokale Datenbank,
+geladene Karten und Wegdaten) und zeigt oben rechts ein Band „TEST“; eine Testversion
+ersetzt die echte App also nie und fasst ihre Daten nicht an. Beide Varianten werden mit
+demselben Schlüssel signiert. Zum Ausprobieren am Gerät: `flutter run --flavor staging`.
+Wohin sich die Test-App verbindet, entscheidet wie immer die Server-Adresse beim Anmelden –
+für Tests am besten ein eigener Testserver oder ein eigenes Konto.
+
+Der Release-Build braucht rund 3 GB Arbeitsspeicher (`android/gradle.properties`) und der
+Ordner `build/` wächst auf mehrere GB; `flutter clean` räumt ihn auf.
 
 ### Release signieren
 
@@ -65,7 +85,7 @@ Schlüsseldatei und Passwort gehören nicht ins Repository und müssen gesichert
 installiert ein Update nur, wenn es mit demselben Schlüssel signiert ist. Geht er verloren,
 muss die App deinstalliert werden (die lokalen, noch nicht abgeglichenen Daten gehen dabei
 verloren). Die Signatur einer APK zeigt
-`~/Android/Sdk/build-tools/36.0.0/apksigner verify --print-certs app-release.apk`.
+`~/Android/Sdk/build-tools/36.0.0/apksigner verify --print-certs app-production-release.apk`.
 
 Der erste Release-Build lädt Flutter-Bausteine von `storage.googleapis.com`; der Rechner muss
 diesen Namen auflösen und erreichen können.
@@ -79,7 +99,7 @@ Die App verlangt Internet, Kamera (Barcode-Scan) und Lesezugriff auf Dateien (Au
 GPX-Dateien und Fotos). Berechtigungen, die Bibliotheken zusätzlich mitbringen (Standort von
 der Karte, Mikrofon von der Kamera), entfernt das Manifest wieder (`tools:node="remove"`),
 weil die App sie nicht nutzt. Was in einer fertigen APK steht, zeigt
-`~/Android/Sdk/build-tools/36.0.0/aapt2 dump permissions app-release.apk`.
+`~/Android/Sdk/build-tools/36.0.0/aapt2 dump permissions app-production-release.apk`.
 
 ## Aufbau
 

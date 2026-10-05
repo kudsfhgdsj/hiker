@@ -72,6 +72,8 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  # Without --flavor the real app is built and run; `--flavor staging` gives "hiker Test".
+  default-flavor: production
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

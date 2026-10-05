@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The test app: the same mountain on orange, so that it cannot be mistaken for the
+     real one on the home screen. -->
+<resources>
+    <color name="ic_launcher_background">#D9641A</color>
+</resources>
