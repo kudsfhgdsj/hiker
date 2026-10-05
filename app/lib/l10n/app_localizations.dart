@@ -2740,6 +2740,18 @@ abstract class AppLocalizations {
   /// **'Gesamtzeit'**
   String get planCompareTotal;
 
+  /// No description provided for @planCompareOnMap.
+  ///
+  /// In de, this message translates to:
+  /// **'Auf der Karte zeigen'**
+  String get planCompareOnMap;
+
+  /// No description provided for @planCompareShown.
+  ///
+  /// In de, this message translates to:
+  /// **'Blau: gegangen ({title})'**
+  String planCompareShown(String title);
+
   /// No description provided for @planCompareNoTrack.
   ///
   /// In de, this message translates to:

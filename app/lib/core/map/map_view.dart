@@ -45,6 +45,7 @@ class MapMarker {
 class MapContent {
   const MapContent({
     this.track = const [],
+    this.secondTrack = const [],
     this.markers = const [],
     this.highlight,
     this.onTap,
@@ -57,6 +58,10 @@ class MapContent {
 
   /// The track as a line.
   final List<GeoPoint> track;
+
+  /// A second line in another colour, to compare with the track: e.g. what
+  /// was really walked over what was planned.
+  final List<GeoPoint> secondTrack;
   final List<MapMarker> markers;
 
   /// A point that follows the finger on the elevation profile.

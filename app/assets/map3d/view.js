@@ -46,22 +46,58 @@
     }
     if (scene.terrain && map.getSource(scene.terrain.source)) map.setTerrain(scene.terrain);
 
-    // Rain radar and clouds of the time that was chosen in the app, over the terrain.
-    for (const image of scene.radar || []) {
-      const id = `radar-${image.kind}`;
-      map.addSource(id, { type: "raster", tiles: [image.tiles], tileSize: 256, maxzoom: image.maxzoom });
-      map.addLayer({
-        id,
-        type: "raster",
-        source: id,
-        paint: { "raster-opacity": image.opacity, "raster-fade-duration": 0 },
-      });
-    }
-    if (scene.radarTime) {
-      const time = new Date(scene.radarTime * 1000);
+    // Rain radar and clouds over the terrain, with a slider for their time. It starts
+    // at the time that was chosen in the app.
+    const radar = scene.radar;
+    if (radar && radar.times.length) {
+      const slider = document.getElementById("time");
       const clock = document.getElementById("clock");
-      clock.textContent = time.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
-      clock.hidden = false;
+      const play = document.getElementById("play");
+      const show = (index) => {
+        const time = radar.times[index];
+        clock.textContent = new Date(time * 1000).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+        for (const layer of radar.layers) {
+          const id = `radar-${layer.kind}`;
+          // The image of that kind closest before the chosen time.
+          const known = layer.frames.filter((frame) => frame <= time);
+          if (!known.length) {
+            if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", "none");
+            continue;
+          }
+          const tiles = [layer.tiles.replace("{time}", known[known.length - 1])];
+          if (map.getSource(id)) {
+            map.getSource(id).setTiles(tiles);
+            map.setLayoutProperty(id, "visibility", "visible");
+          } else {
+            map.addSource(id, { type: "raster", tiles, tileSize: 256, maxzoom: layer.maxzoom });
+            map.addLayer({
+              id,
+              type: "raster",
+              source: id,
+              paint: { "raster-opacity": layer.opacity, "raster-fade-duration": 0 },
+            });
+          }
+        }
+      };
+      slider.max = radar.times.length - 1;
+      slider.value = radar.index;
+      slider.addEventListener("input", () => show(Number(slider.value)));
+      let timer = null;
+      play.addEventListener("click", () => {
+        if (timer) {
+          clearInterval(timer);
+          timer = null;
+          play.textContent = "▶";
+          return;
+        }
+        play.textContent = "⏸";
+        timer = setInterval(() => {
+          slider.value = (Number(slider.value) + 1) % radar.times.length;
+          show(Number(slider.value));
+        }, 900);
+      });
+      show(radar.index);
+      document.getElementById("radar").hidden = false;
     }
 
     const track = scene.track || [];
@@ -73,6 +109,21 @@
       const layout = { "line-join": "round", "line-cap": "round" };
       map.addLayer({ id: "track-casing", type: "line", source: "track", layout, paint: { "line-color": "#ffffff", "line-width": 7 } });
       map.addLayer({ id: "track-line", type: "line", source: "track", layout, paint: { "line-color": "#E8731A", "line-width": 4 } });
+    }
+    const second = scene.secondTrack || [];
+    if (second.length > 1) {
+      // The line to compare with, e.g. what was walked over what was planned.
+      map.addSource("second", {
+        type: "geojson",
+        data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: second } },
+      });
+      map.addLayer({
+        id: "second-line",
+        type: "line",
+        source: "second",
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint: { "line-color": "#1565C0", "line-width": 3 },
+      });
     }
     for (const point of scene.points || []) {
       const element = document.createElement("div");

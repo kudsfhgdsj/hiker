@@ -117,7 +117,12 @@ FakeApi planApi({
       'total_time_s': 3600,
     },
     'deviation': {'mean_m': 35, 'max_m': 150, 'on_plan_share': 0.8},
-    'track': null,
+    'track': {
+      'distance_m': [0, 700, 1350],
+      'lat': [47.0, 47.006, 47.011],
+      'lon': [9.0, 9.004, 9.001],
+      'elevation_m': null,
+    },
   }),
   'POST /planning/routes/import': (_, _) {
     saved?.add('import');
@@ -755,7 +760,7 @@ void main() {
       tester,
     ) async {
       final saved = <Object?>[];
-      await openPlanning(tester, planApi(saved: saved));
+      final map = await openPlanning(tester, planApi(saved: saved));
       await tester.tap(find.text('Auf den Gipfel'));
       await tester.pumpAndSettle();
 
@@ -774,8 +779,19 @@ void main() {
         ),
         findsOneWidget,
       );
-      await tester.tap(find.text('Schließen'));
+      // The walked track is drawn over the plan and taken away again.
+      expect(map.content!.secondTrack, isEmpty);
+      await tester.tap(find.text('Auf der Karte zeigen'));
       await tester.pumpAndSettle();
+      expect(map.content!.secondTrack.length, 3);
+      expect(map.content!.secondTrack.last.lat, 47.011);
+      expect(map.content!.track.length, 3);
+      expect(find.text('Blau: gegangen (Gipfeltag)'), findsOneWidget);
+      tester
+          .widget<InputChip>(find.byKey(const ValueKey('plan-walked')))
+          .onDeleted!();
+      await tester.pumpAndSettle();
+      expect(map.content!.secondTrack, isEmpty);
 
       // The menu starts a new tour from the route.
       await tester.tap(find.byKey(const ValueKey('plan-menu')));

@@ -1464,6 +1464,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get planCompareTotal => 'Gesamtzeit';
 
   @override
+  String get planCompareOnMap => 'Auf der Karte zeigen';
+
+  @override
+  String planCompareShown(String title) {
+    return 'Blau: gegangen ($title)';
+  }
+
+  @override
   String get planCompareNoTrack => 'Die Tour hat noch keinen Track.';
 
   @override

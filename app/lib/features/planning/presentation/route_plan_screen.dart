@@ -53,6 +53,10 @@ class _RoutePlanScreenState extends ConsumerState<RoutePlanScreen> {
   String? _problem;
   int _request = 0;
 
+  /// The walked track of a tour, drawn over the plan to compare them.
+  List<GeoPoint> _walked = const [];
+  String? _walkedTitle;
+
   /// The waypoint the next tap on the map moves, if any.
   int? _moving;
   double? _highlightDistance;
@@ -363,7 +367,16 @@ class _RoutePlanScreenState extends ConsumerState<RoutePlanScreen> {
           ),
       ],
     );
-    await showDialog<void>(
+    final track = compared['track'] as Json?;
+    final walked = <GeoPoint>[
+      if (track != null)
+        for (var i = 0; i < (track['lat'] as List).length; i++)
+          GeoPoint(
+            ((track['lat'] as List)[i] as num).toDouble(),
+            ((track['lon'] as List)[i] as num).toDouble(),
+          ),
+    ];
+    final show = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(compared['tour_title'] as String),
@@ -425,6 +438,11 @@ class _RoutePlanScreenState extends ConsumerState<RoutePlanScreen> {
           ),
         ),
         actions: [
+          if (walked.length > 1)
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(l10n.planCompareOnMap),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(l10n.close),
@@ -432,6 +450,12 @@ class _RoutePlanScreenState extends ConsumerState<RoutePlanScreen> {
         ],
       ),
     );
+    if (show == true && mounted) {
+      setState(() {
+        _walked = walked;
+        _walkedTitle = compared['tour_title'] as String;
+      });
+    }
   }
 
   String _problemText(AppLocalizations l10n, String code) => switch (code) {
@@ -546,6 +570,7 @@ class _RoutePlanScreenState extends ConsumerState<RoutePlanScreen> {
             child: HikerMap(
               content: MapContent(
                 track: line,
+                secondTrack: _walked,
                 highlight: highlight,
                 onTap: _tapMap,
                 // The sheet below starts at three tenths of the height.
@@ -633,6 +658,20 @@ class _RoutePlanScreenState extends ConsumerState<RoutePlanScreen> {
                                 : l10n.planHint,
                             style: theme.textTheme.bodySmall,
                           ),
+                          if (_walked.isNotEmpty)
+                            InputChip(
+                              key: const ValueKey('plan-walked'),
+                              avatar: const Icon(
+                                Icons.show_chart,
+                                color: Color(0xFF1565C0),
+                              ),
+                              label: Text(
+                                l10n.planCompareShown(_walkedTitle ?? ''),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              onDeleted: () =>
+                                  setState(() => _walked = const []),
+                            ),
                           if (_computing) ...[
                             const SizedBox(height: AppSpacing.s),
                             const LinearProgressIndicator(),

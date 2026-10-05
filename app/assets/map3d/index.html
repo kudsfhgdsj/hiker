@@ -8,9 +8,12 @@
   <style>
     html, body, #map { height: 100%; margin: 0; background: #e4e9e6; }
     #note { position: absolute; left: 0; right: 0; top: 40%; text-align: center; font: 16px sans-serif; color: #444; padding: 0 24px; }
-    #clock { position: absolute; left: 10px; top: 10px; padding: 4px 10px; border-radius: 14px; background: #fff;
-      font: 14px sans-serif; color: #222; box-shadow: 0 0 0 2px #0002; }
-    #clock[hidden] { display: none; }
+    #radar { position: absolute; left: 10px; right: 56px; top: 10px; display: flex; align-items: center; gap: 10px;
+      padding: 6px 14px 6px 6px; border-radius: 22px; background: #fff; font: 14px sans-serif; color: #222;
+      box-shadow: 0 0 0 2px #0002; }
+    #radar[hidden] { display: none; }
+    #radar input { flex: 1; min-width: 0; }
+    #play { width: 34px; height: 34px; border: 0; border-radius: 50%; background: #e6efe8; font-size: 15px; }
     .dot { width: 14px; height: 14px; border-radius: 50%; background: #c62828; border: 2px solid #fff; box-shadow: 0 0 3px #0008; }
     .dot.found { background: #1565c0; }
   </style>
@@ -18,7 +21,11 @@
 <body>
   <div id="map"></div>
   <div id="note" hidden></div>
-  <div id="clock" hidden></div>
+  <div id="radar" hidden>
+    <button id="play" type="button" aria-label="Zeitverlauf abspielen">▶</button>
+    <input id="time" type="range" min="0" step="1" aria-label="Zeitpunkt">
+    <span id="clock"></span>
+  </div>
   <script src="maplibre-gl-csp.js"></script>
   <script src="view.js"></script>
 </body>

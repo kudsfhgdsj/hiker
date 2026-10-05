@@ -159,7 +159,7 @@ Startzeitpunkt zeigt der Planer Sonnenauf- und -untergang, die Uhrzeit am gewäh
 Profils und warnt, wenn die Tour ins Dunkle reicht (`features/planning/data/route_schedule.dart`,
 ohne Netz gerechnet). Über das Menü des Planers entsteht aus der Route eine Tour; die Touren
 einer Route stehen unten im Blatt, ein Tipp vergleicht Plan und gegangenen Track (Zahlen und
-Abweichung; beide Linien auf einer Karte zeigt das Web). In der Routenliste importiert der
+Abweichung; „Auf der Karte zeigen“ legt das Gegangene blau über den Plan). In der Routenliste importiert der
 Knopf oben eine GPX-Datei als Route. Diese drei Dinge brauchen den Server.
 
 **Ohne Netz** rechnet die App selbst: Der Routing-Kern von BRouter ist eingebunden

@@ -56,6 +56,7 @@ class MapLibreMapView extends StatefulWidget {
 
 class _MapLibreMapViewState extends State<MapLibreMapView> {
   static const _source = 'track';
+  static const _secondSource = 'second-track';
   static const _clusterRadius = 44.0;
   static const _fallback = LatLng(46.8, 8.2);
 
@@ -132,25 +133,28 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
 
   List<GeoPoint> get _everything => [
     ...widget.content.track,
+    ...widget.content.secondTrack,
     for (final marker in widget.content.markers) marker.position,
   ];
 
-  Map<String, dynamic> _trackGeoJson() => {
+  static Map<String, dynamic> _lineGeoJson(List<GeoPoint> line) => {
     'type': 'FeatureCollection',
     'features': [
-      if (widget.content.track.length > 1)
+      if (line.length > 1)
         {
           'type': 'Feature',
           'properties': <String, dynamic>{},
           'geometry': {
             'type': 'LineString',
             'coordinates': [
-              for (final point in widget.content.track) [point.lon, point.lat],
+              for (final point in line) [point.lon, point.lat],
             ],
           },
         },
     ],
   };
+
+  Map<String, dynamic> _trackGeoJson() => _lineGeoJson(widget.content.track);
 
   /// Which layers of the style are shown for the chosen base map and overlays.
   Map<String, bool> _layerVisibility() {
@@ -210,20 +214,31 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
       'terrain': widget.layerOptions?['terrain'],
       'visible': _layerVisibility(),
       'opacity': _layerOpacity(),
-      // Rain radar and clouds of the time chosen with the slider.
-      'radar': [
-        for (final image in _radarImages())
-          {
-            'kind': image.kind,
-            'tiles': image.tiles,
-            'maxzoom': image.maxZoom,
-            'opacity': image.opacity,
-          },
-      ],
-      if (_radarImages().isNotEmpty)
-        'radarTime': _frames!.times[_frame.clamp(0, _frames!.times.length - 1)],
+      // Rain radar and clouds with all their times; the view starts at the
+      // time chosen here and has a slider of its own.
+      if (_radar case final radar?
+          when widget.layerChoice.radar.isNotEmpty &&
+              (_frames?.times.isNotEmpty ?? false))
+        'radar': {
+          'times': _frames!.times,
+          'index': _frame.clamp(0, _frames!.times.length - 1),
+          'layers': [
+            for (final kind in const ['clouds', 'rain'])
+              if (widget.layerChoice.radar.contains(kind))
+                {
+                  'kind': kind,
+                  'tiles': radar[kind],
+                  'frames': kind == 'rain' ? _frames!.rain : _frames!.clouds,
+                  'maxzoom': (radar['${kind}_max_zoom'] as num?) ?? 7,
+                  'opacity': kind == 'rain' ? 0.75 : 0.55,
+                },
+          ],
+        },
       'track': [
         for (final point in widget.content.track) [point.lon, point.lat],
+      ],
+      'secondTrack': [
+        for (final point in widget.content.secondTrack) [point.lon, point.lat],
       ],
       'points': [
         for (final marker in widget.content.markers)
@@ -287,6 +302,15 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
     if (!listEquals(oldWidget.content.track, widget.content.track)) {
       _controller?.setGeoJsonSource(_source, _trackGeoJson());
     }
+    if (!listEquals(
+      oldWidget.content.secondTrack,
+      widget.content.secondTrack,
+    )) {
+      _controller?.setGeoJsonSource(
+        _secondSource,
+        _lineGeoJson(widget.content.secondTrack),
+      );
+    }
     _updatePositions();
   }
 
@@ -303,6 +327,21 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
       const LineLayerProperties(
         lineColor: '#E8731A',
         lineWidth: 4,
+        lineJoin: 'round',
+        lineCap: 'round',
+      ),
+    );
+    // The line to compare with lies on top, thinner, so that both show.
+    await controller.addGeoJsonSource(
+      _secondSource,
+      _lineGeoJson(widget.content.secondTrack),
+    );
+    await controller.addLineLayer(
+      _secondSource,
+      'second-line',
+      const LineLayerProperties(
+        lineColor: '#1565C0',
+        lineWidth: 3,
         lineJoin: 'round',
         lineCap: 'round',
       ),
