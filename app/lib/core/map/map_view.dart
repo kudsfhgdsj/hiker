@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -14,6 +15,7 @@ import '../modules/feature_module.dart';
 import '../network/trusted_certificates.dart';
 import '../session/session.dart';
 import 'geo.dart';
+import 'map_regions.dart';
 import 'maplibre_map_view.dart';
 import 'tile_proxy.dart';
 
@@ -674,6 +676,114 @@ class _SlopeRangeState extends ConsumerState<_SlopeRange> {
   }
 }
 
+/// The sheet of the search: a field and the places found while typing.
+class PlaceSearchSheet extends StatefulWidget {
+  const PlaceSearchSheet({super.key, required this.search});
+
+  final Future<List<FoundPlace>> Function(String query) search;
+
+  @override
+  State<PlaceSearchSheet> createState() => _PlaceSearchSheetState();
+}
+
+class _PlaceSearchSheetState extends State<PlaceSearchSheet> {
+  List<FoundPlace>? _places;
+  int _asked = 0;
+  Timer? _wait;
+
+  @override
+  void dispose() {
+    _wait?.cancel();
+    super.dispose();
+  }
+
+  void _changed(String text) {
+    _wait?.cancel();
+    // Not a request for every letter.
+    _wait = Timer(const Duration(milliseconds: 300), () => _ask(text));
+  }
+
+  Future<void> _ask(String text) async {
+    final current = ++_asked;
+    if (text.trim().length < 2) {
+      setState(() => _places = null);
+      return;
+    }
+    List<FoundPlace> places;
+    try {
+      places = await widget.search(text.trim());
+    } on Exception {
+      places = const [];
+    }
+    // A newer search is already on its way.
+    if (mounted && current == _asked) setState(() => _places = places);
+  }
+
+  static IconData _icon(String kind) => switch (kind) {
+    'peak' || 'saddle' || 'volcano' => Icons.terrain,
+    'hut' || 'shelter' => Icons.cabin,
+    'lake' || 'waterfall' || 'spring' => Icons.water,
+    'station' || 'halt' => Icons.train,
+    'parking' => Icons.local_parking,
+    'viewpoint' => Icons.visibility_outlined,
+    'camp_site' => Icons.holiday_village_outlined,
+    'city' || 'town' || 'village' || 'hamlet' => Icons.location_city,
+    _ => Icons.place_outlined,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final places = _places;
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.6,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: TextField(
+                autofocus: true,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  labelText: l10n.mapSearch,
+                ),
+                onChanged: _changed,
+                onSubmitted: _ask,
+              ),
+            ),
+            Expanded(
+              child: places == null
+                  ? const SizedBox.shrink()
+                  : places.isEmpty
+                  ? Center(child: Text(l10n.mapSearchNone))
+                  : ListView(
+                      children: [
+                        for (final place in places)
+                          ListTile(
+                            leading: Icon(_icon(place.kind)),
+                            title: Text(place.name),
+                            subtitle: Text(
+                              [
+                                l10n.mapPlaceKind(place.kind),
+                                if (place.elevationM != null)
+                                  Format.meters(place.elevationM),
+                              ].join(', '),
+                            ),
+                            onTap: () => Navigator.pop(context, place),
+                          ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Builds the map. Tests replace it, because the real map needs the platform.
 final mapViewBuilderProvider = Provider<MapViewBuilder>((ref) {
   final tileUrl = ref.watch(mapTileUrlProvider);
@@ -694,6 +804,12 @@ final mapViewBuilderProvider = Provider<MapViewBuilder>((ref) {
     layerSheet: options == null
         ? null
         : (context, part) => MapLayerSheet(options: options, part: part),
+    // The search knows the places of the own map.
+    onSearch: style == null
+        ? null
+        : (query, near) => ref
+              .read(mapRegionStoreProvider)
+              .search(query, lat: near.lat, lon: near.lon),
   );
 });
 

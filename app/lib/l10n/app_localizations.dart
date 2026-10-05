@@ -3118,6 +3118,24 @@ abstract class AppLocalizations {
   /// **'Darstellung'**
   String get mapLooks;
 
+  /// No description provided for @mapSearch.
+  ///
+  /// In de, this message translates to:
+  /// **'Ort, Gipfel oder Hütte suchen'**
+  String get mapSearch;
+
+  /// No description provided for @mapSearchNone.
+  ///
+  /// In de, this message translates to:
+  /// **'Nichts gefunden.'**
+  String get mapSearchNone;
+
+  /// No description provided for @mapPlaceKind.
+  ///
+  /// In de, this message translates to:
+  /// **'{kind, select, city{Stadt} town{Stadt} village{Dorf} hamlet{Weiler} peak{Gipfel} saddle{Sattel} volcano{Vulkan} hut{Hütte} lake{See} viewpoint{Aussichtspunkt} station{Bahnhof} halt{Haltestelle} parking{Parkplatz} camp_site{Campingplatz} shelter{Unterstand} attraction{Sehenswürdigkeit} castle{Burg} ruins{Ruine} cave_entrance{Höhle} waterfall{Wasserfall} spring{Quelle} other{Ort}}'**
+  String mapPlaceKind(String kind);
+
   /// No description provided for @mapGroupTerrain.
   ///
   /// In de, this message translates to:

@@ -34,7 +34,8 @@ und Schätzungen kommen von der API (siehe `DESIGN.md`, Abschnitt 9a).
   mit Schwierigkeit und die Sonnenzeiten des Tages dort (für Gipfel auch bei freiem Horizont)
   und führt auf Wunsch in den Planer. Ebenen: Hangneigung mit einstellbaren Winkeln,
   Lawinengefahr, Schnee und Wetter auch für einen Tag im letzten Jahr, Regenradar und Wolken
-  mit Zeitregler, Umschalter 2D/3D.
+  mit Zeitregler, Umschalter 2D/3D. Das Suchfeld in jeder Karte findet Gipfel, Hütten, Orte
+  und Seen der eigenen Karte nach Namen.
 
 Nicht im Web: Kamera-Scanner und Offline-Betrieb (das kann die Android-App).
 

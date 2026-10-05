@@ -1715,6 +1715,41 @@ class AppLocalizationsDe extends AppLocalizations {
   String get mapLooks => 'Darstellung';
 
   @override
+  String get mapSearch => 'Ort, Gipfel oder Hütte suchen';
+
+  @override
+  String get mapSearchNone => 'Nichts gefunden.';
+
+  @override
+  String mapPlaceKind(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'city': 'Stadt',
+      'town': 'Stadt',
+      'village': 'Dorf',
+      'hamlet': 'Weiler',
+      'peak': 'Gipfel',
+      'saddle': 'Sattel',
+      'volcano': 'Vulkan',
+      'hut': 'Hütte',
+      'lake': 'See',
+      'viewpoint': 'Aussichtspunkt',
+      'station': 'Bahnhof',
+      'halt': 'Haltestelle',
+      'parking': 'Parkplatz',
+      'camp_site': 'Campingplatz',
+      'shelter': 'Unterstand',
+      'attraction': 'Sehenswürdigkeit',
+      'castle': 'Burg',
+      'ruins': 'Ruine',
+      'cave_entrance': 'Höhle',
+      'waterfall': 'Wasserfall',
+      'spring': 'Quelle',
+      'other': 'Ort',
+    });
+    return '$_temp0';
+  }
+
+  @override
   String get mapGroupTerrain => 'Gelände';
 
   @override

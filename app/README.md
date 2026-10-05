@@ -132,6 +132,9 @@ ein geladenes Kartengebiet). Ein Tipp nennt Gipfel, Hütte oder Weg mit Schwieri
 Sonnenzeiten des Tages dort – auf dem Gerät gerechnet (`core/sun.dart`, dieselben Formeln wie
 `backend/app/core/sun.py`), für Gipfel zusätzlich bei freiem Horizont.
 
+Die Lupe oben in der Karte sucht Gipfel, Hütten, Orte und Seen nach Namen: mit Netz beim
+Server, ohne Netz im Suchindex der geladenen Kartengebiete (`MapRegionStore.search`).
+
 Oben in jeder Karte liegen die Felder „Ebenen“ und „Darstellung“ (im Planer zusätzlich
 „Schwierigkeit“). Unter „Ebenen“: Hangneigung mit einem Regler für beide Enden, ein Tag im
 letzten Jahr für Lawinengefahr, Schnee und Wetter, Regenradar und Wolken mit Zeitregler. Die

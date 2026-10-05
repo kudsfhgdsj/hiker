@@ -9,6 +9,7 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../../l10n/app_localizations.dart';
 import 'geo.dart';
+import 'map_regions.dart';
 import 'map_view.dart';
 
 /// The map drawn by MapLibre. The track is a line layer of the map; markers are
@@ -22,6 +23,7 @@ class MapLibreMapView extends StatefulWidget {
     this.layerOptions,
     this.layerChoice = const MapLayerChoice(),
     this.layerSheet,
+    this.onSearch,
   });
 
   final MapContent content;
@@ -39,6 +41,10 @@ class MapLibreMapView extends StatefulWidget {
   /// Builds the sheets for choosing layers and looks; null hides the fields.
   final Widget Function(BuildContext context, MapSheetPart part)? layerSheet;
 
+  /// Looks for places by name near a point; null hides the search.
+  final Future<List<FoundPlace>> Function(String query, GeoPoint near)?
+  onSearch;
+
   @override
   State<MapLibreMapView> createState() => _MapLibreMapViewState();
 }
@@ -51,6 +57,38 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
   MapLibreMapController? _controller;
   bool _styleLoaded = false;
   Map<String, math.Point<double>> _positions = const {};
+
+  /// The place chosen in the search, marked with a pin.
+  GeoPoint? _found;
+
+  /// Opens the search and moves the map to the chosen place.
+  Future<void> _search() async {
+    final onSearch = widget.onSearch;
+    final controller = _controller;
+    if (onSearch == null || controller == null) return;
+    final center = controller.cameraPosition?.target ?? _fallback;
+    final place = await showModalBottomSheet<FoundPlace>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => PlaceSearchSheet(
+        search: (query) =>
+            onSearch(query, GeoPoint(center.latitude, center.longitude)),
+      ),
+    );
+    if (place == null || !mounted) return;
+    setState(() => _found = GeoPoint(place.lat, place.lon));
+    // Towns from further away, a summit or a hut from close by.
+    final zoom = switch (place.kind) {
+      'city' || 'town' => 12.0,
+      'village' => 13.0,
+      _ => 14.0,
+    };
+    await controller.animateCamera(
+      CameraUpdate.newLatLngZoom(LatLng(place.lat, place.lon), zoom),
+    );
+    await _updatePositions();
+  }
 
   /// The view is fitted to the content once, not after every change of style.
   bool _fitted = false;
@@ -396,13 +434,16 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
     final controller = _controller;
     if (controller == null || !_styleLoaded || !mounted) return;
     final highlight = widget.content.highlight;
+    final found = _found;
     final ids = [
       for (final marker in widget.content.markers) marker.id,
       if (highlight != null) '_highlight',
+      if (found != null) '_found',
     ];
     final points = [
       for (final marker in widget.content.markers) _latLng(marker.position),
       if (highlight != null) _latLng(highlight),
+      if (found != null) _latLng(found),
     ];
     if (points.isEmpty) {
       if (_positions.isNotEmpty) setState(() => _positions = const {});
@@ -538,6 +579,19 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
             },
           ),
           ..._overlay(),
+          if (_positions['_found'] case final pin?)
+            Positioned(
+              left: pin.x - 16,
+              top: pin.y - 30,
+              child: const IgnorePointer(
+                child: Icon(
+                  Icons.location_on,
+                  size: 32,
+                  color: Color(0xFF1565C0),
+                  shadows: [Shadow(blurRadius: 3, color: Colors.white)],
+                ),
+              ),
+            ),
           if (widget.content.interactive &&
               (widget.layerSheet != null || widget.content.controls.isNotEmpty))
             Positioned(
@@ -546,6 +600,7 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
               // The compass of the map sits in the right corner.
               right: 56,
               child: _MapFields(
+                onSearch: widget.onSearch == null ? null : _search,
                 fields: [
                   if (widget.layerSheet case final sheet?) ...[
                     MapControl(
@@ -615,9 +670,12 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
 
 /// The fields at the top edge of the map; each opens a sheet.
 class _MapFields extends StatelessWidget {
-  const _MapFields({required this.fields});
+  const _MapFields({required this.fields, this.onSearch});
 
   final List<MapControl> fields;
+
+  /// Opens the search for places; null: no search.
+  final VoidCallback? onSearch;
 
   @override
   Widget build(BuildContext context) {
@@ -626,6 +684,21 @@ class _MapFields extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
+          if (onSearch != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: Material(
+                color: scheme.surface,
+                shape: const CircleBorder(),
+                elevation: 2,
+                child: IconButton(
+                  tooltip: AppLocalizations.of(context).mapSearch,
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.search),
+                  onPressed: onSearch,
+                ),
+              ),
+            ),
           for (final field in fields)
             Padding(
               padding: const EdgeInsets.only(right: 6),
