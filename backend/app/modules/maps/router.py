@@ -117,6 +117,7 @@ def read_tile(
 # --- The own map: vector tiles built from OpenStreetMap data ---
 
 FONTS = FilePath(__file__).parent / "fonts"
+SPRITES = FilePath(__file__).parent / "sprite"
 GLYPH_RANGE = r"^\d{1,5}-\d{1,5}$"
 
 
@@ -150,6 +151,7 @@ def read_style(
     return build_style(
         tile_url=f"{base}/vector/{{z}}/{{x}}/{{y}}.pbf",
         glyph_url=f"{base}/fonts/{{fontstack}}/{{range}}.pbf",
+        sprite_url=f"{base}/sprite",
         attribution=VECTOR_ATTRIBUTION,
         max_zoom=vectors.max_zoom(),
         terrain_url=(
@@ -376,6 +378,34 @@ def read_radar_tile(
     return Response(
         data, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"}
     )
+
+
+def _sprite(double: bool, kind: str) -> Response:
+    file = SPRITES / f"sprite{'@2x' if double else ''}.{kind}"
+    if not file.is_file():
+        raise NotFoundError("No symbols")
+    return Response(
+        file.read_bytes(),
+        media_type="image/png" if kind == "png" else "application/json",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+_SPRITE_RESPONSES = {200: {"content": {"image/png": {}, "application/json": {}}}, 404: {}}
+SpriteKind = Annotated[str, Path(pattern=r"^(json|png)$")]
+
+
+@router.get("/sprite.{kind}", response_class=Response, responses=_SPRITE_RESPONSES)
+def read_sprite(kind: SpriteKind):
+    """The symbols of the map (summit, saddle, hut …) as one image (`png`) and the list
+    of their places in it (`json`). No login."""
+    return _sprite(False, kind)
+
+
+@router.get("/sprite@{ratio}x.{kind}", response_class=Response, responses=_SPRITE_RESPONSES)
+def read_sprite_scaled(ratio: Annotated[int, Path(ge=2, le=3)], kind: SpriteKind):
+    """The symbols in double resolution; screens that ask for the triple one get it too."""
+    return _sprite(True, kind)
 
 
 @router.get(

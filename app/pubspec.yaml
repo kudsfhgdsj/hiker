@@ -91,6 +91,8 @@ flutter:
     - assets/fonts/noto-sans-italic/
     # The 3D view: MapLibre GL JS (BSD-3-Clause), the same files the web frontend serves.
     - assets/map3d/
+    # The symbols of the map (summit, saddle, hut …), the same files the server has.
+    - assets/sprite/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

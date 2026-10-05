@@ -7,6 +7,22 @@ import 'package:hiker/core/map/tile_proxy.dart';
 import '../../helpers.dart';
 
 void main() {
+  test('the app carries the same map symbols as the server', () {
+    const server = '../backend/app/modules/maps/sprite';
+    for (final name in [
+      'sprite.json',
+      'sprite.png',
+      'sprite@2x.json',
+      'sprite@2x.png',
+    ]) {
+      expect(
+        File('assets/sprite/$name').readAsBytesSync(),
+        File('$server/$name').readAsBytesSync(),
+        reason: name,
+      );
+    }
+  });
+
   test('the app carries the same map library as the web frontend', () {
     const web = '../web/hiker_web/static/vendor/maplibre-gl';
     for (final name in [
@@ -34,6 +50,10 @@ void main() {
       final container = createContainer(
         api: FakeApi(),
         overrides: [
+          bundledSpriteProvider.overrideWithValue((name) async {
+            final file = File('assets/sprite/$name');
+            return file.existsSync() ? file.readAsBytesSync() : null;
+          }),
           bundledPageProvider.overrideWithValue((name) async {
             final file = File('assets/map3d/$name');
             return file.existsSync() ? file.readAsBytesSync() : null;
@@ -63,6 +83,22 @@ void main() {
       expect((await get('/3d/view.js')).$3, 'text/javascript');
       expect((await get('/3d/maplibre-gl.css')).$3, 'text/css');
       expect((await get('/3d/maplibre-gl-csp.js')).$1, 200);
+
+      // The symbols of the map come from the app too; triple resolution gets
+      // the double one.
+      final symbols = await get('/sprite.json');
+      expect(symbols.$1, 200);
+      expect((jsonDecode(symbols.$2) as Map).keys, contains('saddle'));
+      final image = await (await client.getUrl(
+        Uri.parse('http://127.0.0.1:$port/sprite@3x.png'),
+      )).close();
+      expect(image.statusCode, 200);
+      expect(image.headers.contentType?.mimeType, 'image/png');
+      expect(
+        await image.expand((chunk) => chunk).toList(),
+        File('assets/sprite/sprite@2x.png').readAsBytesSync(),
+      );
+      expect((await get('/sprite@9x.png')).$1, 404);
 
       // Nothing to show yet, nothing outside the folder, no other files.
       expect((await get('/3d/scene.json')).$1, 404);

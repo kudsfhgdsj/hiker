@@ -1,0 +1,51 @@
+{
+ "peak": {
+  "x": 0,
+  "y": 0,
+  "width": 22,
+  "height": 22,
+  "pixelRatio": 1
+ },
+ "saddle": {
+  "x": 22,
+  "y": 0,
+  "width": 22,
+  "height": 22,
+  "pixelRatio": 1
+ },
+ "hut": {
+  "x": 44,
+  "y": 0,
+  "width": 22,
+  "height": 22,
+  "pixelRatio": 1
+ },
+ "shelter": {
+  "x": 66,
+  "y": 0,
+  "width": 22,
+  "height": 22,
+  "pixelRatio": 1
+ },
+ "viewpoint": {
+  "x": 88,
+  "y": 0,
+  "width": 22,
+  "height": 22,
+  "pixelRatio": 1
+ },
+ "parking": {
+  "x": 110,
+  "y": 0,
+  "width": 22,
+  "height": 22,
+  "pixelRatio": 1
+ },
+ "cable-car": {
+  "x": 132,
+  "y": 0,
+  "width": 22,
+  "height": 22,
+  "pixelRatio": 1
+ }
+}

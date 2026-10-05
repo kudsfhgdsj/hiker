@@ -487,3 +487,58 @@ def test_path_data_tiles_follow_the_built_maps(tmp_path):
     write_map(tmp_path / "bayern.mbtiles", bounds="8.98,47.23,14.09,50.57")
     (tmp_path / "broken.mbtiles").write_text("not a map")
     assert tiles_of_maps(tmp_path) == ["E10_N45", "E10_N50", "E5_N45", "E5_N50"]
+
+
+# --- Symbols ---
+
+
+def test_symbols_are_served_and_used_by_the_topo_look(client, maps):
+    import io
+
+    from PIL import Image
+
+    from app.modules.maps.sprites import SIZE, SYMBOLS, build
+
+    write_map(maps / "switzerland.mbtiles")
+    style = client.get("/api/v1/maps/style.json").json()
+    assert style["sprite"] == "http://testserver/api/v1/maps/sprite"
+
+    index = client.get("/api/v1/maps/sprite.json").json()
+    assert (
+        set(index)
+        == set(SYMBOLS)
+        == {
+            "peak",
+            "saddle",
+            "hut",
+            "shelter",
+            "viewpoint",
+            "parking",
+            "cable-car",
+        }
+    )
+    sheet = Image.open(io.BytesIO(client.get("/api/v1/maps/sprite.png").content))
+    assert sheet.size == (SIZE * len(SYMBOLS), SIZE)
+    assert index["hut"] == {"x": 2 * SIZE, "y": 0, "width": SIZE, "height": SIZE, "pixelRatio": 1}
+    # Double resolution, also for screens that ask for the triple one.
+    double = client.get("/api/v1/maps/sprite@2x.json").json()
+    assert double["hut"]["width"] == 2 * SIZE and double["hut"]["pixelRatio"] == 2
+    big = Image.open(io.BytesIO(client.get("/api/v1/maps/sprite@3x.png").content))
+    assert big.size == (2 * SIZE * len(SYMBOLS), 2 * SIZE)
+    assert client.get("/api/v1/maps/sprite@9x.png").status_code == 422
+    # The files in the repository are what the drawing code produces.
+    assert build(1)[1] == index and build(2)[1] == double
+    assert build(1)[0].size == sheet.size
+
+    layers = {layer["id"]: layer for layer in style["layers"]}
+    topo = next(base for base in style["metadata"]["hiker"]["bases"] if base["id"] == "topo")
+    # Triangle or saddle sign instead of the dot, signs for huts and other places.
+    assert {"topo-peak", "topo-poi"} <= set(topo["show"]) and {"peak", "hut"} <= set(topo["hide"])
+    assert layers["topo-peak"]["layout"]["icon-image"][2:] == ["saddle", "peak"]
+    assert layers["topo-peak"]["layout"]["visibility"] == "none"
+    used = {v for v in layers["topo-poi"]["layout"]["icon-image"] if isinstance(v, str)}
+    assert used - {"case"} <= set(SYMBOLS)
+
+    # Without symbols the look keeps the dots.
+    plain = build_style("t", "g", "©", 14)
+    assert "sprite" not in plain and "topo-peak" not in {layer["id"] for layer in plain["layers"]}

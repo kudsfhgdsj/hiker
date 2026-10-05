@@ -244,3 +244,20 @@ def test_search_is_passed_on_and_offered_by_the_map(user, fake_api):
     # Too short for the API: no results instead of an error.
     fake_api.route("GET", "/maps/search", lambda r: httpx2.Response(422, json={}))
     assert user.get("/map/search?q=s").get_json() == []
+
+
+def test_symbols_of_the_map_come_from_this_server(browser, fake_api):
+    fake_api.route("GET", "/maps/info", {"style_url": "https://api.example/x", "tile_url": "t"})
+    fake_api.route(
+        "GET", "/maps/style.json", STYLE | {"sprite": "https://api.example/api/v1/maps/sprite"}
+    )
+    image = httpx2.Response(200, content=b"png", headers={"content-type": "image/png"})
+    fake_api.route("GET", "/maps/sprite@2x.png", lambda r: image)
+    fake_api.route("GET", "/maps/sprite.json", {"peak": {"x": 0}})
+
+    assert browser.get("/map/style.json").get_json()["sprite"] == "http://localhost/map/sprite"
+    assert browser.get("/map/sprite.json").get_json() == {"peak": {"x": 0}}
+    double = browser.get("/map/sprite@2x.png")
+    assert double.data == b"png" and double.mimetype == "image/png"
+    assert browser.get("/map/sprite@9x.png").status_code == 404
+    assert browser.get("/map/sprite.exe").status_code == 404

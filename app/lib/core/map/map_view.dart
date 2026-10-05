@@ -193,6 +193,7 @@ final mapStyleProvider = FutureProvider<String?>((ref) async {
           },
         },
       'glyphs': '$local/fonts/{fontstack}/{range}.pbf',
+      if (style.containsKey('sprite')) 'sprite': '$local/sprite',
       'sources': {
         for (final entry in (style['sources'] as Map<String, dynamic>).entries)
           entry.key: {

@@ -198,6 +198,8 @@ def create_app(config: dict | None = None) -> Flask:
         style = api().request("GET", "/maps/style.json", auth=False).json()
         root = request.url_root.rstrip("/")
         style["glyphs"] = f"{root}/map/fonts/{{fontstack}}/{{range}}.pbf"
+        if "sprite" in style:
+            style["sprite"] = f"{root}/map/sprite"
 
         # Everything the style loads from the API's maps module comes from here instead.
         def own(address: str) -> str:
@@ -217,6 +219,12 @@ def create_app(config: dict | None = None) -> Flask:
         response = app.json.response(style)
         response.headers["Cache-Control"] = "public, max-age=300"
         return response
+
+    @app.get("/map/sprite<any('', '@2x', '@3x'):ratio>.<any(json, png):kind>")
+    def map_sprite(ratio, kind):
+        """The symbols of the map: one image and the list of their places in it."""
+        upstream = api().request("GET", f"/maps/sprite{ratio}.{kind}", auth=False)
+        return _passed_on(upstream, "image/png" if kind == "png" else "application/json")
 
     @app.get("/map/vector/<int:z>/<int:x>/<int:y>.pbf")
     def map_vector_tile(z, x, y):

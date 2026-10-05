@@ -23,6 +23,7 @@ import 'map_regions.dart';
 /// - `/raster/{layer}/{z}/{x}/{y}` and `/slope/{z}/{x}/{y}.png`: elevation,
 ///   aerial images, snow, precipitation and the slope layer of the user's
 ///   server, and `/avalanche.geojson`, the avalanche danger of today,
+/// - `/sprite.json`, `/sprite.png` (and `@2x`): the symbols of the map,
 /// - `/3d/…`: the page of the 3D view with its map library and what it shows,
 /// - `/radar/frames` and `/radar/{kind}/{time}/{z}/{x}/{y}.png`: rain radar
 ///   and cloud images with their times.
@@ -77,6 +78,7 @@ class TileProxy extends Notifier<int?> {
     'css': 'text/css',
     'json': 'application/json',
   };
+  static final _sprite = RegExp(r'^/sprite(@[23]x)?\.(json|png)$');
   static final _page = RegExp(r'^/3d/([a-z0-9-]+)\.(html|js|css|json)$');
 
   /// The port it listens on, or null while it is not running.
@@ -284,6 +286,27 @@ class TileProxy extends Notifier<int?> {
         response.add(body);
         return;
       }
+      if (_sprite.firstMatch(path) case final sprite?) {
+        // The symbols of the map come with the app, like its fonts: single
+        // resolution or double (also for screens that ask for the triple one).
+        final name = 'sprite${sprite[1] == null ? '' : '@2x'}.${sprite[2]}';
+        final bundled = await ref.read(bundledSpriteProvider)(name);
+        if (bundled != null) {
+          response.statusCode = HttpStatus.ok;
+          response.headers.contentType = sprite[2] == 'png'
+              ? _png
+              : ContentType.json;
+          response.add(bundled);
+          return;
+        }
+        await _fromServer(
+          response,
+          apiPath: '/api/v1/maps/$name',
+          cacheName: 'sprite/$name',
+          type: sprite[2] == 'png' ? _png : ContentType.json,
+        );
+        return;
+      }
       final raster = _raster.firstMatch(path);
       final vector = _vector.firstMatch(path);
       final glyphs = _glyphs.firstMatch(path);
@@ -460,6 +483,23 @@ final bundledGlyphsProvider = Provider<BundledGlyphs>(
     }
   },
 );
+
+/// Reads a file of the map's symbols that comes with the app
+/// (`assets/sprite/`); null if there is none of that name.
+final bundledSpriteProvider =
+    Provider<Future<List<int>?> Function(String name)>(
+      (ref) => (name) async {
+        try {
+          final data = await rootBundle.load('assets/sprite/$name');
+          return data.buffer.asUint8List(
+            data.offsetInBytes,
+            data.lengthInBytes,
+          );
+        } on Object {
+          return null;
+        }
+      },
+    );
 
 /// Reads a file of the 3D view that comes with the app (`assets/map3d/`);
 /// null if there is none of that name.
