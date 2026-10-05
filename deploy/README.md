@@ -283,3 +283,16 @@ bisher beim Ansehen und bleiben danach im Kachel-Zwischenspeicher.
 Dazu der API mehr als einen Prozess und Kern geben (`.env`): `API_WORKERS=3`, `API_CPUS=3`,
 `API_MEMORY=1g`. Die Zugriffsbegrenzung zählt je Prozess (siehe `.env.example`).
 
+## Feinere Höhendaten für ein Gebiet
+
+```sh
+deploy/build-terrain.sh austria      # BEV-Geländemodell 5 m, CC BY 4.0
+```
+
+Lädt das Geländemodell (Österreich: eine Datei mit knapp 19 GB nach
+`DATA_DIR/maps/build/sources`), schneidet es in Höhenkacheln bis Zoom 14 und rechnet
+Hangneigung und Höhenlinien daraus (`DATA_DIR/maps/austria.hires.sqlite`, 5 bis 7 GB). Die
+API nimmt diese Kacheln vor den groben weltweiten und nennt die Quelle in der Karte. Die
+heruntergeladene Datei wird danach nicht mehr gebraucht. Weitere Gebiete brauchen einen
+Eintrag mit Quelle und Lizenz im Skript; geprüfte Quellen stehen in `DESIGN.md`.
+
