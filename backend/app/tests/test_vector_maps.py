@@ -453,3 +453,17 @@ def test_search_prefers_the_nearer_place_and_knows_border_places_once(tmp_path):
         here = (lakes[name]["lat"], lakes[name]["lon"])
         assert [place["name"] for place in search(indexes, "ee", near=here)] == [name, other]
     assert search(indexes + [tmp_path / "missing.sqlite"], "santis")
+
+
+def test_path_data_tiles_follow_the_built_maps(tmp_path):
+    from app.modules.maps.coverage import tiles_for, tiles_of_maps
+
+    # Switzerland lies in two tiles of 5° x 5°; northern Bavaria reaches into the next row.
+    assert tiles_for((5.95, 45.82, 10.5, 47.81)) == {"E5_N45", "E10_N45"}
+    assert tiles_for((8.98, 47.23, 14.09, 50.57)) == {"E5_N45", "E10_N45", "E5_N50", "E10_N50"}
+    assert tiles_for((-1.5, -0.5, 0.5, 0.5)) == {"W5_S5", "W5_N0", "E0_S5", "E0_N0"}
+
+    write_map(tmp_path / "switzerland.mbtiles", bounds="5.95,45.82,10.5,47.81")
+    write_map(tmp_path / "bayern.mbtiles", bounds="8.98,47.23,14.09,50.57")
+    (tmp_path / "broken.mbtiles").write_text("not a map")
+    assert tiles_of_maps(tmp_path) == ["E10_N45", "E10_N50", "E5_N45", "E5_N50"]

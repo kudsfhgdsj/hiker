@@ -149,7 +149,7 @@ deploy/build-map.sh alps                 # der Alpenbogen; MAP_BUILD_MEMORY=6g i
 Der Bau läuft als einmaliger Container (Planetiler), lädt den OSM-Auszug des Gebiets und
 beim ersten Mal rund 1,5 GB Hilfsdaten und legt `DATA_DIR/maps/<gebiet>.mbtiles` ab. Die API
 liefert die Karte sofort aus, ein Neustart ist nicht nötig. Schweiz: rund 350 MB, gut fünf
-Minuten bei 3 GB RAM. Ein monatlicher Aufruf (cron) hält die Karte aktuell. Mehrere Gebiete
+Minuten bei 3 GB RAM. `deploy/update-maps.sh` hält alle Karten aktuell (siehe unten). Mehrere Gebiete
 ergänzen sich; an ihren Grenzen kann eine Kachel nur aus einem der Gebiete stammen, deshalb
 ist ein zusammenhängendes Gebiet (z. B. `alps`) besser als viele kleine.
 
@@ -163,7 +163,7 @@ ihn lassen sich nur Luftlinien planen.
 1. Wegdaten holen (Standard: Alpenraum, rund 1 GB; einzelne Kacheln als Argument):
 
    ```sh
-   deploy/brouter-segments.sh            # E5_N45 E10_N45 E15_N45 E5_N40 E10_N40
+   deploy/brouter-segments.sh            # Alpenraum und alles, was die gebauten Karten abdecken
    deploy/brouter-segments.sh E5_N45     # nur Schweiz, Westösterreich, Süddeutschland
    ```
 
@@ -245,3 +245,21 @@ Beim nächsten Login richtet er den Faktor neu ein.
 - Logs: `docker compose logs -f api web`
 - Grenzen je Container: `db` und `api` 1 CPU / 512 MB, `web` 0,5 CPU / 256 MB (im Leerlauf
   brauchen sie zusammen etwa 200 MB).
+
+## Karten und Wegdaten aktuell halten
+
+`deploy/update-maps.sh` baut jedes vorhandene Kartengebiet neu (Karte, Suchindex,
+Ebenen-Paket) und holt geänderte Wegdaten; danach startet es BRouter neu. Die alte Karte
+bleibt in Betrieb, bis die neue fertig ist. Scheitert ein Gebiet, bleibt seine alte Karte,
+die übrigen werden trotzdem gebaut, und das Skript endet mit Fehlercode. Zwei Läufe zugleich
+verhindert eine Sperre (`DATA_DIR/maps/.update.lock`).
+
+Monatlich per cron, als der Benutzer, dem der Stack gehört (`crontab -e`):
+
+```
+15 2 1 * *  /opt/hiker/deploy/update-maps.sh >> /var/log/hiker-maps.log 2>&1
+```
+
+Je Gebiet dauert es 15 bis 30 Minuten und braucht rund 3 GB freien Arbeitsspeicher;
+`MAP_LAYERS=0` lässt die Ebenen-Pakete aus (Höhendaten ändern sich kaum). Die App bietet
+ein Gebiet erneut zum Laden an, wenn die Datei auf dem Server neuer ist.

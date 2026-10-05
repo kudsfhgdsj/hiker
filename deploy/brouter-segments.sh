@@ -3,7 +3,7 @@
 # brouter.de nach DATA_DIR/brouter/segments. Ein erneuter Aufruf lädt nur, was sich seit dem
 # letzten Mal geändert hat; die Daten werden dort etwa wöchentlich neu gebaut.
 #
-#   deploy/brouter-segments.sh                 # Alpenraum (Standard)
+#   deploy/brouter-segments.sh                 # Alpenraum und alle gebauten Karten
 #   deploy/brouter-segments.sh E5_N45 E10_N45  # einzelne Kacheln
 #
 # Eine Kachel heißt nach ihrer südwestlichen Ecke: E5_N45 reicht von 5° bis 10° Ost und von
@@ -16,8 +16,15 @@ DATA_DIR="${DATA_DIR:-./data}"
 TARGET="$DATA_DIR/brouter/segments"
 SOURCE="${BROUTER_SEGMENTS_URL:-https://brouter.de/brouter/segments4}"
 
-# Alpenraum: Schweiz, Österreich, Süddeutschland, Norditalien, Slowenien, französische Alpen.
-[ "$#" -gt 0 ] || set -- E5_N45 E10_N45 E15_N45 E5_N40 E10_N40
+# Ohne Angabe: der Alpenraum (Schweiz, Österreich, Süddeutschland, Norditalien, Slowenien,
+# französische Alpen) und dazu alles, was die gebauten Karten unter DATA_DIR/maps abdecken.
+# So gibt es überall dort Wegführung, wo es auch eine Karte gibt.
+if [ "$#" -eq 0 ]; then
+  covered="$(docker compose --profile mapbuild run --rm --build --entrypoint python mapsearch \
+    -m app.modules.maps.coverage /data 2>/dev/null | tail -n 1 || true)"
+  # shellcheck disable=SC2086
+  set -- $(printf '%s\n' E5_N45 E10_N45 E15_N45 E5_N40 E10_N40 $covered | sort -u)
+fi
 
 mkdir -p "$TARGET"
 for tile in "$@"; do
@@ -30,9 +37,9 @@ for tile in "$@"; do
   # -z: nur laden, wenn die Datei auf dem Server neuer ist; erst nach vollständigem
   # Download ersetzen, damit BRouter nie eine halbe Datei sieht.
   if [ -f "$file" ]; then
-    curl -fL --retry 3 -z "$file" -o "$file.part" "$SOURCE/$tile.rd5"
+    curl -fL --retry 3 --no-progress-meter -z "$file" -o "$file.part" "$SOURCE/$tile.rd5"
   else
-    curl -fL --retry 3 -o "$file.part" "$SOURCE/$tile.rd5"
+    curl -fL --retry 3 --no-progress-meter -o "$file.part" "$SOURCE/$tile.rd5"
   fi
   if [ -s "$file.part" ]; then
     mv "$file.part" "$file"
