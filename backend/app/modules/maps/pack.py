@@ -132,6 +132,7 @@ def _fetcher() -> Callable[[int, int, int], bytes | None]:
 # --- The deeper pack for the server ---
 
 SERVER_SUFFIX = ".server.sqlite"
+HIRES_SUFFIX = ".hires.sqlite"
 SERVER_MAX_ZOOM = 13
 # Deepest levels the server ever serves (see layers.py and contours.py).
 _SLOPE_LIMIT = 14
@@ -253,14 +254,33 @@ def _derived_tiles(job: tuple[int, int, int, bytes, bool, bool]) -> list[tuple]:
     return made
 
 
+def derived_path(pack: Path) -> Path:
+    """Where the slope and contour tiles of an elevation pack go: a file of their own
+    next to it, which the server reads like any pack."""
+    stem = pack.name.removesuffix(HIRES_SUFFIX)
+    return pack.with_name(f"{stem}.derived{HIRES_SUFFIX}")
+
+
 def derive(pack: Path, *, workers: int = 3, report: Callable[[str], None] = print) -> int:
-    """Computes slope and contour tiles from the elevation tiles a pack already holds
-    (e.g. a fine elevation model cut by deploy/terrain/build_terrain.py) and writes them
-    into the same pack. What is there already is not made again. Returns how many
-    elevation tiles were worked on."""
-    db = sqlite3.connect(pack)
+    """Computes slope and contour tiles from the elevation tiles of a pack (e.g. a fine
+    elevation model cut by deploy/terrain/build_terrain.py).
+
+    They are written into a file of their own (`<region>.derived.hires.sqlite`), not into
+    the pack: the server reads the pack while this runs, and a file that is being written
+    would keep it waiting. What is there already is not made again; an interrupted run
+    goes on where it stopped. Returns how many elevation tiles were worked on.
+    """
+    out = derived_path(pack)
+    part = out.with_name(out.name + ".part")
+    target = out if out.is_file() else part
+    source = sqlite3.connect(f"file:{pack}?mode=ro", uri=True)
+    db = sqlite3.connect(target)
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS layer_tiles (layer TEXT, z INTEGER, x INTEGER, y INTEGER,"
+        " data BLOB, PRIMARY KEY (layer, z, x, y)) WITHOUT ROWID"
+    )
     exists = "SELECT 1 FROM layer_tiles WHERE layer = ? AND z = ? AND x = ? AND y = ?"
-    wanted = db.execute(
+    wanted = source.execute(
         "SELECT z, x, y FROM layer_tiles WHERE layer = 'terrain' AND z >= ? AND z <= ?",
         (min(SLOPE_ZOOMS.start, CONTOUR_ZOOMS.start), _SLOPE_LIMIT),
     ).fetchall()
@@ -272,7 +292,7 @@ def derive(pack: Path, *, workers: int = 3, report: Callable[[str], None] = prin
             slope = slope and not db.execute(exists, ("slope", z, x, y)).fetchone()
             contours = contours and not db.execute(exists, ("contours", z, x, y)).fetchone()
             if slope or contours:
-                (terrain,) = db.execute(
+                (terrain,) = source.execute(
                     "SELECT data FROM layer_tiles"
                     " WHERE layer = 'terrain' AND z = ? AND x = ? AND y = ?",
                     (z, x, y),
@@ -305,6 +325,9 @@ def derive(pack: Path, *, workers: int = 3, report: Callable[[str], None] = prin
                 flush()
     finally:
         db.close()
+        source.close()
+    if target != out:
+        part.replace(out)
     return done
 
 
