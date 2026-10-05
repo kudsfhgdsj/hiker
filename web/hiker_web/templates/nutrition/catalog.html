@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "macros.html" import csrf %}
+{% block title %}{{ t('gear.catalog') }} – {{ t('app.title') }}{% endblock %}
+{% macro entry_text(entry) %}
+<a class="grow" href="{{ url_for('nutrition.food_edit', food_id=entry.id) }}"><strong>{{ entry.name }}</strong><br>
+  <span class="meta">{{ [entry.brand, entry.barcode]|select|join(' · ') }}</span></a>
+{% endmacro %}
+{% block content %}
+<h1>{{ t('gear.catalog') }}</h1>
+{% if is_admin %}
+<h2>{{ t('catalog.pending_list') }}</h2>
+<ul class="list">
+  {% for entry in pending %}
+  <li>{{ entry_text(entry) }}
+    <form method="post" action="{{ url_for('nutrition.catalog_decide', catalog_id=entry.id, decision='catalog') }}" class="inline">{{ csrf() }}<button class="primary">{{ t('catalog.approve') }}</button></form>
+    <form method="post" action="{{ url_for('nutrition.catalog_decide', catalog_id=entry.id, decision='catalog_rejected') }}" class="inline">{{ csrf() }}<button>{{ t('catalog.reject') }}</button></form></li>
+  {% else %}<li>{{ t('catalog.none') }}</li>{% endfor %}
+</ul>
+{% endif %}
+<h2>{{ t('catalog.mine') }}</h2>
+<ul class="list">
+  {% for entry in mine %}
+  <li>{{ entry_text(entry) }}<span class="chip">{{ t('catalog.status.' ~ entry.visibility) }}</span></li>
+  {% else %}<li>{{ t('catalog.none') }}</li>{% endfor %}
+</ul>
+<p><a href="{{ url_for('nutrition.food_list') }}">{{ t('action.back') }}</a></p>
+{% endblock %}

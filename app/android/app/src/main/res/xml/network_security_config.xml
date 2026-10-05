@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Self-hosted servers often use an own certificate authority. Besides the
+     authorities of the system, those the user installed on the device are trusted
+     (Settings > Security > Install a certificate). Plain HTTP stays forbidden. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+    <!-- Only to the app itself: it hands map tiles to the map (TileProxy). -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

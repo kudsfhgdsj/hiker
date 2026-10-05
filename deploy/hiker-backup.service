@@ -1,0 +1,13 @@
+# /etc/systemd/system/hiker-backup.service – Pfad zum Repository anpassen.
+[Unit]
+Description=hiker backup (database dump and files)
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=BACKUP_DIR=/var/backups/hiker
+Environment=KEEP_DAYS=14
+ExecStart=/opt/hiker/deploy/backup.sh
+Nice=10
+IOSchedulingClass=idle

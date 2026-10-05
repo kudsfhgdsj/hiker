@@ -1,0 +1,90 @@
+{# Building blocks shared by the tour page and the public page. #}
+
+{% macro map_block(tour, map_data) %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/maplibre-gl/maplibre-gl.css') }}">
+<div id="map" role="img" aria-label="{{ t('tour.track') }}"></div>
+{% if tour.track_source != 'none' %}
+<h3>{{ t('tour.profile') }}</h3>
+<div id="profile-box">
+  <svg id="profile" tabindex="0" role="img" aria-label="{{ t('tour.profile') }}"></svg>
+  <div id="profile-tip"></div>
+</div>
+<p class="meta">{{ t('tour.profile.hint') }}</p>
+{% endif %}
+<dialog id="photo-dialog"><form method="dialog"><button class="link" aria-label="{{ t('action.cancel') }}">✕</button></form>
+  <img alt=""><p class="meta"></p></dialog>
+<script type="application/json" id="tour-data">{{ map_data|tojson }}</script>
+<script src="{{ url_for('static', filename='vendor/maplibre-gl/maplibre-gl-csp.js') }}" defer></script>
+<script src="{{ url_for('static', filename='tour.js') }}" defer></script>
+{% endmacro %}
+
+{% macro track_facts(stats) %}
+{% if stats %}
+<dt>{{ t('tour.distance') }}</dt><dd>{{ stats.distance_m|distance }}</dd>
+<dt>{{ t('tour.ascent') }}</dt><dd>{{ stats.ascent_m|meters }}</dd>
+<dt>{{ t('tour.descent') }}</dt><dd>{{ stats.descent_m|meters }}</dd>
+<dt>{{ t('tour.highest') }}</dt><dd>{{ stats.max_elevation_m|meters }}</dd>
+<dt>{{ t('tour.lowest') }}</dt><dd>{{ stats.min_elevation_m|meters }}</dd>
+{% if stats.moving_time_s %}<dt>{{ t('tour.moving_time') }}</dt><dd>{{ (stats.moving_time_s // 60)|duration }}</dd>{% endif %}
+{% endif %}
+{% endmacro %}
+
+{% macro burned(value, source) %}
+{% if value is not none %}{{ t('tour.kcal', value=value|number) }}
+{% if source == 'estimated' %}<span class="chip estimate">{{ t('tour.estimated') }}</span>{% endif %}{% else %}–{% endif %}
+{% endmacro %}
+
+{% macro gear_table(rows) %}
+<table>
+  <thead><tr><th>{{ t('common.name') }}</th><th class="num">{{ t('tour.quantity') }}</th><th class="num">{{ t('gear.weight') }}</th><th>{{ t('tour.carried') }}</th></tr></thead>
+  <tbody>
+    {% for row in rows %}
+    <tr><td>{{ row.name }}{% if row.brand %} <span class="meta">{{ row.brand }}</span>{% endif %}</td>
+      <td class="num">{{ row.quantity }}</td>
+      <td class="num">{{ (row.weight_g * row.quantity)|weight if row.weight_g is not none else '–' }}</td>
+      <td>{{ t('value.true' if row.carried else 'value.false') }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endmacro %}
+
+{% macro food_table(rows) %}
+<table>
+  <thead><tr><th>{{ t('common.name') }}</th><th class="num">{{ t('tour.amount') }}</th><th class="num">kcal</th><th>{{ t('tour.carried') }}</th><th>{{ t('tour.eaten') }}</th></tr></thead>
+  <tbody>
+    {% for row in rows %}
+    <tr><td>{{ row.name }}</td><td class="num">{{ row.amount_g|number }}</td><td class="num">{{ row.kcal|number }}</td>
+      <td>{{ t('value.true' if row.carried else 'value.false') }}</td><td>{{ t('value.true' if row.eaten else 'value.false') }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endmacro %}
+
+{% macro weather_table(rows) %}
+<table>
+  <thead><tr><th>{{ t('tour.place') }}</th><th>{{ t('tour.time') }}</th><th class="num">{{ t('tour.weather_temperature') }}</th><th class="num">{{ t('tour.weather_wind') }}</th>
+    <th class="num">{{ t('tour.weather_precipitation') }}</th><th class="num">{{ t('tour.weather_clouds') }}</th><th class="num">{{ t('tour.weather_freezing') }}</th></tr></thead>
+  <tbody>
+    {% for row in rows %}
+    <tr><td>{{ t('tour.weather_point.' ~ row.sample_point) }}{% if row.elevation_m is not none %} <span class="meta">{{ row.elevation_m|meters }}</span>{% endif %}</td>
+      <td><time datetime="{{ row.time }}" class="local-time">{{ row.time|datetime }}</time></td>
+      <td class="num">{% if row.temperature_c is not none %}{{ row.temperature_c|number(1) }} °C{% else %}–{% endif %}</td>
+      <td class="num">{% if row.wind_speed_kmh is not none %}{{ row.wind_speed_kmh|number }}{% if row.wind_gusts_kmh is not none %} ({{ row.wind_gusts_kmh|number }}){% endif %} km/h{% else %}–{% endif %}</td>
+      <td class="num">{% if row.precipitation_mm is not none %}{{ row.precipitation_mm|number(1) }} mm{% else %}–{% endif %}</td>
+      <td class="num">{% if row.cloud_cover_pct is not none %}{{ row.cloud_cover_pct|number }} %{% else %}–{% endif %}</td>
+      <td class="num">{{ row.freezing_level_m|meters }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p class="meta">{{ t('tour.weather_source') }}</p>
+{% endmacro %}
+
+{% macro peak_list(rows) %}
+<ul class="list">
+  {% for peak in rows %}
+  <li><span class="grow">{{ peak.name }}</span>
+    {% if peak.reached_at %}<time datetime="{{ peak.reached_at }}" class="local-time meta">{{ peak.reached_at|datetime }}</time>{% endif %}
+    <span>{{ peak.elevation_m|meters }}</span></li>
+  {% endfor %}
+</ul>
+{% endmacro %}

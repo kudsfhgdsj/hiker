@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% from "macros.html" import field, csrf %}
+{% block title %}{{ t('profile.title') }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<section class="narrow">
+  <h1>{{ t('profile.title') }}</h1>
+  <p><strong>{{ t('auth.signed_in_as', name=current_user.display_name) }}</strong><br>
+    {{ current_user.email }}{% if current_user.role == 'admin' %} · {{ t('auth.admin') }}{% endif %}</p>
+  <p>{{ t('profile.intro') }}</p>
+  <form method="post" class="stack">
+    {{ csrf() }}
+    {{ field('weight_kg', t('profile.weight'), profile.weight_kg, attrs='inputmode="decimal"') }}
+    {{ field('birth_year', t('profile.birth_year'), profile.birth_year, attrs='inputmode="numeric"') }}
+    <label class="field">
+      <span>{{ t('profile.sex') }}</span>
+      <select name="sex">
+        <option value="">{{ t('profile.sex.none') }}</option>
+        {% for value in sex_values %}
+        <option value="{{ value }}"{% if profile.sex == value %} selected{% endif %}>{{ t('profile.sex.' ~ value) }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {{ field('max_heart_rate', t('profile.max_heart_rate'), profile.max_heart_rate, attrs='inputmode="numeric"') }}
+    {{ field('resting_heart_rate', t('profile.resting_heart_rate'), profile.resting_heart_rate, attrs='inputmode="numeric"') }}
+    <button class="primary">{{ t('action.save') }}</button>
+  </form>
+
+  <h2>{{ t('auth.security') }}</h2>
+  <ul class="list">
+    {% if current_user.has_password %}
+    <li><a class="grow" href="{{ url_for('auth.password') }}">{{ t('auth.password_change') }}</a></li>
+    {% endif %}
+    <li><a class="grow" href="{{ url_for('auth.mfa_setup', new=1) }}">{{ t('mfa.renew' if current_user.mfa_enabled else 'mfa.title') }}</a>
+      <span class="chip{% if not current_user.mfa_enabled %} estimate{% endif %}">{{ t('admin.mfa_on' if current_user.mfa_enabled else 'admin.mfa_off') }}</span></li>
+  </ul>
+  {% if current_user.mfa_enabled %}
+  <form method="post" action="{{ url_for('auth.mfa_recovery_codes') }}" class="row">
+    {{ csrf() }}
+    {{ field('code', t('auth.code'), required=True, hint=t('mfa.recovery_new_hint'), attrs='autocomplete="one-time-code" inputmode="numeric" maxlength="8"') }}
+    <button>{{ t('mfa.recovery_new') }}</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

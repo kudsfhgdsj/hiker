@@ -1,0 +1,171 @@
+# Läuft neben anderen Diensten auf einem geteilten Server: keine Ports 80/443,
+# API und Web-Frontend sind nur über 127.0.0.1 erreichbar; der vorhandene Reverse Proxy
+# leitet /api/ an die API und alles andere an das Web-Frontend.
+# Konfiguration über .env (siehe .env.example).
+#
+# Alle Daten liegen als normale Dateien unter DATA_DIR (Standard ./data), nicht in
+# Docker-Volumes: db/ (PostgreSQL), files/ (Fotos, GPX), tiles/ (Kartenkacheln),
+# web-sessions/ (Anmeldungen des Web-Frontends), caddy/ (Zertifikate des Proxys).
+name: hiker
+
+# Kein Container läuft als root: alle Prozesse gehören HIKER_UID:HIKER_GID, haben keine
+# Linux-Capabilities, können keine neuen Rechte erlangen und ein schreibgeschütztes Dateisystem.
+x-unprivileged: &unprivileged
+  user: "${HIKER_UID:-1000}:${HIKER_GID:-1000}"
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  # Legt die Datenordner an. Läuft wie alle Dienste als HIKER_UID, nie als root; DATA_DIR selbst
+  # muss deshalb vorhanden sein und diesem Benutzer gehören (./data ist im Repository angelegt).
+  init:
+    image: postgres:17-alpine
+    restart: "no"
+    <<: *unprivileged
+    entrypoint:
+      - sh
+      - -c
+      - |
+        if ! mkdir -p /data/db /data/files /data/tiles /data/web-sessions /data/caddy; then
+          echo "DATA_DIR muss existieren und dem Benutzer $$(id -u):$$(id -g) gehören." >&2
+          exit 1
+        fi
+        chmod 700 /data/db /data/web-sessions
+    volumes:
+      - ${DATA_DIR:-./data}:/data
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    <<: *unprivileged
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    tmpfs:
+      - /var/run/postgresql
+      - /tmp
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hiker}
+      POSTGRES_USER: ${POSTGRES_USER:-hiker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD fehlt in .env}
+    volumes:
+      - ${DATA_DIR:-./data}/db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    cpus: 1.0
+    mem_limit: 512m
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    <<: *unprivileged
+    tmpfs:
+      - /tmp
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-hiker}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hiker}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY fehlt in .env}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?PUBLIC_BASE_URL fehlt in .env}
+      ENABLED_MODULES: ${ENABLED_MODULES:-auth,gear,nutrition,protocols,sync,maps}
+      REGISTRATION_MODE: ${REGISTRATION_MODE:-open}
+      MFA_REQUIRED: ${MFA_REQUIRED:-true}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_NAME: ${OIDC_NAME:-SSO}
+      OIDC_SCOPES: ${OIDC_SCOPES:-openid email profile}
+      OIDC_REQUIRE_VERIFIED_EMAIL: ${OIDC_REQUIRE_VERIFIED_EMAIL:-true}
+      STORAGE_PATH: /data/files
+      TILE_CACHE_PATH: /data/tiles
+      TILE_CACHE_DAYS: ${TILE_CACHE_DAYS:-14}
+      TILE_CACHE_MAX_MB: ${TILE_CACHE_MAX_MB:-2000}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-15}
+    volumes:
+      - ${DATA_DIR:-./data}/files:/data/files
+      - ${DATA_DIR:-./data}/tiles:/data/tiles
+    ports:
+      - "127.0.0.1:${API_PORT:-8010}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    cpus: 1.0
+    mem_limit: 512m
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    <<: *unprivileged
+    tmpfs:
+      - /tmp
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      api:
+        condition: service_healthy
+    environment:
+      WEB_SECRET_KEY: ${WEB_SECRET_KEY:?WEB_SECRET_KEY fehlt in .env}
+      API_BASE_URL: http://api:8000
+      WEB_SESSION_DIR: /data/sessions
+      WEB_COOKIE_SECURE: ${WEB_COOKIE_SECURE:-true}
+      WEB_SESSION_DAYS: ${REFRESH_TOKEN_TTL_DAYS:-30}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-15}
+      # Leer = Kacheln vom eigenen Server (Modul maps der API).
+      MAP_TILE_URL: ${MAP_TILE_URL:-}
+    volumes:
+      - ${DATA_DIR:-./data}/web-sessions:/data/sessions
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8011}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    cpus: 0.5
+    mem_limit: 256m
+
+  # Reverse Proxy mit selbst ausgestelltem Zertifikat. Nur mit dem Profil "proxy" aktiv
+  # (COMPOSE_PROFILES=proxy in der .env), damit der Stack auf einem Server mit eigenem
+  # Proxy keine Ports belegt. Der Port ist einstellbar (HTTPS_PORT).
+  caddy:
+    image: caddy:2
+    profiles: ["proxy"]
+    restart: unless-stopped
+    <<: *unprivileged
+    # The Caddy binary is marked for binding low ports; without this one capability the
+    # kernel refuses to start it. Everything else stays dropped.
+    cap_add:
+      - NET_BIND_SERVICE
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      web:
+        condition: service_healthy
+    environment:
+      CADDY_SITES: ${CADDY_SITES:-localhost}
+      CADDY_DEFAULT_SNI: ${CADDY_DEFAULT_SNI:-localhost}
+      # Hier liegen die eigene Zertifizierungsstelle und die Zertifikate.
+      XDG_DATA_HOME: /data
+      XDG_CONFIG_HOME: /tmp/config
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${DATA_DIR:-./data}/caddy:/data
+    ports:
+      - "${HTTPS_BIND:-0.0.0.0}:${HTTPS_PORT:-443}:8443"
+    cpus: 0.5
+    mem_limit: 128m

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "macros.html" import csrf %}
+{% block title %}{{ t('gear.catalog') }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('gear.catalog') }}</h1>
+{% if is_admin %}
+<h2>{{ t('catalog.pending_list') }}</h2>
+<ul class="list">
+  {% for entry in pending %}
+  <li><span class="grow"><strong>{{ entry.name }}</strong><br><span class="meta">{{ [entry.brand, entry.nominal_weight_g|weight]|select|join(' · ') }}</span></span>
+    <form method="post" action="{{ url_for('gear.catalog_decide', catalog_id=entry.id, decision='approved') }}" class="inline">{{ csrf() }}<button class="primary">{{ t('catalog.approve') }}</button></form>
+    <form method="post" action="{{ url_for('gear.catalog_decide', catalog_id=entry.id, decision='rejected') }}" class="inline">{{ csrf() }}<button>{{ t('catalog.reject') }}</button></form></li>
+  {% else %}<li>{{ t('catalog.none') }}</li>{% endfor %}
+</ul>
+{% endif %}
+<h2>{{ t('catalog.mine') }}</h2>
+<ul class="list">
+  {% for entry in mine %}
+  <li><span class="grow"><strong>{{ entry.name }}</strong><br><span class="meta">{{ [entry.brand, entry.nominal_weight_g|weight]|select|join(' · ') }}</span></span>
+    <span class="chip">{{ t('catalog.status.' ~ entry.status) }}</span></li>
+  {% else %}<li>{{ t('catalog.none') }}</li>{% endfor %}
+</ul>
+<p><a href="{{ url_for('gear.item_list') }}">{{ t('action.back') }}</a></p>
+{% endblock %}

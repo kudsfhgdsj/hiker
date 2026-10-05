@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}{{ t('mfa.recovery_title') }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<section class="narrow">
+  <h1>{{ t('mfa.recovery_title') }}</h1>
+  <p>{{ t('mfa.recovery_intro') }}</p>
+  <ul class="codes">
+    {% for code in codes %}<li><code>{{ code }}</code></li>{% endfor %}
+  </ul>
+  <p class="flash">{{ t('mfa.recovery_once') }}</p>
+  <p><a class="button primary" href="{{ url_for('home') }}">{{ t('mfa.recovery_done') }}</a></p>
+</section>
+{% endblock %}

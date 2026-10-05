@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ t('nav.gear') }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>{{ t('nav.gear') }}</h1><span class="spacer"></span>
+  <a class="button" href="{{ url_for('gear.summary', **filters) }}">{{ t('gear.summary') }}</a>
+  <a class="button" href="{{ url_for('gear.packing_lists') }}">{{ t('gear.lists') }}</a>
+  <a class="button" href="{{ url_for('gear.manage') }}">{{ t('gear.manage') }}</a>
+  <a class="button" href="{{ url_for('gear.catalog') }}">{{ t('gear.catalog') }}</a>
+  <a class="button primary" href="{{ url_for('gear.item_new') }}">{{ t('gear.new') }}</a>
+</div>
+<form method="get" class="row card" role="search">
+  <label class="field"><span>{{ t('action.search') }}</span>
+    <input type="search" name="q" value="{{ filters.q }}" placeholder="{{ t('gear.search_hint') }}"></label>
+  <label class="field"><span>{{ t('gear.status') }}</span>
+    <select name="status">
+      <option value="">{{ t('common.all') }}</option>
+      {% for value in ('active', 'retired') %}
+      <option value="{{ value }}"{% if filters.status == value %} selected{% endif %}>{{ t('gear.status.' ~ value) }}</option>
+      {% endfor %}
+    </select></label>
+  <label class="field"><span>{{ t('gear.type') }}</span>
+    <select name="type_id">
+      <option value="">{{ t('common.all') }}</option>
+      {% for type in types %}
+      <option value="{{ type.id }}"{% if filters.type_id == type.id %} selected{% endif %}>{{ type.name }}</option>
+      {% endfor %}
+    </select></label>
+  {% if tags %}
+  <fieldset class="field"><legend class="meta">{{ t('gear.tags') }}</legend>
+    {% for tag in tags %}
+    <label><input type="checkbox" name="tag_id" value="{{ tag.id }}"{% if tag.id in filters.tag_id %} checked{% endif %}> {{ tag.name }}</label>
+    {% endfor %}
+  </fieldset>
+  {% endif %}
+  <label><input type="checkbox" name="favorite" value="1"{% if filters.favorite %} checked{% endif %}> {{ t('gear.only_favorites') }}</label>
+  <button>{{ t('action.search') }}</button>
+</form>
+{% if items %}
+<ul class="list">
+  {% for item in items %}
+  <li>
+    {% if item.image_file_id %}
+    <img class="thumb" src="{{ url_for('gear.item_image', item_id=item.id, v=item.image_file_id) }}" alt="">
+    {% else %}<span class="thumb" aria-hidden="true"></span>{% endif %}
+    <a class="grow" href="{{ url_for('gear.item_edit', item_id=item.id) }}">
+      <strong>{{ item.name }}</strong><br>
+      <span class="meta">{{ [item.brand, type_names.get(item.type_id)]|select|join(' · ') }}</span>
+    </a>
+    <span>{{ item.weight_g|weight }}</span>
+    <form method="post" action="{{ url_for('gear.item_favorite', item_id=item.id) }}" class="inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="back" value="{{ request.full_path }}">
+      <button class="star{% if item.favorite %} on{% endif %}" name="favorite" value="{{ '0' if item.favorite else '1' }}"
+        aria-pressed="{{ 'true' if item.favorite else 'false' }}" title="{{ t('gear.favorite') }}" aria-label="{{ t('gear.favorite') }}">{{ '★' if item.favorite else '☆' }}</button>
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p>{{ t('gear.empty') }}</p>
+{% endif %}
+{% endblock %}

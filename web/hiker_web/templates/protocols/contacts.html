@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "macros.html" import field, csrf, delete_form %}
+{% block title %}{{ t('contact.title') }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('contact.title') }}</h1>
+<p class="meta">{{ t('contact.intro') }}</p>
+<ul class="list">
+  {% for contact in contacts %}
+  <li><span class="grow">{{ contact.display_name }}
+      {% if contact.linked_user %}<span class="meta">{{ t('contact.linked', name=contact.linked_user.display_name or '?') }}</span>{% endif %}</span>
+    {{ delete_form(url_for('protocols.contact_delete', contact_id=contact.id)) }}</li>
+  {% else %}<li>{{ t('tour.no_contacts') }}</li>{% endfor %}
+</ul>
+<form method="post" class="row">
+  {{ csrf() }}
+  {{ field('display_name', t('contact.name'), required=True, attrs='maxlength="100"') }}
+  {{ field('email', t('contact.email'), type='email') }}
+  <button class="primary">{{ t('action.add') }}</button>
+</form>
+<p><a href="{{ url_for('protocols.tour_list') }}">{{ t('action.back') }}</a></p>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ t('nav.tours') }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>{{ t('nav.tours') }}</h1><span class="spacer"></span>
+  <a class="button" href="{{ url_for('protocols.contacts') }}">{{ t('tour.contacts') }}</a>
+  <a class="button primary" href="{{ url_for('protocols.tour_new') }}">{{ t('tour.new') }}</a>
+</div>
+<nav class="tabs">
+  {% for value in scopes %}
+  <a href="{{ url_for('protocols.tour_list', scope=value, q=query or none) }}"{% if scope == value %} aria-current="page"{% endif %}>{{ t('tour.scope.' ~ value) }}</a>
+  {% endfor %}
+</nav>
+<form method="get" class="row" role="search">
+  <input type="hidden" name="scope" value="{{ scope }}">
+  <label class="field"><span>{{ t('action.search') }}</span>
+    <input type="search" name="q" value="{{ query }}" placeholder="{{ t('tour.search_hint') }}"></label>
+  <button>{{ t('action.search') }}</button>
+</form>
+{% if tours %}
+<ul class="list">
+  {% for tour in tours %}
+  <li>
+    {% if tour.cover_photo_id %}
+    <img class="thumb" src="{{ url_for('protocols.photo_image', tour_id=tour.id, photo_id=tour.cover_photo_id, size='thumb') }}" alt="" loading="lazy">
+    {% else %}<span class="thumb" aria-hidden="true"></span>{% endif %}
+    <a class="grow" href="{{ url_for('protocols.tour_detail', tour_id=tour.id) }}">
+      <strong>{{ tour.title }}</strong><br>
+      <span class="meta">{{ ([tour.start_time|date] + tour.peaks)|select|join(' · ') }}</span>
+    </a>
+    {% if tour.permission != 'owner' %}
+    <span class="chip">{{ t('tour.by', name=tour.owner.display_name or '?') }} · {{ t('tour.permission.' ~ tour.permission) }}</span>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p>{{ t('tour.empty') }}</p>
+{% endif %}
+{% endblock %}

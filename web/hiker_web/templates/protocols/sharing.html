@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "macros.html" import field, csrf, delete_form %}
+{% block title %}{{ t('share.title') }} – {{ tour.title }}{% endblock %}
+{% macro permission_select(current) %}
+<select name="permission" aria-label="{{ t('share.permission') }}">
+  {% for value in ('read', 'edit') %}<option value="{{ value }}"{% if current == value %} selected{% endif %}>{{ t('share.permission.' ~ value) }}</option>{% endfor %}
+</select>
+{% endmacro %}
+{% block content %}
+<h1>{{ t('share.title') }}: {{ tour.title }}</h1>
+<h2>{{ t('share.users') }}</h2>
+<ul class="list">
+  {% for share in shares %}
+  <li><span class="grow">{{ share.user.display_name or '?' }}</span>
+    <form method="post" action="{{ url_for('protocols.share_update', tour_id=tour.id, user_id=share.user.id) }}" class="inline">{{ csrf() }}
+      {{ permission_select(share.permission) }} <button>{{ t('share.change') }}</button></form>
+    {{ delete_form(url_for('protocols.share_delete', tour_id=tour.id, user_id=share.user.id), t('share.remove')) }}</li>
+  {% else %}<li>{{ t('share.none') }}</li>{% endfor %}
+</ul>
+<form method="post" action="{{ url_for('protocols.share_create', tour_id=tour.id) }}" class="row">
+  {{ csrf() }}
+  {{ field('email', t('share.email'), type='email', required=True) }}
+  <label class="field"><span>{{ t('share.permission') }}</span>{{ permission_select('read') }}</label>
+  <button class="primary">{{ t('share.add') }}</button>
+</form>
+<p class="meta">{{ t('share.edit_hint') }} {{ t('share.health_note') }}</p>
+
+<h2>{{ t('link.title') }}</h2>
+<p class="meta">{{ t('link.intro') }}</p>
+<ul class="list">
+  {% for link in links %}
+  <li><span class="grow">
+      {% if link.active %}<input readonly value="{{ link.url }}" aria-label="{{ t('link.title') }}" class="select-on-focus">{% endif %}
+      <span class="meta">
+        <span class="chip">{{ t('link.active' if link.active else ('link.revoked' if link.revoked_at else 'link.expired')) }}</span>
+        {% if link.expires_at %}{{ t('link.expires_at', date=link.expires_at|date) }} · {% endif %}
+        {{ [t('link.hide_start') if link.hide_exact_start, t('link.strip_gps') if link.strip_photo_gps, t('link.health') if link.show_health_data]|select|join(' · ') }}
+      </span></span>
+    {% if link.active %}
+    <form method="post" action="{{ url_for('protocols.link_revoke', tour_id=tour.id, link_id=link.id) }}" class="inline" data-confirm="{{ t('link.revoke') }}?">{{ csrf() }}<button class="danger">{{ t('link.revoke') }}</button></form>
+    {% endif %}</li>
+  {% else %}<li>{{ t('link.none') }}</li>{% endfor %}
+</ul>
+<form method="post" action="{{ url_for('protocols.link_create', tour_id=tour.id) }}" class="stack narrow">
+  {{ csrf() }}
+  {{ field('expires', t('link.expires'), type='date') }}
+  <label><input type="checkbox" name="hide_exact_start"> {{ t('link.hide_start') }}</label>
+  <label><input type="checkbox" name="strip_photo_gps"> {{ t('link.strip_gps') }}</label>
+  <label><input type="checkbox" name="show_health_data"> {{ t('link.health') }}</label>
+  <button class="primary">{{ t('link.create') }}</button>
+</form>
+<p><a href="{{ url_for('protocols.tour_detail', tour_id=tour.id) }}">{{ t('action.back') }}</a></p>
+{% endblock %}

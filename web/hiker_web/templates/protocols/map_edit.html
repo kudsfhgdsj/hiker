@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% from "macros.html" import field, csrf, delete_form %}
+{% block title %}{{ t('map.title') }} – {{ tour.title }}{% endblock %}
+{% macro position(prefix, lat=None, lon=None, readonly=False) %}
+<div class="row position" data-position="{{ prefix }}">
+  {{ field(prefix ~ 'lat', t('map.lat'), lat, attrs='inputmode="decimal" required' ~ (' readonly' if readonly else '')) }}
+  {{ field(prefix ~ 'lon', t('map.lon'), lon, attrs='inputmode="decimal" required' ~ (' readonly' if readonly else '')) }}
+  {% if not readonly %}<button type="button" class="pick" hidden>{{ t('map.pick') }}</button>{% endif %}
+</div>
+{% endmacro %}
+{% block content %}
+<h1>{{ t('map.title') }}: {{ tour.title }}</h1>
+<p class="meta">{{ t('map.intro') }}</p>
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/maplibre-gl/maplibre-gl.css') }}">
+<div id="map" class="tall"></div>
+<p id="pick-hint" class="flash" hidden></p>
+<script type="application/json" id="tour-data">{{ map_data|tojson }}</script>
+<script type="application/json" id="map-texts">{{ {'pick': t('map.pick_hint'), 'draw': t('map.draw_hint')}|tojson }}</script>
+<script src="{{ url_for('static', filename='vendor/maplibre-gl/maplibre-gl-csp.js') }}" defer></script>
+<script src="{{ url_for('static', filename='map_edit.js') }}" defer></script>
+
+<section id="waypoints">
+  <h2>{{ t('map.waypoints') }}</h2>
+  <ul class="list">
+    {% for point in waypoints %}
+    <li><span class="chip">{{ t('tour.station.' ~ point.kind) }}</span><span class="grow">{{ point.name }}</span>
+      <span class="meta">{{ point.elevation_m|meters }}</span>
+      {{ delete_form(url_for('protocols.waypoint_delete', tour_id=tour.id, waypoint_id=point.id)) }}</li>
+    {% endfor %}
+  </ul>
+  <form method="post" action="{{ url_for('protocols.waypoint_create', tour_id=tour.id) }}" class="stack card">
+    {{ csrf() }}
+    <h3 style="margin-top:0">{{ t('map.waypoint_new') }}</h3>
+    {{ field('name', t('common.name'), required=True, attrs='maxlength="200"') }}
+    {{ field('description', t('gear.description')) }}
+    {{ position('') }}
+    <button class="primary">{{ t('action.add') }}</button>
+  </form>
+</section>
+
+{% if photos %}
+<section id="photos">
+  <h2>{{ t('map.photo_positions') }}</h2>
+  <p class="meta">{{ t('map.photo_hint') }}</p>
+  {% for photo in photos %}
+  <form method="post" action="{{ url_for('protocols.photo_position', tour_id=tour.id, photo_id=photo.id) }}" class="row card">
+    {{ csrf() }}
+    <img class="thumb" src="{{ url_for('protocols.photo_image', tour_id=tour.id, photo_id=photo.id, size='thumb') }}" alt="{{ photo.caption or t('tour.photos') }}" loading="lazy">
+    <span class="meta">{{ photo.caption or '' }} {{ t('tour.photo_position.' ~ photo.position_source) }}</span>
+    {{ position('', photo.lat, photo.lon) }}
+    <button>{{ t('action.save') }}</button>
+    {% if photo.position_source == 'manual' %}<button name="auto" value="1" formnovalidate>{{ t('map.photo_auto') }}</button>{% endif %}
+  </form>
+  {% endfor %}
+</section>
+{% endif %}
+
+{% if is_owner %}
+<section id="points">
+  <h2>{{ t('map.points') }}</h2>
+  {% set fixed = tour.points_source == 'gpx' %}
+  {% if fixed %}<p class="meta">{{ t('map.points_from_track') }}</p>{% endif %}
+  <form method="post" action="{{ url_for('protocols.points_set', tour_id=tour.id) }}" class="stack card">
+    {{ csrf() }}
+    {% for prefix, label, point in (('start', t('tour.start'), tour.start_point), ('end', t('tour.end'), tour.end_point)) %}
+    <fieldset class="stack"><legend>{{ label }}</legend>
+      {{ field(prefix ~ '_name', t('common.name'), point.name if point else None, attrs='maxlength="200"') }}
+      <div class="row position" data-position="{{ prefix }}_">
+        {{ field(prefix ~ '_lat', t('map.lat'), point.lat if point else None, attrs='inputmode="decimal"' ~ (' readonly' if fixed else '')) }}
+        {{ field(prefix ~ '_lon', t('map.lon'), point.lon if point else None, attrs='inputmode="decimal"' ~ (' readonly' if fixed else '')) }}
+        {% if not fixed %}<button type="button" class="pick" hidden>{{ t('map.pick') }}</button>{% endif %}
+      </div>
+    </fieldset>
+    {% endfor %}
+    <button class="primary">{{ t('action.save') }}</button>
+  </form>
+</section>
+
+<section id="draw">
+  <h2>{{ t('map.draw') }}</h2>
+  <p class="meta">{{ t('map.draw_intro') }}{% if tour.track_source != 'none' %} <strong>{{ t('map.draw_replaces') }}</strong>{% endif %}</p>
+  <form method="post" action="{{ url_for('protocols.track_drawn', tour_id=tour.id) }}" class="stack card"{% if tour.track_source != 'none' %} data-confirm="{{ t('map.draw_replaces') }}"{% endif %}>
+    {{ csrf() }}
+    <label class="field"><span>{{ t('map.draw_points') }}</span>
+      <textarea name="points" id="draw-points" rows="5" required placeholder="47.2490, 9.3430"></textarea></label>
+    <div class="toolbar">
+      <button type="button" id="draw-start" hidden>{{ t('map.draw_start') }}</button>
+      <button type="button" id="draw-undo" hidden>{{ t('map.draw_undo') }}</button>
+      <button class="primary">{{ t('map.draw_save') }}</button>
+    </div>
+  </form>
+</section>
+
+<section id="weather">
+  <h2>{{ t('map.weather_point') }}</h2>
+  <form method="post" action="{{ url_for('protocols.weather_fetch', tour_id=tour.id) }}" class="stack card">
+    {{ csrf() }}
+    {{ position('') }}
+    <input type="hidden" name="time" id="weather_time" value="{{ tour.start_time or '' }}">
+    <label class="field"><span>{{ t('tour.time') }}</span><input type="datetime-local" data-utc-target="weather_time" required></label>
+    <button class="primary">{{ t('tour.weather_fetch') }}</button>
+  </form>
+</section>
+{% endif %}
+<p><a href="{{ url_for('protocols.tour_detail', tour_id=tour.id) }}">{{ t('action.back') }}</a></p>
+{% endblock %}

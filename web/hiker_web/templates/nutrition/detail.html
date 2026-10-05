@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "macros.html" import csrf %}
+{% block title %}{{ food.name }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<section class="narrow">
+  <h1>{{ food.name }}</h1>
+  <p class="meta">{{ [food.brand, food.barcode]|select|join(' · ') }}
+    <span class="chip">{{ t('catalog.status.' ~ food.visibility) }}</span></p>
+  <dl class="facts">
+    <dt>{{ t('food.kcal') }}</dt><dd>{{ food.kcal_per_100g|number if food.kcal_per_100g is not none else '–' }}</dd>
+    {% for name in ('protein', 'fat', 'carbs', 'sugar', 'salt') %}
+    {% set value = food[name ~ '_g'] %}
+    <dt>{{ t('food.' ~ name) }}</dt><dd>{{ value|number(1) if value is not none else '–' }}</dd>
+    {% endfor %}
+    <dt>{{ t('food.serving') }}</dt><dd>{{ food.serving_size_g|number if food.serving_size_g is not none else '–' }}</dd>
+  </dl>
+  {% include "nutrition/_source.html" %}
+  <form method="post" action="{{ url_for('nutrition.food_copy', food_id=food.id) }}">{{ csrf() }}
+    <button class="primary"{% if food.kcal_per_100g is none %} disabled title="{{ t('food.copy_needs_kcal') }}"{% endif %}>{{ t('food.copy') }}</button></form>
+  <p class="meta">{{ t('food.copy_hint') }}</p>
+  <p><a href="{{ url_for('nutrition.food_list') }}">{{ t('action.back') }}</a></p>
+</section>
+{% endblock %}

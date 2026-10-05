@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "macros.html" import field, csrf %}
+{% block title %}{{ t('auth.register' if register else 'auth.login') }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<section class="narrow">
+  <h1>{{ t('auth.register' if register else 'auth.login') }}</h1>
+  <form method="post" class="stack">
+    {{ csrf() }}
+    {{ field('email', t('auth.email'), request.form.get('email'), type='email', required=True, attrs='autocomplete="email"') }}
+    {% if register %}
+    {{ field('display_name', t('auth.display_name'), request.form.get('display_name'), required=True, attrs='autocomplete="name" maxlength="100"') }}
+    {{ field('password', t('auth.password'), type='password', required=True, hint=t('auth.password_hint'), attrs='autocomplete="new-password" minlength="8" maxlength="128"') }}
+    {{ field('password_repeat', t('auth.password_repeat'), type='password', required=True, attrs='autocomplete="new-password" minlength="8" maxlength="128"') }}
+    {% else %}
+    {{ field('password', t('auth.password'), type='password', required=True, attrs='autocomplete="current-password"') }}
+    {% endif %}
+    <button class="primary">{{ t('auth.register' if register else 'auth.login') }}</button>
+  </form>
+  {% if sso.enabled %}
+  <p><a class="button" href="{{ url_for('auth.sso_start') }}">{{ t('auth.sso', name=sso.name) }}</a></p>
+  {% endif %}
+  <p><a href="{{ url_for('auth.login' if register else 'auth.register') }}">{{ t('auth.to_login' if register else 'auth.to_register') }}</a></p>
+</section>
+{% endblock %}

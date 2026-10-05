@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "macros.html" import csrf %}
+{% import "protocols/_parts.html" as parts %}
+{% block title %}{{ t('history.version', version=revision.version) }} – {{ tour.title }}{% endblock %}
+{% macro shown(value) %}{% if value is none or value == '' %}{{ t('value.none') }}{% elif value is boolean %}{{ t('value.true' if value else 'value.false') }}{% else %}{{ value }}{% endif %}{% endmacro %}
+{% block content %}
+<h1>{{ t('history.version', version=revision.version) }}: {{ revision.snapshot.title }}</h1>
+<p class="meta">{{ t('history.kind.' ~ revision.kind) }} · {{ revision.author.display_name if revision.author else t('history.unknown_author') }} ·
+  <time datetime="{{ revision.created_at }}" class="local-time">{{ revision.created_at|datetime }}</time></p>
+
+<h2>{{ t('history.changes') }}</h2>
+{% if revision.diff %}
+<table>
+  <tbody>
+    {% for name, change in revision.diff.items() %}
+    <tr><th scope="row">{{ label(name) }}</th>
+      <td>
+        {% if change.old is defined or change.new is defined %}
+        <del>{{ shown(change.old) }}</del> → <ins>{{ shown(change.new) }}</ins>
+        {% else %}
+        {% for entry in change.added %}<div><span class="chip">{{ t('history.added') }}</span> {{ entry.name or entry.caption or '' }}</div>{% endfor %}
+        {% for entry in change.removed %}<div><span class="chip">{{ t('history.removed') }}</span> {{ entry.name or entry.caption or '' }}</div>{% endfor %}
+        {% for entry in change.changed %}
+        <div><span class="chip">{{ t('history.changed') }}</span> {{ entry.name or '' }}:
+          {% for key, values in entry.changes.items() %}{{ label(key) }} <del>{{ shown(values.old) }}</del> → <ins>{{ shown(values.new) }}</ins>{% if not loop.last %}; {% endif %}{% endfor %}</div>
+        {% endfor %}
+        {% if change.reordered %}<div><span class="chip">{{ t('history.reordered') }}</span></div>{% endif %}
+        {% endif %}
+      </td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}<p>{{ t('history.no_changes') }}</p>{% endif %}
+
+{% set snapshot = revision.snapshot %}
+{% if snapshot.summary %}<h2>{{ t('tour.summary') }}</h2><p style="white-space:pre-line">{{ snapshot.summary }}</p>{% endif %}
+{% if snapshot.peaks %}<h2>{{ t('tour.peaks') }}</h2>{{ parts.peak_list(snapshot.peaks) }}{% endif %}
+{% if snapshot.gear %}<h2>{{ t('tour.gear') }}</h2>{{ parts.gear_table(snapshot.gear) }}{% endif %}
+{% if snapshot.food %}<h2>{{ t('tour.food') }}</h2>{{ parts.food_table(snapshot.food) }}{% endif %}
+
+{% if tour.permission in ('owner', 'edit') and revision.version != tour.version %}
+<form method="post" action="{{ url_for('protocols.restore', tour_id=tour.id, version=revision.version) }}">
+  {{ csrf() }}<button class="primary">{{ t('history.restore') }}</button>
+  <p class="meta">{{ t('history.restore_hint') }}</p>
+</form>
+{% endif %}
+<p><a href="{{ url_for('protocols.history', tour_id=tour.id) }}">{{ t('action.back') }}</a></p>
+{% endblock %}

@@ -1,20 +1,22 @@
-# hikr – Projektregeln für Claude Code
+# hiker – Projektregeln für Claude Code
 
 Lies zuerst `DESIGN.md`. Sie ist die verbindliche Grundlage für Architektur, Datenmodell, API und Phasenplan.
 
 ## Projekt in Kürze
-Android-App (Flutter) mit späterer Web-Version und eigenem Backend (FastAPI + PostgreSQL), selbst gehostet unter `hiker.xy.com` auf Ubuntu 26.04. Module: auth, gear, nutrition, protocols (jetzt); planning, reports (später). Aktuell gilt Phase 1 aus `DESIGN.md`.
+Android-App (Flutter, nur Android), Web-Frontend (Python Flask) und eigenes Backend (FastAPI + PostgreSQL), selbst gehostet unter `hiker.lacasa.internal` (vorläufig, wird später auf die endgültige Domain umgestellt) auf Ubuntu 26.04. Module: auth, gear, nutrition, protocols, sync, maps (jetzt); planning, reports (später). Aktuell gilt Phase 1 aus `DESIGN.md`.
 
 ## Sprache
-- UI-Texte und Dokumentation: Deutsch (UI-Texte über ARB-Dateien).
+- UI-Texte und Dokumentation: Deutsch (App: ARB-Dateien; Web-Frontend: eine Übersetzungsdatei, keine Texte verstreut in den Vorlagen).
 - Code, Bezeichner, Commit-Nachrichten, API-Felder: Englisch.
 
 ## Architektur
 - Modulgrenzen einhalten: Core importiert keine Module. Ein Modul nutzt ein anderes nur über deklarierte `depends_on`-Einträge und dessen öffentliche Service-Schnittstelle oder über IDs. Keine Zyklen. `protocols` darf `gear` und `nutrition` nutzen, nie umgekehrt.
 - Jedes Modul hat `register(app)` und `MODULE_INFO`; Aktivierung über `ENABLED_MODULES`.
 - API-first, Version `/api/v1` beibehalten; Änderungen müssen in OpenAPI sichtbar sein.
-- Local-first im Client (Drift), Sync über `/sync/*`.
-- Externe Dienste (Open-Meteo, Open-Meteo-Elevation, Open Food Facts, Dateispeicher, später hikr.org) nur über Adapter-Interfaces ansprechen.
+- Local-first in der Android-App (Drift), Sync über `/sync/*`.
+- Flutter wird nur für Android gebaut; keine Web-Plattform und kein web-spezifischer Code im Flutter-Projekt.
+- Das Web-Frontend (Flask, `web/`) spricht ausschließlich mit der REST-API, nie direkt mit Datenbank oder Dateispeicher, und enthält keine eigene Fachlogik. Tokens bleiben serverseitig in der Sitzung; Formulare sind gegen CSRF geschützt. JavaScript-Bibliotheken werden vom eigenen Server ausgeliefert, nicht von einem CDN.
+- Externe Dienste (Open-Meteo, Open-Meteo-Elevation, Open Food Facts, OpenStreetMap/Overpass, Kartenkacheln, Dateispeicher, später hikr.org) nur über Adapter-Interfaces ansprechen.
 - Datenbankänderungen nur über Alembic-Migrationen.
 - Konfiguration über Umgebungsvariablen; keine Geheimnisse oder feste Domains im Code (`PUBLIC_BASE_URL`).
 
@@ -22,7 +24,8 @@ Android-App (Flutter) mit späterer Web-Version und eigenem Backend (FastAPI + P
 - Keine Google-Dienste oder -SDKs: Firebase, Google Maps, FCM, Google Sign-In, ML Kit. Barcode-Scan mit ZXing (`flutter_zxing`); vor dem Einsatz Pflegezustand des Pakets prüfen.
 - Neue Abhängigkeiten nur mit kurzer Begründung; Lizenz muss Open Source sein.
 - wanderer (open-wanderer/wanderer, AGPLv3) ist nur UX-Vorbild für die Foto- und Wegpunktdarstellung. Keinen Code, keine Texte, keine Grafiken übernehmen.
-- Open-Food-Facts-Daten stehen unter ODbL: Quelle in der App nennen.
+- Open-Food-Facts- und OpenStreetMap-Daten stehen unter ODbL: Quelle in der App nennen.
+- An OpenStreetMap (Overpass) geht nur der Kartenausschnitt einer Tour, nie der Track selbst.
 
 ## Fachliche Regeln
 - Jede Änderung an einer Tour erzeugt eine `tour_revision`; Historie nie überschreiben oder verkürzen. Wiederherstellen erzeugt eine neue Revision.
@@ -38,13 +41,19 @@ Android-App (Flutter) mit späterer Web-Version und eigenem Backend (FastAPI + P
 - Fotos: EXIF lesen, dem Track zuordnen (GPS, sonst Zeit mit einstellbarem Versatz), Position korrigierbar halten; Uploads prüfen und neu kodieren; EXIF-GPS bei öffentlichen Links optional entfernen.
 - Gemeinsame Kataloge (Ausrüstung, Lebensmittel): nur Produktdaten teilen, keine persönlichen Felder (Kaufpreis, Kaufdatum, Notizen); Freigabe durch `admin`; Kopie statt Verweis bei Übernahme.
 - Gesundheitsdaten (Herzfrequenz, Profil) nur für Owner sichtbar, in Freigaben und Links abschaltbar.
+- Anmeldung: Passwortregeln nach BSI (`auth/passwords.py`), zweiter Faktor (TOTP) Pflicht, optional SSO über OIDC. Ob eine Sitzung vollständig ist, prüft allein die Dependency `CurrentUser`; nur die Endpunkte zum Einrichten des zweiten Faktors und zum Passwortwechsel nutzen `SignedIn`.
+- Ausrüstung: Preise immer in EUR; Favorit ist der feste Tag `favorite`; Zusatzfelder je Art der Kategorie stehen in `gear/attributes.py` und gespiegelt in der App (`gearKinds`).
 
 ## Qualität
 - Backend: pytest-Tests für jede Änderung, vor allem Rechteprüfung, Historie, GPX-Auswertung, Foto-Zuordnung und Kalorienschätzung.
 - Flutter: Unit-Tests für Repositories und Provider, Widget-Tests für zentrale Screens.
+- Web-Frontend: pytest mit dem Flask-Testclient für Seiten, Formulare und Rechte; die API wird in den Tests ersetzt.
 - Kleine, abgeschlossene Schritte entlang des Phasenplans; nach jedem Schritt muss alles starten und alle Tests laufen.
 - Bei Unklarheiten oder wenn `DESIGN.md` widersprüchlich ist: kurz nachfragen, statt zu raten. Neue Entscheidungen in `DESIGN.md` nachtragen.
 
 ## Betrieb
-- Der Stack läuft auf einem bereits genutzten Server. Keine festen Ports 80/443 im Docker-Compose-Stack; API nur auf `127.0.0.1`. Proxy-Beispiele und Backup-Skripte liegen in `deploy/`.
+- Der Stack läuft auf einem bereits genutzten Server und belegt von sich aus keine Ports 80/443; API und Web-Frontend nur auf `127.0.0.1`. Der mitgelieferte Reverse Proxy (Caddy mit eigener CA) ist ein abschaltbares Compose-Profil (`proxy`) mit einstellbarem Port. Proxy-Beispiele für einen vorhandenen Proxy und Backup-Skripte liegen in `deploy/`.
 - Container-Ressourcen begrenzen.
+- Kein Container läuft als root: Dienste laufen als `HIKER_UID`, ohne Capabilities, mit schreibgeschütztem Dateisystem.
+- Daten liegen als normale Ordner unter `DATA_DIR` (Bind-Mounts), nicht in Docker-Volumes.
+- Kartenkacheln kommen vom eigenen Server (Modul `maps`): beim ersten Ansehen geholt, als Datei gespeichert, frühestens nach 7 Tagen neu geprüft. Nie Kacheln auf Vorrat herunterladen (Nutzungsbedingungen von OpenStreetMap).

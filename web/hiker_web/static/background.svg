@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" preserveAspectRatio="xMidYMax slice">
+  <!-- A mountain in the manner of the Matterhorn, drawn for hiker in flat grey shapes.
+       Black and white with low opacity, so it works on light and dark pages. -->
+  <g fill="#808890">
+    <!-- far ranges -->
+    <path fill-opacity=".07" d="M0 600V455l95-70 70 45 85-80 95 95 60-40 115 195z"/>
+    <path fill-opacity=".07" d="M760 600l110-175 75 55 95-105 80 85 80-50v190z"/>
+    <!-- the peak -->
+    <path fill-opacity=".13" d="M300 600l150-205 55-45 45-110 40-55 30-80 24-22 26 34 22 78 44 92 52 60 78 122 104 131z"/>
+    <!-- its shaded east face -->
+    <path fill-opacity=".10" d="M644 83l26 34 22 78 44 92 52 60 78 122 104 131H690l-30-190-22-120z"/>
+    <!-- foreground -->
+    <path fill-opacity=".09" d="M0 600v-70l140-45 150 50 170-60 180 75 160-55 190 60 210-50v155z"/>
+  </g>
+  <g fill="#ffffff" fill-opacity=".16">
+    <!-- snow on the summit and the shoulder -->
+    <path d="M644 83l-24 22-18 48 22-14 14 20 16-24 16 18z"/>
+    <path d="M550 240l-18 44 26-12 20 26 14-36z"/>
+    <path d="M736 287l-6 34 26-8 32 34z"/>
+  </g>
+</svg>

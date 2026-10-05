@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% import "protocols/_parts.html" as parts %}
+{% block title %}{{ tour.title }} – {{ t('app.title') }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block content %}
+<h1>{{ tour.title }}</h1>
+<p class="meta">{{ t('tour.public_note') }}{% if tour.owner_name %} · {{ t('tour.by', name=tour.owner_name) }}{% endif %}</p>
+{% if tour.summary %}<p style="white-space:pre-line">{{ tour.summary }}</p>{% endif %}
+
+<section class="card">
+  <h2 style="margin-top:0">{{ t('tour.facts') }}</h2>
+  <dl class="facts">
+    {% if tour.start_time %}<dt>{{ t('tour.start_time') }}</dt><dd><time datetime="{{ tour.start_time }}" class="local-time">{{ tour.start_time|datetime }}</time></dd>{% endif %}
+    {% if tour.end_time %}<dt>{{ t('tour.end_time') }}</dt><dd><time datetime="{{ tour.end_time }}" class="local-time">{{ tour.end_time|datetime }}</time></dd>{% endif %}
+    <dt>{{ t('tour.duration') }}</dt><dd>{{ tour.duration_minutes|duration }}</dd>
+    {{ parts.track_facts(tour.track_stats) }}
+    {% if tour.pack_weight_start_g is not none %}<dt>{{ t('tour.pack_weight') }}</dt><dd>{{ tour.pack_weight_start_g|weight }}</dd>{% endif %}
+    {% if tour.food %}<dt>{{ t('tour.calories_eaten') }}</dt><dd>{{ t('tour.kcal', value=tour.calories_eaten|number) }}</dd>{% endif %}
+    {# Health data: only there if the owner enabled it for this link. #}
+    {% if tour.calories_burned is not none %}<dt>{{ t('tour.calories_burned') }}</dt><dd>{{ parts.burned(tour.calories_burned, tour.calories_burned_source) }}</dd>{% endif %}
+    {% if tour.track_stats and tour.track_stats.heart_rate %}
+    <dt>{{ t('tour.heart_rate') }}</dt><dd>{{ t('tour.heart_rate_value', avg=tour.track_stats.heart_rate.avg, max=tour.track_stats.heart_rate.max) }}</dd>
+    {% endif %}
+  </dl>
+  {% if (tour.start_point and tour.start_point.approximate) or (tour.end_point and tour.end_point.approximate) %}
+  <p class="meta">{{ t('tour.start') }} / {{ t('tour.end') }}: {{ t('tour.approximate') }}</p>
+  {% endif %}
+</section>
+
+{% if tour.track_source != 'none' or tour.start_point or tour.photos or tour.waypoints %}
+<section><h2>{{ t('tour.track') }}</h2>{{ parts.map_block(tour, map_data) }}</section>
+{% endif %}
+
+{% if tour.photos %}
+<section><h2>{{ t('tour.photos') }}</h2>
+  <div class="photo-grid">
+    {% for photo in tour.photos %}
+    <figure><a href="{{ url_for('public.photo', token=token, index=photo.index, size='full') }}" class="photo-link" data-caption="{{ photo.caption or '' }}">
+        <img src="{{ url_for('public.photo', token=token, index=photo.index, size='thumb') }}" alt="{{ photo.caption or t('tour.photos') }}" loading="lazy"></a>
+      {% if photo.caption %}<figcaption class="meta">{{ photo.caption }}</figcaption>{% endif %}</figure>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if tour.waypoints %}
+<section><h2>{{ t('tour.course') }}</h2>
+  <ul class="list">
+    {% for point in tour.waypoints %}
+    <li><span class="chip">{{ t('tour.station.' ~ point.kind) }}</span><span class="grow">{{ point.name }}{% if point.description %}<br><span class="meta">{{ point.description }}</span>{% endif %}</span>
+      {% if point.reached_at %}<time datetime="{{ point.reached_at }}" class="local-time meta" data-format="time">{{ point.reached_at|time }}</time>{% endif %}
+      <span>{{ point.elevation_m|meters }}</span></li>
+    {% endfor %}
+  </ul>
+  {% if tour.waypoints|selectattr('source', 'equalto', 'osm')|list %}<p class="meta">© OpenStreetMap-Mitwirkende (ODbL)</p>{% endif %}
+</section>
+{% endif %}
+{% if tour.weather %}<section><h2>{{ t('tour.weather') }}</h2>{{ parts.weather_table(tour.weather) }}</section>{% endif %}
+{% if tour.peaks %}<section><h2>{{ t('tour.peaks') }}</h2>{{ parts.peak_list(tour.peaks) }}</section>{% endif %}
+{% if tour.partners %}<section><h2>{{ t('tour.partners') }}</h2><p>{% for name in tour.partners %}<span class="chip">{{ name }}</span> {% endfor %}</p></section>{% endif %}
+{% if tour.gear %}<section><h2>{{ t('tour.gear') }}</h2>{{ parts.gear_table(tour.gear) }}</section>{% endif %}
+{% if tour.food %}<section><h2>{{ t('tour.food') }}</h2>{{ parts.food_table(tour.food) }}</section>{% endif %}
+{% endblock %}

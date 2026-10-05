@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ t('gear.lists') }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>{{ t('gear.lists') }}</h1><span class="spacer"></span>
+  <a class="button primary" href="{{ url_for('gear.packing_list_new') }}">{{ t('gear.list_new') }}</a>
+</div>
+<p class="meta">{{ t('gear.lists_hint') }}</p>
+<ul class="list">
+  {% for gear_list in lists %}
+  <li><a class="grow" href="{{ url_for('gear.packing_list_edit', list_id=gear_list.id) }}">
+      <strong>{{ gear_list.name }}</strong><br>
+      <span class="meta">{{ t('gear.item_count', count=gear_list.entries|length) }}{% if gear_list.description %} · {{ gear_list.description }}{% endif %}</span></a>
+    <span>{{ gear_list.total_weight_g|weight }}</span></li>
+  {% else %}<li>{{ t('gear.lists_empty') }}</li>{% endfor %}
+</ul>
+<p><a href="{{ url_for('gear.item_list') }}">{{ t('action.back') }}</a></p>
+{% endblock %}
