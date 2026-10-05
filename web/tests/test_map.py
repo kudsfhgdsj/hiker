@@ -143,7 +143,12 @@ def test_pages_carry_the_texts_of_the_layer_control(user, fake_api):
     page = user.get("/routes/new").get_data(as_text=True)
 
     texts = plan_data(page)["layerTexts"]
-    assert texts["base"] == {"map": "Karte", "winter": "Winter", "satellite": "Luftbild"}
+    assert texts["base"] == {
+        "map": "Karte",
+        "winter": "Winter",
+        "topo": "Topo",
+        "satellite": "Luftbild",
+    }
     assert texts["overlay"]["slope"] == "Hangneigung" and "3D" in texts["terrain"]
     # The drop-down fields of the map: layers, looks, slope angles, a past day, the radar.
     assert texts["title"] == "Ebenen" and texts["looks"] == "Darstellung"
