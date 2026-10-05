@@ -10,8 +10,10 @@ themselves are not kept.
     mosaic_tiles.py --list https://…/files.csv --out /data/build/sources/switzerland-5m.tif --step 5
 
 `--list` is a text file or address with one address per line, or an address that
-answers with JSON `{"href": …}` pointing to such a list (swisstopo). The names must hold
-the kilometre of the south-west corner (`…_2501-1120_…`); the extent is taken from them.
+answers with JSON `{"href": …}` pointing to such a list (swisstopo). The addresses must
+hold the kilometre of the south-west corner (`…_2501-1120_…`); the extent is taken from
+them and from `--size-km`. The addresses may as well be requests to a coverage service
+(WCS) for one square each, with the corner in a parameter of no other meaning.
 
 Runs in the GDAL container like `build_terrain.py`. An interrupted run goes on where
 it stopped: next to the unfinished raster lies a list of the files already in it.
@@ -103,20 +105,22 @@ def main() -> None:
     parser.add_argument("--out", required=True)
     parser.add_argument("--step", type=float, required=True, help="grid width in metres")
     parser.add_argument("--srs", required=True)
-    parser.add_argument("--corner", default=r"_(\d{4})-(\d{4})_", help="kilometre of the south-west corner in a name")
+    parser.add_argument("--corner", default=r"_(\d{4})-(\d{4})_", help="kilometre of the south-west corner in an address")
+    parser.add_argument("--size-km", type=int, default=1, help="edge of one file in kilometres")
     parser.add_argument("--workers", type=int, default=6)
     arguments = parser.parse_args()
 
     addresses = read_list(arguments.list)
     print(f"{len(addresses)} files in the list", flush=True)
-    corners = [re.search(arguments.corner, os.path.basename(address)) for address in addresses]
+    corners = [re.search(arguments.corner, address) for address in addresses]
     if not all(corners):
-        sys.exit("a name in the list does not hold the corner of its file")
+        sys.exit("an address in the list does not hold the corner of its file")
     eastings = [int(corner.group(1)) * 1000 for corner in corners]
     northings = [int(corner.group(2)) * 1000 for corner in corners]
     step = arguments.step
-    west, east = min(eastings), max(eastings) + 1000
-    south, north = min(northings), max(northings) + 1000
+    edge = arguments.size_km * 1000
+    west, east = min(eastings), max(eastings) + edge
+    south, north = min(northings), max(northings) + edge
     width, height = round((east - west) / step), round((north - south) / step)
     print(f"raster: {width} x {height} cells of {step} m", flush=True)
 
@@ -163,9 +167,11 @@ def main() -> None:
                 failed.append(address)
             else:
                 column, row = round((left - west) / step), round((north - top) / step)
-                inside = 0 <= column and 0 <= row and column + heights.shape[1] <= width and row + heights.shape[0] <= height
-                if not inside:
-                    failed.append(address)
+                # A file whose grid lies between the cells reaches a cell over the edge.
+                heights = heights[max(0, -row) : height - row, max(0, -column) : width - column]
+                column, row = max(0, column), max(0, row)
+                if not heights.size:
+                    fresh.append(address)
                     continue
                 # Neighbours may share their edge: keep what is there where this one is empty.
                 there = band.ReadAsArray(column, row, heights.shape[1], heights.shape[0])

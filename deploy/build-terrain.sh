@@ -8,6 +8,7 @@
 #   deploy/build-terrain.sh austria
 #   deploy/build-terrain.sh bayern
 #   deploy/build-terrain.sh switzerland
+#   deploy/build-terrain.sh suedtirol
 #
 # Quellen (offene Daten; die Nennung steht danach in der Karte):
 #   austria   BEV, Digitales Geländehöhenmodell, Höhenraster 5 m, CC BY 4.0
@@ -18,6 +19,9 @@
 #   switzerland  swisstopo, swissALTI3D, 2 m (mit Liechtenstein), frei nutzbar mit
 #             Quellenangabe; https://www.swisstopo.admin.ch (rund 44.000 Dateien, 52 GB;
 #             sie werden beim Laden auf 5 m verkleinert und nicht aufbewahrt)
+#   suedtirol Autonome Provinz Bozen – Südtirol, DTM 2,5 m, CC0; nur über den
+#             Abrufdienst (WCS) der Provinz: rund 700 Quadrate zu 5 km, 11 GB, beim
+#             Laden auf 5 m verkleinert und nicht aufbewahrt
 #
 #   MAP_TERRAIN_ZOOM=14   tiefste Zoomstufe (14 sind rund 6,5 m je Bildpunkt)
 #   MAP_BUILD_CPUS=3      so viele Prozesse rechnen zugleich
@@ -62,11 +66,28 @@ case "$area" in
     tiles="https://ogd.swisstopo.admin.ch/services/swiseld/services/assets/ch.swisstopo.swissalti3d/search?format=image%2Ftiff%3B%20application%3Dgeotiff%3B%20profile%3Dcloud-optimized&resolution=2.0&srid=2056&state=current&csv=true"
     srs="EPSG:2056"
     step=5
+    size=1
+    fetchers=6
     file="switzerland-5m.tif"
     attribution="Höhendaten Schweiz: © swisstopo (swissALTI3D)"
     priority=10
     ;;
-  *) echo "Für '$area' ist noch kein Geländemodell hinterlegt (bisher: austria, bayern, switzerland)." >&2; exit 1 ;;
+  suedtirol)
+    # Kein Download als Datei: Der Abrufdienst liefert Quadrate (UTM 32), deren Liste
+    # hier entsteht. Die Ecke steht in einem Parameter ohne weitere Bedeutung (tile).
+    url=""
+    metalink=""
+    tiles="suedtirol.list"
+    srs="EPSG:25832"
+    step=5
+    size=5
+    # Ein öffentlicher Dienst: wenige Abrufe zugleich.
+    fetchers=3
+    file="suedtirol-5m.tif"
+    attribution="Höhendaten Südtirol: Autonome Provinz Bozen – Südtirol (DTM 2,5 m), CC0"
+    priority=10
+    ;;
+  *) echo "Für '$area' ist noch kein Geländemodell hinterlegt (bisher: austria, bayern, switzerland, suedtirol)." >&2; exit 1 ;;
 esac
 
 DATA_DIR="${DATA_DIR:-$(sed -n 's/^DATA_DIR=//p' .env 2>/dev/null | tail -n 1)}"
@@ -85,9 +106,21 @@ if [ ! -f "$sources/$file" ] && [ -n "$metalink" ]; then
     --out "/data/build/sources/$file" --srs "$srs" --step "$step" --workers "$WORKERS"
 elif [ ! -f "$sources/$file" ] && [ -n "$tiles" ]; then
   echo "== Lade und verkleinere: $file $(date '+%Y-%m-%d %H:%M') =="
+  if [ "$area" = suedtirol ]; then
+    # Ausdehnung des Modells laut Dienst: 605–768 km Ost, 5120–5221 km Nord.
+    service="https://geoservices9.civis.bz.it/geoserver/p_bz-Elevation/ows?service=WCS&version=2.0.1&request=GetCoverage&coverageId=p_bz-Elevation__DigitalTerrainModel-2.5m&format=image%2Ftiff"
+    : > "$sources/$tiles"
+    for east in $(seq 605 5 765); do
+      for north in $(seq 5120 5 5220); do
+        printf '%s&subset=E(%s000,%s000)&subset=N(%s000,%s000)&tile=_%04d-%04d_\n' "$service" \
+          "$east" "$((east + 5))" "$north" "$((north + 5))" "$east" "$north" >> "$sources/$tiles"
+      done
+    done
+    tiles="/data/build/sources/$tiles"
+  fi
   docker compose --profile mapbuild run --rm --entrypoint python3 terrainbuild \
     /tool/mosaic_tiles.py --list "$tiles" --out "/data/build/sources/$file" \
-    --srs "$srs" --step "$step"
+    --srs "$srs" --step "$step" --size-km "$size" --workers "$fetchers"
 elif [ ! -f "$sources/$file" ]; then
   echo "== Lade $file =="
   # Ein unterbrochener Download wird fortgesetzt; erst die ganze Datei bekommt den Namen.
