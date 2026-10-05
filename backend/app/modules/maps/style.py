@@ -113,9 +113,67 @@ def _roads() -> list[dict]:
     return layers
 
 
-def _add_topo_look(
-    layers: list[dict], hiker: dict, insert_before, *, symbols: bool = False
-) -> None:
+def _use_symbols(layers: list[dict]) -> None:
+    """Symbols instead of dots, in every look: a triangle for a summit, two arcs for a
+    saddle, and signs for huts, shelters, viewpoints, car parks and cable car stations.
+    The layers keep their names (`peak`, `hut`), so everything that refers to them holds."""
+    cls = ["get", "class"]
+    detail = ["get", "subclass"]
+    huts = ["in", detail, ["literal", ["alpine_hut", "wilderness_hut"]]]
+    symbols = {
+        "peak": {
+            "id": "peak",
+            "type": "symbol",
+            "source": "hiker",
+            "source-layer": "mountain_peak",
+            "minzoom": 9,
+            # The layer also holds ridges and cliffs as lines: only points get a sign.
+            "filter": ["==", ["geometry-type"], "Point"],
+            "layout": {
+                "icon-image": ["case", ["==", cls, "saddle"], "saddle", "peak"],
+                "icon-size": ["interpolate", ["linear"], ["zoom"], 9, 0.5, 14, 0.8],
+                "icon-allow-overlap": True,
+                # The sign must not push away the name that belongs to it.
+                "icon-ignore-placement": True,
+            },
+        },
+        "hut": {
+            "id": "hut",
+            "type": "symbol",
+            "source": "hiker",
+            "source-layer": "poi",
+            "minzoom": 12,
+            "filter": [
+                "any",
+                huts,
+                ["==", detail, "viewpoint"],
+                ["in", cls, ["literal", ["shelter", "parking", "aerialway"]]],
+            ],
+            "layout": {
+                "icon-image": [
+                    "case",
+                    huts,
+                    "hut",
+                    ["==", detail, "viewpoint"],
+                    "viewpoint",
+                    ["==", cls, "shelter"],
+                    "shelter",
+                    ["==", cls, "parking"],
+                    "parking",
+                    "cable-car",
+                ],
+                "icon-size": ["interpolate", ["linear"], ["zoom"], 12, 0.7, 15, 0.95],
+                # Where signs would cover each other, huts are placed first.
+                "symbol-sort-key": ["case", huts, 0, 1],
+            },
+        },
+    }
+    for index, layer in enumerate(layers):
+        if layer["id"] in symbols:
+            layers[index] = symbols[layer["id"]]
+
+
+def _add_topo_look(layers: list[dict], hiker: dict, insert_before) -> None:
     """The look "Topo": a classic topographic hiking map. Strong green forest, grey rock,
     heavy relief and dense brown contour lines, paths in red, summits in bold black.
 
@@ -221,65 +279,6 @@ def _add_topo_look(
                 },
             },
             ("peak-name",),
-        )
-    if symbols:
-        # Symbols instead of dots: a triangle for a summit, two arcs for a saddle, and
-        # signs for huts, shelters, viewpoints, car parks and cable car stations.
-        point = ["==", ["geometry-type"], "Point"]
-        add(
-            "peak-name",
-            {
-                "id": "topo-peak",
-                "type": "symbol",
-                "source": "hiker",
-                "source-layer": "mountain_peak",
-                "minzoom": 10,
-                "filter": point,
-                "layout": {
-                    "icon-image": ["case", ["==", cls, "saddle"], "saddle", "peak"],
-                    "icon-size": ["interpolate", ["linear"], ["zoom"], 10, 0.55, 14, 0.8],
-                    "icon-allow-overlap": True,
-                    # The sign must not push away the name that belongs to it.
-                    "icon-ignore-placement": True,
-                },
-            },
-            ("peak",),
-        )
-        detail = ["get", "subclass"]
-        huts = ["in", detail, ["literal", ["alpine_hut", "wilderness_hut"]]]
-        add(
-            "peak-name",
-            {
-                "id": "topo-poi",
-                "type": "symbol",
-                "source": "hiker",
-                "source-layer": "poi",
-                "minzoom": 12,
-                "filter": [
-                    "any",
-                    huts,
-                    ["==", detail, "viewpoint"],
-                    ["in", cls, ["literal", ["shelter", "parking", "aerialway"]]],
-                ],
-                "layout": {
-                    "icon-image": [
-                        "case",
-                        huts,
-                        "hut",
-                        ["==", detail, "viewpoint"],
-                        "viewpoint",
-                        ["==", cls, "shelter"],
-                        "shelter",
-                        ["==", cls, "parking"],
-                        "parking",
-                        "cable-car",
-                    ],
-                    "icon-size": ["interpolate", ["linear"], ["zoom"], 12, 0.7, 15, 0.95],
-                    # Where signs would cover each other, huts are placed first.
-                    "symbol-sort-key": ["case", huts, 0, 1],
-                },
-            },
-            ("hut",),
         )
     hiker["bases"].append({"id": "topo", "show": show, "hide": hide})
 
@@ -975,7 +974,9 @@ def build_style(
                 "opacity": {"layer": "satellite", "default": SATELLITE_OPACITY, "min": 0.1},
             }
         )
-    _add_topo_look(layers, hiker, insert_before, symbols=sprite_url is not None)
+    if sprite_url:
+        _use_symbols(layers)
+    _add_topo_look(layers, hiker, insert_before)
     # The order and the groups in which the clients offer the overlays: what belongs to
     # the ground, then everything about snow, then the weather.
     for overlay in hiker["overlays"]:

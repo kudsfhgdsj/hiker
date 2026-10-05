@@ -530,15 +530,18 @@ def test_symbols_are_served_and_used_by_the_topo_look(client, maps):
     assert build(1)[1] == index and build(2)[1] == double
     assert build(1)[0].size == sheet.size
 
+    # In every look: triangle or saddle sign instead of the dot, signs for huts and
+    # other places. The layers keep their names.
     layers = {layer["id"]: layer for layer in style["layers"]}
-    topo = next(base for base in style["metadata"]["hiker"]["bases"] if base["id"] == "topo")
-    # Triangle or saddle sign instead of the dot, signs for huts and other places.
-    assert {"topo-peak", "topo-poi"} <= set(topo["show"]) and {"peak", "hut"} <= set(topo["hide"])
-    assert layers["topo-peak"]["layout"]["icon-image"][2:] == ["saddle", "peak"]
-    assert layers["topo-peak"]["layout"]["visibility"] == "none"
-    used = {v for v in layers["topo-poi"]["layout"]["icon-image"] if isinstance(v, str)}
+    assert layers["peak"]["type"] == "symbol" and layers["hut"]["type"] == "symbol"
+    assert layers["peak"]["layout"]["icon-image"][2:] == ["saddle", "peak"]
+    assert "visibility" not in layers["peak"]["layout"]
+    used = {v for v in layers["hut"]["layout"]["icon-image"] if isinstance(v, str)}
     assert used - {"case"} <= set(SYMBOLS)
+    topo = next(base for base in style["metadata"]["hiker"]["bases"] if base["id"] == "topo")
+    assert "peak" not in topo["hide"] and "hut" not in topo["hide"]
 
-    # Without symbols the look keeps the dots.
+    # Without symbols the map keeps the dots.
     plain = build_style("t", "g", "©", 14)
-    assert "sprite" not in plain and "topo-peak" not in {layer["id"] for layer in plain["layers"]}
+    plain_layers = {layer["id"]: layer for layer in plain["layers"]}
+    assert "sprite" not in plain and plain_layers["peak"]["type"] == "circle"
