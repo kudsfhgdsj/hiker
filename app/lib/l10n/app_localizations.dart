@@ -3256,6 +3256,12 @@ abstract class AppLocalizations {
   /// **'Winter'**
   String get mapBaseWinter;
 
+  /// No description provided for @mapBaseTopo.
+  ///
+  /// In de, this message translates to:
+  /// **'Topo'**
+  String get mapBaseTopo;
+
   /// No description provided for @mapBaseSatellite.
   ///
   /// In de, this message translates to:

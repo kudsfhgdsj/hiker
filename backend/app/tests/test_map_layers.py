@@ -214,7 +214,7 @@ def test_style_offers_the_layers_the_server_has(client, layers, tmp_path, monkey
     assert style["sources"]["satellite"]["tiles"] == [f"{base}/raster/satellite/{{z}}/{{x}}/{{y}}"]
     assert "swisstopo" in style["sources"]["satellite"]["attribution"]
     hiker = style["metadata"]["hiker"]
-    assert [entry["id"] for entry in hiker["bases"]] == ["map", "winter"]
+    assert [entry["id"] for entry in hiker["bases"]] == ["map", "winter", "topo"]
     assert style["sources"]["contours"]["tiles"] == [f"{base}/contours/{{z}}/{{x}}/{{y}}.pbf"]
     # In the order the clients offer them: the ground, then snow, then the weather.
     assert [(entry["id"], entry["group"]) for entry in hiker["overlays"]] == [
@@ -272,7 +272,30 @@ def test_switchable_layers_start_hidden_and_keep_their_place():
     assert layers["contour"]["source-layer"] == "contour"
     assert layers["contour-label"]["filter"] == ["==", ["get", "index"], 1]
     # The user chooses how much of the map shines through the aerial image.
-    assert [base["id"] for base in hiker["bases"]] == ["map", "winter"]
+    assert [base["id"] for base in hiker["bases"]] == ["map", "winter", "topo"]
+    # The look "Topo" shows its own ground, relief, contours, paths and summit names
+    # instead of the usual ones; everything of it starts hidden.
+    topo = hiker["bases"][2]
+    assert set(topo["show"]) == {
+        "topo-ground",
+        "topo-grass",
+        "topo-wood",
+        "topo-rock",
+        "topo-hillshade",
+        "topo-contour",
+        "topo-path-casing",
+        "topo-path",
+        "topo-peak-name",
+    }
+    assert {"wood", "rock", "hillshade", "contour", "path", "path-difficulty", "peak-name"} <= set(
+        topo["hide"]
+    )
+    assert all(layers[name]["layout"]["visibility"] == "none" for name in topo["show"])
+    assert order.index("wood") < order.index("topo-wood") < order.index("topo-hillshade")
+    assert order.index("topo-path-casing") < order.index("topo-path") < order.index("peak-name")
+    assert layers["topo-path"]["paint"]["line-color"] == "#d0182b"
+    # The grade next to the path and the via ferratas stay in every look.
+    assert "path-difficulty-label" not in topo["hide"] and "via-ferrata" not in topo["hide"]
     assert hiker["overlays"][1] == {
         "id": "satellite",
         "layers": ["satellite"],
@@ -287,7 +310,10 @@ def test_switchable_layers_start_hidden_and_keep_their_place():
 
     plain = build_style("t", "g", "©", 14)
     assert set(plain["sources"]) == {"hiker"}
-    assert plain["metadata"]["hiker"]["bases"] == [{"id": "map", "show": [], "hide": []}]
+    # Without elevation data: the usual look and "Topo" without relief and contours.
+    bases = plain["metadata"]["hiker"]["bases"]
+    assert [base["id"] for base in bases] == ["map", "topo"]
+    assert "topo-hillshade" not in bases[1]["show"] and "topo-path" in bases[1]["show"]
     assert plain["metadata"]["hiker"]["overlays"] == []
 
 

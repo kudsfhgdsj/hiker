@@ -63,6 +63,7 @@ def map_config(attribution: str) -> dict:
             "base": {
                 "map": t("map.base.map"),
                 "winter": t("map.base.winter"),
+                "topo": t("map.base.topo"),
                 "satellite": t("map.base.satellite"),
             },
             # Search for places of the own map; only a server with a vector map has it.

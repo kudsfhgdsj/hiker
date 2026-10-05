@@ -113,6 +113,116 @@ def _roads() -> list[dict]:
     return layers
 
 
+def _add_topo_look(layers: list[dict], hiker: dict, insert_before) -> None:
+    """The look "Topo": a classic topographic hiking map. Strong green forest, grey rock,
+    heavy relief and dense brown contour lines, paths in red, summits in bold black.
+
+    A look is a set of layers that are shown instead of others (`bases` in the metadata),
+    so the clients switch it like the winter look, without loading another style.
+    """
+    cls = ["get", "class"]
+    present = {layer["id"] for layer in layers}
+    hidden = {"layout": {"visibility": "none"}}
+    show: list[str] = []
+    hide: list[str] = []
+
+    def add(before: str, layer: dict, replaces: tuple[str, ...] = ()) -> None:
+        layer["layout"] = {**layer.get("layout", {}), **hidden["layout"]}
+        insert_before(before, layer)
+        show.append(layer["id"])
+        hide.extend(name for name in replaces if name in present)
+
+    # Ground: meadow as the basic tone, forest clearly darker, rock and scree grey.
+    add(
+        "residential",
+        {"id": "topo-ground", "type": "background", "paint": {"background-color": "#e6edc4"}},
+    )
+    for name, colour in (("grass", "#d3e6a4"), ("wood", "#7fb069"), ("rock", "#cbc9c4")):
+        add("park", _fill(f"topo-{name}", "landcover", ["==", cls, name], colour), (name,))
+    if "hillshade" in present:
+        add(
+            "waterway",
+            {
+                "id": "topo-hillshade",
+                "type": "hillshade",
+                "source": "terrain",
+                "paint": {
+                    "hillshade-exaggeration": 0.85,
+                    "hillshade-shadow-color": "#1c2a18",
+                    "hillshade-highlight-color": "#ffffff",
+                    "hillshade-accent-color": "#26331f",
+                },
+            },
+            ("hillshade",),
+        )
+    if "contour" in present:
+        add(
+            "waterway",
+            {
+                "id": "topo-contour",
+                "type": "line",
+                "source": "contours",
+                "source-layer": "contour",
+                "minzoom": 11,
+                "paint": {
+                    "line-color": "#5f4320",
+                    "line-opacity": ["case", ["==", ["get", "index"], 1], 0.85, 0.5],
+                    "line-width": ["case", ["==", ["get", "index"], 1], 1.3, 0.6],
+                },
+            },
+            ("contour",),
+        )
+    # Paths: red on a light casing, dashed; the grade still stands next to them close up.
+    path = ["==", cls, "path"]
+    add(
+        "boundary",
+        _line(
+            "topo-path-casing",
+            "transportation",
+            path,
+            {
+                "line-color": "#ffffff",
+                "line-opacity": 0.75,
+                "line-width": _width((11, 1.8), (14, 3.6), (18, 8)),
+            },
+            minzoom=11,
+        ),
+        ("path-halo", "path", "path-difficulty"),
+    )
+    add(
+        "boundary",
+        _line(
+            "topo-path",
+            "transportation",
+            path,
+            {
+                "line-color": "#d0182b",
+                "line-width": _width((11, 0.9), (14, 1.9), (18, 4.2)),
+                "line-dasharray": [3, 1.6],
+            },
+            minzoom=11,
+            cap="butt",
+        ),
+    )
+    if "peak-name" in present:
+        summit = next(layer for layer in layers if layer["id"] == "peak-name")
+        add(
+            "peak-name",
+            {
+                **summit,
+                "id": "topo-peak-name",
+                "layout": {**summit["layout"], "text-font": BOLD, "text-size": 13},
+                "paint": {
+                    "text-color": "#111111",
+                    "text-halo-color": "rgba(255, 255, 255, 0.92)",
+                    "text-halo-width": 2,
+                },
+            },
+            ("peak-name",),
+        )
+    hiker["bases"].append({"id": "topo", "show": show, "hide": hide})
+
+
 SATELLITE_OPACITY = 0.7
 # Deepest zoom level of the elevation tiles (see layers.TERRAIN).
 TERRAIN_MAX_ZOOM = 15
@@ -803,6 +913,7 @@ def build_style(
                 "opacity": {"layer": "satellite", "default": SATELLITE_OPACITY, "min": 0.1},
             }
         )
+    _add_topo_look(layers, hiker, insert_before)
     # The order and the groups in which the clients offer the overlays: what belongs to
     # the ground, then everything about snow, then the weather.
     for overlay in hiker["overlays"]:

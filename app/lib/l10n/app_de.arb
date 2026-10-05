@@ -649,6 +649,7 @@
   "mapRadarPlay": "Zeitverlauf abspielen",
   "mapBaseMap": "Karte",
   "mapBaseWinter": "Winter",
+  "mapBaseTopo": "Topo",
   "mapBaseSatellite": "Luftbild",
   "mapOverlaySlope": "Hangneigung",
   "mapSlopeLegend": "Gelb ab 30°, orange ab 35°, rot ab 40°, violett ab 45°",

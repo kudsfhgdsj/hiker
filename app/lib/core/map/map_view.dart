@@ -406,6 +406,7 @@ class MapLayerSheet extends ConsumerWidget {
     String baseLabel(String id) => switch (id) {
       'map' => l10n.mapBaseMap,
       'winter' => l10n.mapBaseWinter,
+      'topo' => l10n.mapBaseTopo,
       'satellite' => l10n.mapBaseSatellite,
       _ => id,
     };

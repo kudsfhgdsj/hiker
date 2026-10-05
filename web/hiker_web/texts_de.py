@@ -295,6 +295,7 @@ TEXTS = {
     "map.layers": "Ebenen",
     "map.base.map": "Karte",
     "map.base.winter": "Winter",
+    "map.base.topo": "Topo",
     "map.base.satellite": "Luftbild",
     "map.search": "Ort, Gipfel oder Hütte suchen",
     "map.search.none": "Nichts gefunden.",
