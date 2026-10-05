@@ -1,6 +1,7 @@
 #!/bin/sh
 # Baut aus einem feinen Geländemodell eines Gebiets Höhenkacheln für die eigene Karte,
-# dazu Hangneigung und Höhenlinien (DATA_DIR/maps/<gebiet>.hires.sqlite). Die API nimmt
+# dazu Hangneigung und Höhenlinien (DATA_DIR/maps/<gebiet>.hires.sqlite und
+# <gebiet>.derived.hires.sqlite). Die API nimmt
 # sie vor den groben weltweiten Kacheln: schärfere Grate in Schummerung und 3D,
 # genauere Hangneigung und Höhenlinien.
 #
@@ -55,4 +56,4 @@ docker compose --profile mapbuild run --rm --build mappack \
   "/data/$area.hires.sqlite" --derive "--workers=$WORKERS"
 
 echo "== fertig $(date '+%Y-%m-%d %H:%M') =="
-ls -lh "$DATA_DIR/maps/$area.hires.sqlite"
+ls -lh "$DATA_DIR/maps/$area.hires.sqlite" "$DATA_DIR/maps/$area.derived.hires.sqlite"

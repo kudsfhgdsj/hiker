@@ -185,10 +185,12 @@ def test_a_fine_elevation_model_comes_first_and_is_named(client, maps, monkeypat
     lines: list[str] = []
     # Slope for every level of the model, contours down to their deepest level (13).
     assert derive(maps / "austria.hires.sqlite", report=lines.append) == 3
+    # They go into a file of their own: the server reads the pack meanwhile.
+    with sqlite3.connect(maps / "austria.derived.hires.sqlite") as db:
+        made = db.execute("SELECT layer, z FROM layer_tiles ORDER BY 1, 2").fetchall()
     with sqlite3.connect(maps / "austria.hires.sqlite") as db:
-        made = db.execute(
-            "SELECT layer, z FROM layer_tiles WHERE layer != 'terrain' ORDER BY 1, 2"
-        ).fetchall()
+        untouched = db.execute("SELECT count(*) FROM layer_tiles WHERE layer != 'terrain'")
+        assert untouched.fetchone() == (0,)
     assert made == [("contours", 12), ("contours", 13), ("slope", 12), ("slope", 13), ("slope", 14)]
     # Run again, nothing is left to do.
     assert derive(maps / "austria.hires.sqlite", report=lines.append) == 0
