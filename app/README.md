@@ -167,6 +167,13 @@ Kartenbibliothek der App das noch nicht kann, läuft dort MapLibre GL JS aus `as
 (dieselben Dateien wie im Web-Frontend) in einer WebView; alles kommt vom Kartenserver der App
 (`/3d/…`). Im Emulator mit Software-Grafik stürzt die Ansicht ab; sie braucht ein echtes Gerät.
 
+## Statistik
+
+Über das Symbol in der Tourenliste oder den Eintrag im Profil: Summen aller eigenen Touren
+(gesamt und je Jahr), die Tage unterwegs als Jahresraster, alle Tracks auf einer Karte,
+bestiegene Gipfel und Wunschgipfel (`features/reports/`). Gerechnet wird auf dem Server
+(Modul `reports`); ohne Netz zeigt die App den zuletzt gesehenen Stand.
+
 ## Planung
 
 Unter „Planung“ liegen die Routenliste und der Planer: Punkte auf der Karte setzen und

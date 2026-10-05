@@ -24,6 +24,7 @@ import 'features/nutrition/nutrition_module.dart';
 import 'features/planning/planning_module.dart';
 import 'features/protocols/data/tour_repository.dart';
 import 'features/protocols/protocols_module.dart';
+import 'features/reports/reports_module.dart';
 import 'l10n/app_localizations.dart';
 
 /// The features built into the app. A feature is added or removed here only.
@@ -33,6 +34,7 @@ final List<FeatureModule> builtInModules = [
   mapModule,
   gearModule,
   nutritionModule,
+  reportsModule,
 ];
 
 /// Wires the features into core. Tests pass their own list of modules.

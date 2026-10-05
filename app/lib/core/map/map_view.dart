@@ -47,6 +47,7 @@ class MapContent {
   const MapContent({
     this.track = const [],
     this.secondTrack = const [],
+    this.heatLines = const [],
     this.markers = const [],
     this.highlight,
     this.onTap,
@@ -63,6 +64,10 @@ class MapContent {
   /// A second line in another colour, to compare with the track: e.g. what
   /// was really walked over what was planned.
   final List<GeoPoint> secondTrack;
+
+  /// Many lines at once, drawn translucent: ground covered often shows
+  /// darker. For the map of everything a user has walked.
+  final List<List<GeoPoint>> heatLines;
   final List<MapMarker> markers;
 
   /// A point that follows the finger on the elevation profile.

@@ -16,6 +16,7 @@ class FeatureModule {
     required this.icon,
     required this.label,
     required this.routes,
+    this.inNavigation = true,
   });
 
   /// Name of the backend module; the feature is shown only if it is enabled there.
@@ -25,6 +26,10 @@ class FeatureModule {
   final String rootPath;
   final IconData icon;
   final String Function(AppLocalizations l10n) label;
+
+  /// False: the feature has screens but no entry of its own in the navigation;
+  /// other screens lead to it.
+  final bool inNavigation;
 
   /// Routes below the navigation shell.
   final List<RouteBase> routes;

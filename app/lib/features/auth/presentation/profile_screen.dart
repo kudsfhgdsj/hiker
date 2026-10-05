@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/modules/feature_module.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/session/session.dart';
@@ -91,6 +92,17 @@ class ProfileScreen extends ConsumerWidget {
                             : user.email,
                       ),
                     ),
+                    if (ref
+                        .watch(activeModulesProvider)
+                        .any((module) => module.id == 'reports'))
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.insights_outlined),
+                        title: Text(l10n.statsTitle),
+                        subtitle: Text(l10n.statsHint),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => context.push('/stats'),
+                      ),
                     if (user.hasPassword)
                       ListTile(
                         contentPadding: EdgeInsets.zero,

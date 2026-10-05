@@ -30,6 +30,8 @@ und Schätzungen kommen von der API (siehe `DESIGN.md`, Abschnitt 9a).
   Aus einer Route lässt sich eine Tour anlegen; hat die Tour einen Track, stellt
   „Vergleichen“ Plan und Gegangenes gegenüber (Zahlen, Abweichung, beide Linien auf der
   Karte). Eine GPX-Datei lässt sich in der Routenliste als Route importieren.
+- Statistik (`/stats`): Summen aller eigenen Touren, Tage unterwegs als Jahresraster, alle
+  Tracks auf einer Karte, bestiegene Gipfel und Wunschgipfel.
 - Karte (`/map`): die Karte ansehen, ohne zu planen. Ein Klick nennt Gipfel, Hütte oder Weg
   mit Schwierigkeit und die Sonnenzeiten des Tages dort (für Gipfel auch bei freiem Horizont)
   und führt auf Wunsch in den Planer. Ebenen: Hangneigung mit einstellbaren Winkeln,

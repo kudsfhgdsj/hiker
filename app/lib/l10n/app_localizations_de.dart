@@ -1723,6 +1723,115 @@ class AppLocalizationsDe extends AppLocalizations {
   String get mapLooks => 'Darstellung';
 
   @override
+  String get statsTitle => 'Statistik';
+
+  @override
+  String get statsHint => 'Strecke, Höhenmeter, Gipfel und wo du warst';
+
+  @override
+  String get statsTotals => 'Alle Touren zusammen';
+
+  @override
+  String get statsTours => 'Touren';
+
+  @override
+  String get statsDays => 'Tage unterwegs';
+
+  @override
+  String get statsMovingTime => 'Zeit in Bewegung';
+
+  @override
+  String get statsPeaks => 'Gipfel';
+
+  @override
+  String statsWithoutTrack(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Touren haben',
+      one: '1 Tour hat',
+    );
+    return '$_temp0 keinen Track und zählen nicht bei Strecke und Höhenmetern.';
+  }
+
+  @override
+  String statsYearLine(int tours, int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      tours,
+      locale: localeName,
+      other: '$tours Touren',
+      one: '1 Tour',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days Tage',
+      one: '1 Tag',
+    );
+    return '$_temp0, $_temp1';
+  }
+
+  @override
+  String statsCalendar(String year) {
+    return 'Tage unterwegs $year';
+  }
+
+  @override
+  String get statsCalendarNote =>
+      'Farbe nach Höhenmetern im Aufstieg. Ein Tipp auf einen Tag öffnet die Tour.';
+
+  @override
+  String get statsMap => 'Wo ich war';
+
+  @override
+  String get statsMapNote =>
+      'Alle eigenen Tracks. Oft begangene Strecken erscheinen dunkler.';
+
+  @override
+  String get statsNoTracks => 'Noch keine Tracks.';
+
+  @override
+  String statsClimbed(int count) {
+    return 'Bestiegene Gipfel ($count)';
+  }
+
+  @override
+  String get statsNoPeaks =>
+      'Noch keine Gipfel. Sie kommen aus den Gipfeln deiner Touren.';
+
+  @override
+  String statsVisits(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Besuche',
+      one: '1 Besuch',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get statsWishes => 'Wunschgipfel';
+
+  @override
+  String get statsNoWishes => 'Noch keine Wunschgipfel.';
+
+  @override
+  String get statsWishNew => 'Wunschgipfel hinzufügen';
+
+  @override
+  String get statsWishDone => 'bestiegen';
+
+  @override
+  String get statsPeak => 'Gipfel';
+
+  @override
+  String get statsElevation => 'Höhe (m)';
+
+  @override
+  String get statsNote => 'Notiz';
+
+  @override
   String get mapKey => 'Legende';
 
   @override

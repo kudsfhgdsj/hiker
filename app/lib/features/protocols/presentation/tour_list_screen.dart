@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/modules/feature_module.dart';
 import '../../../core/format.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/api_image.dart';
@@ -45,6 +46,15 @@ class _TourListScreenState extends ConsumerState<TourListScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(l10n.toursTitle),
+          actions: [
+            // Totals, climbed peaks and where the user has been.
+            if (ref.watch(activeModulesProvider).any((m) => m.id == 'reports'))
+              IconButton(
+                tooltip: l10n.statsTitle,
+                icon: const Icon(Icons.insights_outlined),
+                onPressed: () => context.push('/stats'),
+              ),
+          ],
           bottom: TabBar(
             tabs: [
               Tab(text: l10n.toursMine),

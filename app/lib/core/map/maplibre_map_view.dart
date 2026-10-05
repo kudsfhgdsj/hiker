@@ -135,7 +135,26 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
 
   static LatLng _latLng(GeoPoint point) => LatLng(point.lat, point.lon);
 
+  Map<String, dynamic> _heatGeoJson() => {
+    'type': 'FeatureCollection',
+    'features': [
+      for (final line in widget.content.heatLines)
+        if (line.length > 1)
+          {
+            'type': 'Feature',
+            'properties': <String, dynamic>{},
+            'geometry': {
+              'type': 'LineString',
+              'coordinates': [
+                for (final point in line) [point.lon, point.lat],
+              ],
+            },
+          },
+    ],
+  };
+
   List<GeoPoint> get _everything => [
+    for (final line in widget.content.heatLines) ...line,
     ...widget.content.track,
     ...widget.content.secondTrack,
     for (final marker in widget.content.markers) marker.position,
@@ -335,6 +354,35 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
         lineCap: 'round',
       ),
     );
+    if (widget.content.heatLines.isNotEmpty) {
+      // A wide soft band under a thin line: overlaps add up to darker ground.
+      await controller.addGeoJsonSource('heat', _heatGeoJson());
+      await controller.addLineLayer(
+        'heat',
+        'heat-glow',
+        const LineLayerProperties(
+          lineColor: '#E8351A',
+          lineWidth: 9,
+          lineOpacity: 0.18,
+          lineBlur: 4,
+          lineJoin: 'round',
+          lineCap: 'round',
+        ),
+        belowLayerId: 'track-line',
+      );
+      await controller.addLineLayer(
+        'heat',
+        'heat-line',
+        const LineLayerProperties(
+          lineColor: '#B5120C',
+          lineWidth: 2.2,
+          lineOpacity: 0.55,
+          lineJoin: 'round',
+          lineCap: 'round',
+        ),
+        belowLayerId: 'track-line',
+      );
+    }
     // The line to compare with lies on top, thinner, so that both show.
     await controller.addGeoJsonSource(
       _secondSource,

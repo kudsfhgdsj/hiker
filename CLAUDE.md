@@ -3,7 +3,7 @@
 Lies zuerst `DESIGN.md`. Sie ist die verbindliche Grundlage für Architektur, Datenmodell, API und Phasenplan.
 
 ## Projekt in Kürze
-Android-App (Flutter, nur Android), Web-Frontend (Python Flask) und eigenes Backend (FastAPI + PostgreSQL), selbst gehostet unter `hiker.lacasa.internal` (vorläufig, wird später auf die endgültige Domain umgestellt) auf Ubuntu 26.04. Module: auth, gear, nutrition, protocols, sync, maps, planning (jetzt); reports (später). Phase 1 ist abgeschlossen; aktuell gilt Phase 2 aus `DESIGN.md` (Abschnitt 9b).
+Android-App (Flutter, nur Android), Web-Frontend (Python Flask) und eigenes Backend (FastAPI + PostgreSQL), selbst gehostet unter `hiker.lacasa.internal` (vorläufig, wird später auf die endgültige Domain umgestellt) auf Ubuntu 26.04. Module: auth, gear, nutrition, protocols, sync, maps, planning, reports. Phase 1 ist abgeschlossen; aktuell gilt Phase 2 aus `DESIGN.md` (Abschnitt 9b).
 
 ## Sprache
 - UI-Texte und Dokumentation: Deutsch (App: ARB-Dateien; Web-Frontend: eine Übersetzungsdatei, keine Texte verstreut in den Vorlagen).

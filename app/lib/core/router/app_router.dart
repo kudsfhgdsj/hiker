@@ -92,7 +92,8 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: refresh,
     redirect: (context, state) {
       final active = ref.read(activeModulesProvider);
-      final home = active.isEmpty ? AppRoutes.profile : active.first.rootPath;
+      final pages = active.where((module) => module.inNavigation);
+      final home = pages.isEmpty ? AppRoutes.profile : pages.first.rootPath;
       final session = ref.read(sessionProvider);
       return redirectFor(
         session.status,

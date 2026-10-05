@@ -25,7 +25,8 @@ class AppShell extends ConsumerWidget {
     final modules = ref.watch(activeModulesProvider);
     final destinations = [
       for (final module in modules)
-        (path: module.rootPath, icon: module.icon, label: module.label(l10n)),
+        if (module.inNavigation)
+          (path: module.rootPath, icon: module.icon, label: module.label(l10n)),
       (path: profilePath, icon: Icons.person_outline, label: l10n.profileTitle),
     ];
     final index = destinations.indexWhere(

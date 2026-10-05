@@ -3130,6 +3130,150 @@ abstract class AppLocalizations {
   /// **'Darstellung'**
   String get mapLooks;
 
+  /// No description provided for @statsTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Statistik'**
+  String get statsTitle;
+
+  /// No description provided for @statsHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Strecke, Höhenmeter, Gipfel und wo du warst'**
+  String get statsHint;
+
+  /// No description provided for @statsTotals.
+  ///
+  /// In de, this message translates to:
+  /// **'Alle Touren zusammen'**
+  String get statsTotals;
+
+  /// No description provided for @statsTours.
+  ///
+  /// In de, this message translates to:
+  /// **'Touren'**
+  String get statsTours;
+
+  /// No description provided for @statsDays.
+  ///
+  /// In de, this message translates to:
+  /// **'Tage unterwegs'**
+  String get statsDays;
+
+  /// No description provided for @statsMovingTime.
+  ///
+  /// In de, this message translates to:
+  /// **'Zeit in Bewegung'**
+  String get statsMovingTime;
+
+  /// No description provided for @statsPeaks.
+  ///
+  /// In de, this message translates to:
+  /// **'Gipfel'**
+  String get statsPeaks;
+
+  /// No description provided for @statsWithoutTrack.
+  ///
+  /// In de, this message translates to:
+  /// **'{count, plural, =1{1 Tour hat} other{{count} Touren haben}} keinen Track und zählen nicht bei Strecke und Höhenmetern.'**
+  String statsWithoutTrack(int count);
+
+  /// No description provided for @statsYearLine.
+  ///
+  /// In de, this message translates to:
+  /// **'{tours, plural, =1{1 Tour} other{{tours} Touren}}, {days, plural, =1{1 Tag} other{{days} Tage}}'**
+  String statsYearLine(int tours, int days);
+
+  /// No description provided for @statsCalendar.
+  ///
+  /// In de, this message translates to:
+  /// **'Tage unterwegs {year}'**
+  String statsCalendar(String year);
+
+  /// No description provided for @statsCalendarNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Farbe nach Höhenmetern im Aufstieg. Ein Tipp auf einen Tag öffnet die Tour.'**
+  String get statsCalendarNote;
+
+  /// No description provided for @statsMap.
+  ///
+  /// In de, this message translates to:
+  /// **'Wo ich war'**
+  String get statsMap;
+
+  /// No description provided for @statsMapNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Alle eigenen Tracks. Oft begangene Strecken erscheinen dunkler.'**
+  String get statsMapNote;
+
+  /// No description provided for @statsNoTracks.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch keine Tracks.'**
+  String get statsNoTracks;
+
+  /// No description provided for @statsClimbed.
+  ///
+  /// In de, this message translates to:
+  /// **'Bestiegene Gipfel ({count})'**
+  String statsClimbed(int count);
+
+  /// No description provided for @statsNoPeaks.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch keine Gipfel. Sie kommen aus den Gipfeln deiner Touren.'**
+  String get statsNoPeaks;
+
+  /// No description provided for @statsVisits.
+  ///
+  /// In de, this message translates to:
+  /// **'{count, plural, =1{1 Besuch} other{{count} Besuche}}'**
+  String statsVisits(int count);
+
+  /// No description provided for @statsWishes.
+  ///
+  /// In de, this message translates to:
+  /// **'Wunschgipfel'**
+  String get statsWishes;
+
+  /// No description provided for @statsNoWishes.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch keine Wunschgipfel.'**
+  String get statsNoWishes;
+
+  /// No description provided for @statsWishNew.
+  ///
+  /// In de, this message translates to:
+  /// **'Wunschgipfel hinzufügen'**
+  String get statsWishNew;
+
+  /// No description provided for @statsWishDone.
+  ///
+  /// In de, this message translates to:
+  /// **'bestiegen'**
+  String get statsWishDone;
+
+  /// No description provided for @statsPeak.
+  ///
+  /// In de, this message translates to:
+  /// **'Gipfel'**
+  String get statsPeak;
+
+  /// No description provided for @statsElevation.
+  ///
+  /// In de, this message translates to:
+  /// **'Höhe (m)'**
+  String get statsElevation;
+
+  /// No description provided for @statsNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Notiz'**
+  String get statsNote;
+
   /// No description provided for @mapKey.
   ///
   /// In de, this message translates to:
