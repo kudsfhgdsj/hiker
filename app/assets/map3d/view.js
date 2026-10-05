@@ -46,6 +46,24 @@
     }
     if (scene.terrain && map.getSource(scene.terrain.source)) map.setTerrain(scene.terrain);
 
+    // Rain radar and clouds of the time that was chosen in the app, over the terrain.
+    for (const image of scene.radar || []) {
+      const id = `radar-${image.kind}`;
+      map.addSource(id, { type: "raster", tiles: [image.tiles], tileSize: 256, maxzoom: image.maxzoom });
+      map.addLayer({
+        id,
+        type: "raster",
+        source: id,
+        paint: { "raster-opacity": image.opacity, "raster-fade-duration": 0 },
+      });
+    }
+    if (scene.radarTime) {
+      const time = new Date(scene.radarTime * 1000);
+      const clock = document.getElementById("clock");
+      clock.textContent = time.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+      clock.hidden = false;
+    }
+
     const track = scene.track || [];
     if (track.length > 1) {
       map.addSource("track", {

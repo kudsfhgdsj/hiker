@@ -210,6 +210,18 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
       'terrain': widget.layerOptions?['terrain'],
       'visible': _layerVisibility(),
       'opacity': _layerOpacity(),
+      // Rain radar and clouds of the time chosen with the slider.
+      'radar': [
+        for (final image in _radarImages())
+          {
+            'kind': image.kind,
+            'tiles': image.tiles,
+            'maxzoom': image.maxZoom,
+            'opacity': image.opacity,
+          },
+      ],
+      if (_radarImages().isNotEmpty)
+        'radarTime': _frames!.times[_frame.clamp(0, _frames!.times.length - 1)],
       'track': [
         for (final point in widget.content.track) [point.lon, point.lat],
       ],
@@ -353,6 +365,36 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
     }
   }
 
+  /// The radar and cloud images of the chosen time, in the order they are
+  /// drawn: address of the tiles, deepest zoom level and opacity per kind.
+  List<({String kind, String tiles, double maxZoom, double opacity})>
+  _radarImages() {
+    final radar = _radar;
+    final frames = _frames;
+    if (radar == null || frames == null || frames.times.isEmpty) {
+      return const [];
+    }
+    final time = frames.times[_frame.clamp(0, frames.times.length - 1)];
+    return [
+      for (final kind in const ['clouds', 'rain'])
+        if (widget.layerChoice.radar.contains(kind))
+          // The image of that kind closest before the chosen time.
+          if ((kind == 'rain' ? frames.rain : frames.clouds).where(
+                (frame) => frame <= time,
+              )
+              case final known when known.isNotEmpty)
+            (
+              kind: kind,
+              tiles: (radar[kind] as String).replaceFirst(
+                '{time}',
+                '${known.last}',
+              ),
+              maxZoom: (radar['${kind}_max_zoom'] as num?)?.toDouble() ?? 7,
+              opacity: kind == 'rain' ? 0.75 : 0.55,
+            ),
+    ];
+  }
+
   /// Lays the radar and cloud image of the chosen time over the map.
   Future<void> _applyRadar() async {
     final controller = _controller;
@@ -365,42 +407,31 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
     } else if (_frames == null) {
       await _loadFrames();
     }
-    final frames = _frames;
-    for (final kind in const ['clouds', 'rain']) {
-      final id = 'radar-$kind';
-      if (_radarShown.remove(id)) {
-        try {
-          await controller.removeLayer(id);
-          await controller.removeSource(id);
-        } on Exception {
-          // Already gone with the style.
-        }
+    for (final id in _radarShown.toList()) {
+      _radarShown.remove(id);
+      try {
+        await controller.removeLayer(id);
+        await controller.removeSource(id);
+      } on Exception {
+        // Already gone with the style.
       }
-      if (!chosen.contains(kind) || frames == null || frames.times.isEmpty) {
-        continue;
-      }
-      // The image of that kind closest before the chosen time.
-      final time = frames.times[_frame.clamp(0, frames.times.length - 1)];
-      final known = (kind == 'rain' ? frames.rain : frames.clouds).where(
-        (frame) => frame <= time,
-      );
-      if (known.isEmpty) continue;
+    }
+    for (final image in _radarImages()) {
+      final id = 'radar-${image.kind}';
       try {
         await controller.addSource(
           id,
           RasterSourceProperties(
-            tiles: [
-              (radar[kind] as String).replaceFirst('{time}', '${known.last}'),
-            ],
+            tiles: [image.tiles],
             tileSize: 256,
-            maxzoom: (radar['${kind}_max_zoom'] as num?)?.toDouble() ?? 7,
+            maxzoom: image.maxZoom,
           ),
         );
         await controller.addRasterLayer(
           id,
           id,
           RasterLayerProperties(
-            rasterOpacity: kind == 'rain' ? 0.75 : 0.55,
+            rasterOpacity: image.opacity,
             rasterFadeDuration: 0,
           ),
           belowLayerId: 'track-line',
