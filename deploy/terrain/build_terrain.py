@@ -227,6 +227,9 @@ def main() -> None:
                     print(f"zoom {z}: {count} of {len(jobs)} tiles looked at, {made} written", flush=True)
             db.commit()
             print(f"zoom {z}: {len(jobs)} tiles looked at, {made} written", flush=True)
+    # Tiles noted to be cut anew (join_packs.py --forget-shared) have been cut now.
+    db.execute("DROP TABLE IF EXISTS wanted")
+    db.commit()
     db.close()
     if target != arguments.out:
         os.replace(part, arguments.out)

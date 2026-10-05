@@ -26,6 +26,7 @@ from multiprocessing import Pool
 
 import numpy as np
 from osgeo import gdal, osr
+from wanted import wanted_cells
 
 gdal.UseExceptions()
 
@@ -98,11 +99,21 @@ def main() -> None:
     parser.add_argument("--step", type=float, required=True, help="grid width in metres")
     parser.add_argument("--downloads", type=int, default=6)
     parser.add_argument("--workers", type=int, default=3)
+    parser.add_argument("--only-for", default="", help="a pack: fetch only what its wanted tiles need")
     arguments = parser.parse_args()
 
     files = read_metalink(arguments.metalink)
     os.makedirs(arguments.dir, exist_ok=True)
     print(f"{len(files)} files in the list", flush=True)
+    cells = wanted_cells(arguments.only_for, arguments.srs)
+    if cells is not None:
+        # The names hold the kilometre of the south-west corner: `746_5317.zip`.
+        files = [
+            entry for entry in files if tuple(int(part) for part in entry[0].split(".")[0].split("_")[:2]) in cells
+        ]
+        print(f"{len(files)} of them are needed for the tiles to cut anew", flush=True)
+        if not files:
+            sys.exit("nothing to fetch")
     jobs = [(name, digest, addresses, arguments.dir) for name, digest, addresses in files]
     failed = []
     with ThreadPoolExecutor(arguments.downloads) as pool:

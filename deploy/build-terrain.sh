@@ -10,6 +10,7 @@
 #   deploy/build-terrain.sh switzerland
 #   deploy/build-terrain.sh suedtirol
 #   deploy/build-terrain.sh norditalia
+#   deploy/build-terrain.sh lombardia
 #
 # Quellen (offene Daten; die Nennung steht danach in der Karte):
 #   austria   BEV, Digitales Geländehöhenmodell, Höhenraster 5 m, CC BY 4.0
@@ -27,6 +28,8 @@
 #             https://doi.org/10.13127/tinitaly/1.1): Italien nördlich von etwa 43,3° N,
 #             78 Dateien, rund 3 GB. Gröber als die übrigen Modelle; Südtirol behält
 #             sein eigenes (Vorrang).
+#   lombardia Regione Lombardia, DTM 5x5 (Ausgabe 2015), CC BY 4.0; ein Archiv mit
+#             3 GB, ausgepackt 8 GB (Erdas Imagine)
 #
 #   MAP_TERRAIN_ZOOM=14   tiefste Zoomstufe (14 sind rund 6,5 m je Bildpunkt)
 #   MAP_BUILD_CPUS=3      so viele Prozesse rechnen zugleich
@@ -105,7 +108,18 @@ case "$area" in
     # Endet an der Staatsgrenze, ist aber gröber als das Südtiroler Modell.
     priority=5
     ;;
-  *) echo "Für '$area' ist noch kein Geländemodell hinterlegt (bisher: austria, bayern, switzerland, suedtirol, norditalia)." >&2; exit 1 ;;
+  lombardia)
+    # Ein Archiv; darin das Raster als .img mit der großen Datei .ige daneben.
+    url="https://www.cartografia.servizirl.it/download/DTM5_RL.zip"
+    metalink=""
+    tiles=""
+    packed="DTM5_RL.img DTM5_RL.ige"
+    file="lombardia/DTM5_RL.img"
+    attribution="Höhendaten Lombardei: Regione Lombardia (DTM 5x5), CC BY 4.0"
+    # Feiner als TINITALY, endet an der Grenze der Region.
+    priority=8
+    ;;
+  *) echo "Für '$area' ist noch kein Geländemodell hinterlegt (bisher: austria, bayern, switzerland, suedtirol, norditalia, lombardia)." >&2; exit 1 ;;
 esac
 
 DATA_DIR="${DATA_DIR:-$(sed -n 's/^DATA_DIR=//p' .env 2>/dev/null | tail -n 1)}"
@@ -121,7 +135,8 @@ if [ ! -f "$sources/$file" ] && [ -n "$metalink" ]; then
   # Schon geholte Dateien bleiben liegen; ein abgebrochener Lauf macht weiter.
   docker compose --profile mapbuild run --rm --entrypoint python3 terrainbuild \
     /tool/mosaic_xyz.py --metalink "$metalink" --dir "/data/build/sources/${file%.tif}" \
-    --out "/data/build/sources/$file" --srs "$srs" --step "$step" --workers "$WORKERS"
+    --out "/data/build/sources/$file" --srs "$srs" --step "$step" --workers "$WORKERS" \
+    --only-for "/data/$area.hires.sqlite"
 elif [ ! -f "$sources/$file" ] && [ -n "${index:-}" ]; then
   echo "== Lade: $file $(date '+%Y-%m-%d %H:%M') =="
   docker compose --profile mapbuild run --rm --entrypoint python3 terrainbuild \
@@ -143,7 +158,23 @@ elif [ ! -f "$sources/$file" ] && [ -n "$tiles" ]; then
   fi
   docker compose --profile mapbuild run --rm --entrypoint python3 terrainbuild \
     /tool/mosaic_tiles.py --list "$tiles" --out "/data/build/sources/$file" \
-    --srs "$srs" --step "$step" --size-km "$size" --workers "$fetchers"
+    --srs "$srs" --step "$step" --size-km "$size" --workers "$fetchers" \
+    --only-for "/data/$area.hires.sqlite"
+elif [ ! -f "$sources/$file" ] && [ -n "${packed:-}" ]; then
+  echo "== Lade und packe aus: $file $(date '+%Y-%m-%d %H:%M') =="
+  archive="$sources/$(basename "$url")"
+  if [ ! -f "$archive" ]; then
+    curl -fL --retry 5 -C - --no-progress-meter -o "$archive.part" "$url"
+    mv "$archive.part" "$archive"
+  fi
+  docker compose --profile mapbuild run --rm --entrypoint python3 terrainbuild -c '
+import sys, zipfile
+archive, folder, *members = sys.argv[1:]
+with zipfile.ZipFile(archive) as packed:
+    for member in members:
+        packed.extract(member, folder)
+' "/data/build/sources/$(basename "$url")" "/data/build/sources/$(dirname "$file")" $packed
+  rm "$archive"
 elif [ ! -f "$sources/$file" ]; then
   echo "== Lade $file =="
   # Ein unterbrochener Download wird fortgesetzt; erst die ganze Datei bekommt den Namen.

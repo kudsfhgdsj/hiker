@@ -30,6 +30,7 @@ from multiprocessing import Pool
 
 import numpy as np
 from osgeo import gdal, osr
+from wanted import wanted_cells
 
 gdal.UseExceptions()
 
@@ -108,6 +109,7 @@ def main() -> None:
     parser.add_argument("--corner", default=r"_(\d{4})-(\d{4})_", help="kilometre of the south-west corner in an address")
     parser.add_argument("--size-km", type=int, default=1, help="edge of one file in kilometres")
     parser.add_argument("--workers", type=int, default=6)
+    parser.add_argument("--only-for", default="", help="a pack: fetch only what its wanted tiles need")
     arguments = parser.parse_args()
 
     addresses = read_list(arguments.list)
@@ -115,6 +117,18 @@ def main() -> None:
     corners = [re.search(arguments.corner, address) for address in addresses]
     if not all(corners):
         sys.exit("an address in the list does not hold the corner of its file")
+    cells = wanted_cells(arguments.only_for, arguments.srs)
+    if cells is not None:
+        size = arguments.size_km
+        keep = [
+            any((int(corner.group(1)) + dx, int(corner.group(2)) + dy) in cells for dx in range(size) for dy in range(size))
+            for corner in corners
+        ]
+        addresses = [address for address, kept in zip(addresses, keep) if kept]
+        corners = [corner for corner, kept in zip(corners, keep) if kept]
+        print(f"{len(addresses)} of them are needed for the tiles to cut anew", flush=True)
+        if not addresses:
+            sys.exit("nothing to fetch")
     eastings = [int(corner.group(1)) * 1000 for corner in corners]
     northings = [int(corner.group(2)) * 1000 for corner in corners]
     step = arguments.step

@@ -57,13 +57,30 @@ def write_bands(bands: np.ndarray) -> bytes:
     return data
 
 
+def real(bands: np.ndarray, world: np.ndarray) -> np.ndarray:
+    """Where a tile holds heights of its model and not what was filled in.
+
+    Filled pixels are the same as the world-wide tile to the bit. But here and there a
+    height of the model is by chance the same too; such a pixel lies among others that
+    differ, whereas what was filled in is a whole area. So a pixel also counts as the
+    model's if most of the 5 x 5 around it differ.
+    """
+    differs = (bands != world).any(axis=0)
+    padded = np.pad(differs, 2, mode="edge").astype(np.uint8)
+    around = np.zeros(differs.shape, np.uint8)
+    for dy in range(5):
+        for dx in range(5):
+            around += padded[dy : dy + SIZE, dx : dx + SIZE]
+    return differs | (around >= 18)
+
+
 def join(world: np.ndarray, tiles: list[np.ndarray]) -> np.ndarray:
     """The world-wide tile with everything on it that any of the packs really has;
     later tiles win over earlier ones."""
     joined = world.copy()
     for bands in tiles:
-        real = (bands != world).any(axis=0)
-        joined[:, real] = bands[:, real]
+        own = real(bands, world)
+        joined[:, own] = bands[:, own]
     return joined
 
 
@@ -86,6 +103,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("packs", nargs="+")
     parser.add_argument("--fill-url", default=FILL_URL)
+    parser.add_argument(
+        "--forget-shared",
+        action="store_true",
+        help="remove the shared tiles of the packs with a priority above 0 instead of joining,"
+        " so that build_terrain.py cuts them anew from the model",
+    )
     arguments = parser.parse_args()
 
     packs = {path: sqlite3.connect(path) for path in arguments.packs if os.path.isfile(path)}
@@ -100,6 +123,26 @@ def main() -> None:
             holders.setdefault(tile, []).append(path)
     shared = sorted(tile for tile, paths in holders.items() if len(paths) > 1)
     print(f"{len(shared)} tiles are in more than one pack", flush=True)
+    if arguments.forget_shared:
+        # For packs whose shared tiles were joined by an older, less careful rule.
+        for path, db in packs.items():
+            mine = [tile for tile in shared if path in holders[tile] and priority[path] > 0]
+            # Noted, so that only the files of the model that touch them are fetched again.
+            db.execute("CREATE TABLE IF NOT EXISTS wanted (z INTEGER, x INTEGER, y INTEGER, PRIMARY KEY (z, x, y))")
+            db.executemany("INSERT OR IGNORE INTO wanted VALUES (?, ?, ?)", mine)
+            db.executemany("DELETE FROM layer_tiles WHERE layer = 'terrain' AND z = ? AND x = ? AND y = ?", mine)
+            db.executemany("DELETE FROM seen WHERE z = ? AND x = ? AND y = ?", mine)
+            db.commit()
+            db.close()
+            derived = derived_of(path)
+            if mine and os.path.isfile(derived):
+                with sqlite3.connect(derived) as other:
+                    other.executemany(
+                        "DELETE FROM layer_tiles WHERE layer IN ('slope', 'contours') AND z = ? AND x = ? AND y = ?",
+                        mine,
+                    )
+            print(f"{path}: {len(mine)} shared tiles removed", flush=True)
+        return
 
     select = "SELECT data FROM layer_tiles WHERE layer = 'terrain' AND z = ? AND x = ? AND y = ?"
     changed: dict[str, list[tuple[int, int, int]]] = {path: [] for path in packs}
