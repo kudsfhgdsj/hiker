@@ -6,7 +6,7 @@ os.environ.update(
         "SECRET_KEY": "test-secret-key-not-for-production-0123456789",
         "DATABASE_URL": "sqlite://",
         "PUBLIC_BASE_URL": "http://testserver",
-        "ENABLED_MODULES": "auth,gear,nutrition,protocols,sync,maps,planning",
+        "ENABLED_MODULES": "auth,gear,nutrition,protocols,sync,maps,planning,reports",
         # Most tests sign in with a password only; test_auth_security.py switches it on.
         "MFA_REQUIRED": "false",
         "REGISTRATION_MODE": "open",

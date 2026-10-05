@@ -78,7 +78,7 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-hiker}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hiker}
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY fehlt in .env}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?PUBLIC_BASE_URL fehlt in .env}
-      ENABLED_MODULES: ${ENABLED_MODULES:-auth,gear,nutrition,protocols,sync,maps,planning}
+      ENABLED_MODULES: ${ENABLED_MODULES:-auth,gear,nutrition,protocols,sync,maps,planning,reports}
       REGISTRATION_MODE: ${REGISTRATION_MODE:-open}
       MFA_REQUIRED: ${MFA_REQUIRED:-true}
       OIDC_ISSUER: ${OIDC_ISSUER:-}

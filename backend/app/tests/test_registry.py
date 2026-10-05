@@ -121,6 +121,7 @@ def test_app_loads_modules_from_settings(client):
         "sync",
         "maps",
         "planning",
+        "reports",
     ]
 
 
