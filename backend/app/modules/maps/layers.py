@@ -266,7 +266,9 @@ class LayerPacks:
     one for this server (`<region>.server.sqlite`). What they hold is answered at once,
     without asking a source and without computing anything."""
 
-    _SUFFIXES = (".layers.sqlite", ".server.sqlite")
+    # In the order they are asked: a fine elevation model of a region (`terrain/`,
+    # built by deploy/build-terrain.sh) comes before the world-wide tiles built ahead.
+    _SUFFIXES = (".hires.sqlite", ".server.sqlite", ".layers.sqlite")
     _RESCAN_S = 60
 
     def __init__(self, folder: str | None):
@@ -283,11 +285,27 @@ class LayerPacks:
                 self._scanned = now
                 found = []
                 if self._folder is not None and self._folder.is_dir():
-                    for path in sorted(self._folder.iterdir()):
-                        if path.name.endswith(self._SUFFIXES) and path.is_file():
-                            found.append((path, path.stat().st_mtime))
+                    for suffix in self._SUFFIXES:
+                        for path in sorted(self._folder.glob(f"*{suffix}")):
+                            if path.is_file():
+                                found.append((path, path.stat().st_mtime))
                 self._files = found
             return self._files
+
+    def attributions(self) -> list[str]:
+        """Who must be named for the packs: what their builders wrote into them."""
+        named: list[str] = []
+        for path, _modified in self._packs():
+            try:
+                with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as db:
+                    row = db.execute(
+                        "SELECT value FROM metadata WHERE name = 'attribution'"
+                    ).fetchone()
+            except sqlite3.Error:
+                continue
+            if row and row[0] and row[0] not in named:
+                named.append(row[0])
+        return named
 
     def get(self, layer: str, z: int, x: int, y: int) -> bytes | None:
         # One connection per thread and version of a file; SQLite objects stay in their thread.
@@ -338,6 +356,9 @@ class Layers:
             )
             for name in (*sources, "slope", "contours", "weather")
         }
+
+    def pack_attributions(self) -> list[str]:
+        return self._packs.attributions()
 
     def available(self) -> set[str]:
         names = set(self._sources)
@@ -419,11 +440,12 @@ def media_type(layer: str) -> str:
     return "image/jpeg" if layer == "satellite" else "image/png"
 
 
-def attributions(available: set[str]) -> dict[str, str]:
-    """What must be named when a layer is shown."""
+def attributions(available: set[str], packs: list[str] | None = None) -> dict[str, str]:
+    """What must be named when a layer is shown. `packs`: the sources of the fine
+    elevation models built for single regions."""
     result = {}
     if "terrain" in available:
-        result["terrain"] = TERRAIN.attribution
+        result["terrain"] = " · ".join([TERRAIN.attribution, *(packs or [])])
     if "satellite" in available:
         result["satellite"] = " · ".join(provider.attribution for provider in SATELLITE)
     for provider in (SNOW, PRECIPITATION):

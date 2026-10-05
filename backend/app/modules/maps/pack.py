@@ -240,6 +240,74 @@ def build_server_pack(
     return out
 
 
+# --- Slope and contours from a fine elevation model ---
+
+
+def _derived_tiles(job: tuple[int, int, int, bytes, bool, bool]) -> list[tuple]:
+    z, x, y, terrain, with_slope, with_contours = job
+    made = []
+    if with_slope:
+        made.append(("slope", z, x, y, slope_tile(terrain, z, y)))
+    if with_contours:
+        made.append(("contours", z, x, y, contour_tile(terrain, z)))
+    return made
+
+
+def derive(pack: Path, *, workers: int = 3, report: Callable[[str], None] = print) -> int:
+    """Computes slope and contour tiles from the elevation tiles a pack already holds
+    (e.g. a fine elevation model cut by deploy/terrain/build_terrain.py) and writes them
+    into the same pack. What is there already is not made again. Returns how many
+    elevation tiles were worked on."""
+    db = sqlite3.connect(pack)
+    exists = "SELECT 1 FROM layer_tiles WHERE layer = ? AND z = ? AND x = ? AND y = ?"
+    wanted = db.execute(
+        "SELECT z, x, y FROM layer_tiles WHERE layer = 'terrain' AND z >= ? AND z <= ?",
+        (min(SLOPE_ZOOMS.start, CONTOUR_ZOOMS.start), _SLOPE_LIMIT),
+    ).fetchall()
+
+    def jobs():
+        for z, x, y in wanted:
+            slope = SLOPE_ZOOMS.start <= z <= _SLOPE_LIMIT
+            contours = CONTOUR_ZOOMS.start <= z <= _CONTOUR_LIMIT
+            slope = slope and not db.execute(exists, ("slope", z, x, y)).fetchone()
+            contours = contours and not db.execute(exists, ("contours", z, x, y)).fetchone()
+            if slope or contours:
+                (terrain,) = db.execute(
+                    "SELECT data FROM layer_tiles"
+                    " WHERE layer = 'terrain' AND z = ? AND x = ? AND y = ?",
+                    (z, x, y),
+                ).fetchone()
+                yield z, x, y, terrain, slope, contours
+
+    done = 0
+    try:
+        with ProcessPoolExecutor(max_workers=workers) as pool:
+            # Jobs carry their elevation tile along; they are handed out in portions,
+            # so that not all of them wait in memory at once.
+            batch: list[tuple] = []
+
+            def flush() -> None:
+                nonlocal done
+                for made in pool.map(_derived_tiles, batch, chunksize=8):
+                    db.executemany(
+                        "INSERT OR REPLACE INTO layer_tiles VALUES (?, ?, ?, ?, ?)", made
+                    )
+                done += len(batch)
+                db.commit()
+                report(f"{done} tiles derived")
+                batch.clear()
+
+            for job in jobs():
+                batch.append(job)
+                if len(batch) >= 600:
+                    flush()
+            if batch:
+                flush()
+    finally:
+        db.close()
+    return done
+
+
 if __name__ == "__main__":
     arguments = [argument for argument in sys.argv[1:] if not argument.startswith("--")]
     options = dict(
@@ -247,8 +315,12 @@ if __name__ == "__main__":
         for argument in sys.argv[1:]
         if argument.startswith("--")
     )
-    if len(arguments) != 1 or set(options) - {"server", "max-zoom", "workers"}:
+    if len(arguments) != 1 or set(options) - {"server", "derive", "max-zoom", "workers"}:
         sys.exit(__doc__)
+    if "derive" in options:
+        count = derive(Path(arguments[0]), workers=int(options.get("workers") or 3))
+        print(f"{arguments[0]}: slope and contours for {count} tiles")
+        sys.exit(0)
     if "server" in options:
         result = build_server_pack(
             Path(arguments[0]),

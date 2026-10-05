@@ -190,7 +190,7 @@ def read_style(
             else None
         ),
         history_days=HISTORY_DAYS,
-        attributions=attributions(layers.available())
+        attributions=attributions(layers.available(), layers.pack_attributions())
         | {
             "avalanche": AVALANCHE_ATTRIBUTION,
             "weather": WEATHER_ATTRIBUTION,

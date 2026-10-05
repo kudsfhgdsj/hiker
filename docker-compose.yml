@@ -230,6 +230,22 @@ services:
     # Das Server-Paket rechnet in mehreren Prozessen (deploy/prebuild-layers.sh).
     mem_limit: 2g
 
+  # Schneidet ein feines Geländemodell eines Gebiets in Höhenkacheln
+  # (deploy/build-terrain.sh). GDAL (MIT/X-Lizenz) gibt es nur hier, nicht in der API.
+  terrainbuild:
+    image: ghcr.io/osgeo/gdal:ubuntu-small-3.13.0
+    profiles: ["mapbuild"]
+    restart: "no"
+    <<: *unprivileged
+    entrypoint: ["python3", "/tool/build_terrain.py"]
+    tmpfs:
+      - /tmp
+    volumes:
+      - ${DATA_DIR:-./data}/maps:/data
+      - ./deploy/terrain:/tool:ro
+    cpus: ${MAP_BUILD_CPUS:-2.0}
+    mem_limit: 3g
+
   # Baut den Suchindex eines Gebiets aus dessen Karte (deploy/build-map.sh).
   mapsearch:
     build: ./backend

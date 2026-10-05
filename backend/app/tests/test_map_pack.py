@@ -141,3 +141,70 @@ def test_the_server_answers_from_packs_built_ahead(client, maps, monkeypatch):
     assert client.get(f"/api/v1/maps/contours/{z}/{x}/{y}.pbf").content == b"contours built ahead"
     assert client.get(f"/api/v1/maps/raster/terrain/{z}/{x}/{y}").content == elevation
     layers_module._layers.cache_clear()
+
+
+def test_a_fine_elevation_model_comes_first_and_is_named(client, maps, monkeypatch):
+    from app.modules.maps import layers as layers_module
+    from app.modules.maps.pack import derive
+
+    write_map(maps / "austria.mbtiles", bounds="9.5,46.4,17.2,49.0")
+    fine = terrain_png(lambda column, row: 2000 + column * 4)
+    coarse = terrain_png(lambda column, row: 1000)
+
+    def pack(name: str, elevation: bytes, attribution: str | None = None) -> None:
+        with sqlite3.connect(maps / name) as db:
+            db.execute(
+                "CREATE TABLE layer_tiles (layer TEXT, z INTEGER, x INTEGER, y INTEGER,"
+                " data BLOB, PRIMARY KEY (layer, z, x, y)) WITHOUT ROWID"
+            )
+            db.execute("CREATE TABLE metadata (name TEXT PRIMARY KEY, value TEXT)")
+            if attribution:
+                db.execute("INSERT INTO metadata VALUES ('attribution', ?)", (attribution,))
+            for z, x, y in ((13, 4420, 2850), (14, 8840, 5700), (12, 2210, 1425)):
+                db.execute(
+                    "INSERT INTO layer_tiles VALUES ('terrain', ?, ?, ?, ?)", (z, x, y, elevation)
+                )
+
+    pack("austria.server.sqlite", coarse)
+    pack("austria.hires.sqlite", fine, "Höhendaten Österreich: © BEV (DGM 5 m), CC BY 4.0")
+
+    class Inline:
+        def __init__(self, max_workers):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *error):
+            return False
+
+        def map(self, function, jobs, chunksize=1):
+            return [function(job) for job in jobs]
+
+    monkeypatch.setattr("app.modules.maps.pack.ProcessPoolExecutor", Inline)
+    lines: list[str] = []
+    # Slope for every level of the model, contours down to their deepest level (13).
+    assert derive(maps / "austria.hires.sqlite", report=lines.append) == 3
+    with sqlite3.connect(maps / "austria.hires.sqlite") as db:
+        made = db.execute(
+            "SELECT layer, z FROM layer_tiles WHERE layer != 'terrain' ORDER BY 1, 2"
+        ).fetchall()
+    assert made == [("contours", 12), ("contours", 13), ("slope", 12), ("slope", 13), ("slope", 14)]
+    # Run again, nothing is left to do.
+    assert derive(maps / "austria.hires.sqlite", report=lines.append) == 0
+
+    def no_source(*args, **kwargs):
+        raise AssertionError("the pack must answer")
+
+    get_settings.cache_clear()
+    layers_module._layers.cache_clear()
+    monkeypatch.setattr(layers_module.TileCache, "get", no_source)
+    # The fine model wins over the tiles built ahead from the world-wide source.
+    assert client.get("/api/v1/maps/raster/terrain/13/4420/2850").content == fine
+    assert client.get("/api/v1/maps/slope/14/8840/5700.png").status_code == 200
+    assert client.get("/api/v1/maps/contours/13/4420/2850.pbf").status_code == 200
+    # Its source is named with the elevation data.
+    style = client.get("/api/v1/maps/style.json").json()
+    named = style["sources"]["terrain"]["attribution"]
+    assert "Mapzen" in named and "© BEV (DGM 5 m), CC BY 4.0" in named
+    layers_module._layers.cache_clear()

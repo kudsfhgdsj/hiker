@@ -240,9 +240,9 @@ def test_style_offers_the_layers_the_server_has(client, layers, tmp_path, monkey
     }
     assert "avalanche.report" in style["sources"]["avalanche"]["attribution"]
     assert hiker["terrain"] == {"source": "terrain-3d", "exaggeration": 1.3}
-    # Shading and 3D view take the elevation as fine as the tiles have it: sharper ridges.
-    assert style["sources"]["terrain-3d"]["maxzoom"] == 15
-    assert style["sources"]["terrain"]["maxzoom"] == 15
+    # Shading and 3D view ask for elevation down to the level the fine models are cut to.
+    assert style["sources"]["terrain-3d"]["maxzoom"] == 14
+    assert style["sources"]["terrain"]["maxzoom"] == 14
 
 
 def test_switchable_layers_start_hidden_and_keep_their_place():

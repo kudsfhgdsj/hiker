@@ -467,8 +467,10 @@ def _add_look(layers: list[dict], hiker: dict, insert_before, look: Look) -> Non
 
 
 SATELLITE_OPACITY = 0.7
-# Deepest zoom level of the elevation tiles (see layers.TERRAIN).
-TERRAIN_MAX_ZOOM = 15
+# Deepest zoom level of the elevation tiles the map asks for. The fine elevation models
+# of single regions are cut down to this level (about 6 m per pixel in the Alps); the
+# map library enlarges it when the user zooms in further.
+TERRAIN_MAX_ZOOM = 14
 OVERLAY_GROUPS = {
     "terrain": ("slope", "satellite"),
     "snow": ("avalanche", "snow", "snowdepth"),

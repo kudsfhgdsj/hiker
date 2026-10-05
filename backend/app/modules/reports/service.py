@@ -67,6 +67,9 @@ def climbed_peaks(db: Session, user: User) -> list[dict]:
     if not tours:
         return []
     entries = db.scalars(select(TourPeak).where(TourPeak.tour_id.in_(tours))).all()
+    # In the order of the tours: the first entry of a peak gives it its name.
+    position = {tour_id: index for index, tour_id in enumerate(tours)}
+    entries = sorted(entries, key=lambda entry: (position[entry.tour_id], entry.sort_order))
     peaks: list[dict] = []
     for entry in entries:
         tour = tours[entry.tour_id]
