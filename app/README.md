@@ -139,8 +139,13 @@ Oben in jeder Karte liegen die Felder „Ebenen“ und „Darstellung“ (im Pla
 „Schwierigkeit“). Unter „Ebenen“: Hangneigung mit einem Regler für beide Enden, ein Tag im
 letzten Jahr für Lawinengefahr, Schnee und Wetter, Regenradar und Wolken mit Zeitregler. Die
 gewählten Winkel und der Tag stehen in den Adressen, die die Karte beim Kartenserver der App
-abfragt (`styleWithChoice`). Ein 3D-Gelände kann die Kartenbibliothek der App nicht zeigen;
-das gibt es nur im Web.
+abfragt (`styleWithChoice`).
+
+Der Knopf „3D“ öffnet die 3D-Ansicht (`core/map/map_3d_screen.dart`): denselben Ausschnitt mit
+Route und eingeschalteten Ebenen, das Gelände angehoben, nur zum Ansehen. Weil die
+Kartenbibliothek der App das noch nicht kann, läuft dort MapLibre GL JS aus `assets/map3d/`
+(dieselben Dateien wie im Web-Frontend) in einer WebView; alles kommt vom Kartenserver der App
+(`/3d/…`). Im Emulator mit Software-Grafik stürzt die Ansicht ab; sie braucht ein echtes Gerät.
 
 ## Planung
 

@@ -51,6 +51,7 @@ dependencies:
   crypto: ^3.0.7
   path_provider: ^2.1.6
   sqlite3: ^3.5.2
+  webview_flutter: ^4.14.1
 
 dev_dependencies:
   flutter_test:
@@ -86,6 +87,8 @@ flutter:
     - assets/fonts/noto-sans-regular/
     - assets/fonts/noto-sans-bold/
     - assets/fonts/noto-sans-italic/
+    # The 3D view: MapLibre GL JS (BSD-3-Clause), the same files the web frontend serves.
+    - assets/map3d/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

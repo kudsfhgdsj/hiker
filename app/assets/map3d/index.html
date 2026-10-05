@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>hiker 3D</title>
+  <link rel="stylesheet" href="maplibre-gl.css">
+  <style>
+    html, body, #map { height: 100%; margin: 0; background: #e4e9e6; }
+    #note { position: absolute; left: 0; right: 0; top: 40%; text-align: center; font: 16px sans-serif; color: #444; padding: 0 24px; }
+    .dot { width: 14px; height: 14px; border-radius: 50%; background: #c62828; border: 2px solid #fff; box-shadow: 0 0 3px #0008; }
+    .dot.found { background: #1565c0; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="note" hidden></div>
+  <script src="maplibre-gl-csp.js"></script>
+  <script src="view.js"></script>
+</body>
+</html>

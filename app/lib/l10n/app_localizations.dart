@@ -3118,6 +3118,24 @@ abstract class AppLocalizations {
   /// **'Darstellung'**
   String get mapLooks;
 
+  /// No description provided for @map3dTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'3D-Ansicht'**
+  String get map3dTitle;
+
+  /// No description provided for @map3dHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Zum Ansehen: mit einem Finger verschieben, mit zwei Fingern drehen, zoomen und kippen.'**
+  String get map3dHint;
+
+  /// No description provided for @map3dUnsupported.
+  ///
+  /// In de, this message translates to:
+  /// **'Dieses Gerät kann die 3D-Ansicht nicht darstellen.'**
+  String get map3dUnsupported;
+
   /// No description provided for @mapSearch.
   ///
   /// In de, this message translates to:

@@ -24,6 +24,7 @@ class MapLibreMapView extends StatefulWidget {
     this.layerChoice = const MapLayerChoice(),
     this.layerSheet,
     this.onSearch,
+    this.on3D,
   });
 
   final MapContent content;
@@ -44,6 +45,10 @@ class MapLibreMapView extends StatefulWidget {
   /// Looks for places by name near a point; null hides the search.
   final Future<List<FoundPlace>> Function(String query, GeoPoint near)?
   onSearch;
+
+  /// Opens the 3D view with what the map shows right now (see [_scene]);
+  /// null: no 3D view.
+  final void Function(BuildContext context, Map<String, dynamic> scene)? on3D;
 
   @override
   State<MapLibreMapView> createState() => _MapLibreMapViewState();
@@ -147,11 +152,10 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
     ],
   };
 
-  /// Shows the layers of the chosen base map and overlays, hides the others.
-  Future<void> _applyLayerChoice() async {
-    final controller = _controller;
+  /// Which layers of the style are shown for the chosen base map and overlays.
+  Map<String, bool> _layerVisibility() {
     final options = widget.layerOptions;
-    if (controller == null || options == null || !_styleLoaded) return;
+    if (options == null) return const {};
     final choice = widget.layerChoice;
     final bases = (options['bases'] as List<dynamic>)
         .cast<Map<String, dynamic>>();
@@ -180,7 +184,52 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
         visible[layer] = choice.overlays.contains(overlay['id']);
       }
     }
-    for (final entry in visible.entries) {
+    return visible;
+  }
+
+  /// How opaque the overlays with a slider are drawn, by layer.
+  Map<String, double> _layerOpacity() => {
+    for (final overlay
+        in (widget.layerOptions?['overlays'] as List<dynamic>? ?? const [])
+            .cast<Map<String, dynamic>>())
+      if (overlay['opacity'] case final Map<String, dynamic> opacity)
+        opacity['layer'] as String:
+            widget.layerChoice.opacity[overlay['id']] ??
+            (opacity['default'] as num).toDouble(),
+  };
+
+  /// What the 3D view needs to show the same as this map.
+  Map<String, dynamic> _scene() {
+    final camera = _controller?.cameraPosition;
+    final center = camera?.target ?? _fallback;
+    return {
+      'style': jsonDecode(_style),
+      'center': [center.longitude, center.latitude],
+      'zoom': camera?.zoom ?? 11,
+      'bearing': camera?.bearing ?? 0,
+      'terrain': widget.layerOptions?['terrain'],
+      'visible': _layerVisibility(),
+      'opacity': _layerOpacity(),
+      'track': [
+        for (final point in widget.content.track) [point.lon, point.lat],
+      ],
+      'points': [
+        for (final marker in widget.content.markers)
+          {'lat': marker.position.lat, 'lon': marker.position.lon},
+        if (_found case final found?)
+          {'lat': found.lat, 'lon': found.lon, 'found': true},
+      ],
+      'texts': {'unsupported': AppLocalizations.of(context).map3dUnsupported},
+    };
+  }
+
+  /// Shows the layers of the chosen base map and overlays, hides the others.
+  Future<void> _applyLayerChoice() async {
+    final controller = _controller;
+    final options = widget.layerOptions;
+    if (controller == null || options == null || !_styleLoaded) return;
+    final choice = widget.layerChoice;
+    for (final entry in _layerVisibility().entries) {
       try {
         await controller.setLayerVisibility(entry.key, entry.value);
       } on Exception {
@@ -601,6 +650,11 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
               right: 56,
               child: _MapFields(
                 onSearch: widget.onSearch == null ? null : _search,
+                on3D:
+                    widget.on3D == null ||
+                        widget.layerOptions?['terrain'] == null
+                    ? null
+                    : () => widget.on3D!(context, _scene()),
                 fields: [
                   if (widget.layerSheet case final sheet?) ...[
                     MapControl(
@@ -670,7 +724,10 @@ class _MapLibreMapViewState extends State<MapLibreMapView> {
 
 /// The fields at the top edge of the map; each opens a sheet.
 class _MapFields extends StatelessWidget {
-  const _MapFields({required this.fields, this.onSearch});
+  const _MapFields({required this.fields, this.onSearch, this.on3D});
+
+  /// Opens the 3D view; null: the map has none.
+  final VoidCallback? on3D;
 
   final List<MapControl> fields;
 
@@ -731,6 +788,26 @@ class _MapFields extends StatelessWidget {
                         const Icon(Icons.arrow_drop_down, size: 20),
                       ],
                     ),
+                  ),
+                ),
+              ),
+            ),
+          if (on3D != null)
+            Material(
+              color: scheme.surface,
+              borderRadius: BorderRadius.circular(18),
+              elevation: 2,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: on3D,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    '3D',
+                    style: Theme.of(context).textTheme.labelLarge,
                   ),
                 ),
               ),

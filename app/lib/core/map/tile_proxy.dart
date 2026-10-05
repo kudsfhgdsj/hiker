@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -22,6 +23,7 @@ import 'map_regions.dart';
 /// - `/raster/{layer}/{z}/{x}/{y}` and `/slope/{z}/{x}/{y}.png`: elevation,
 ///   aerial images, snow, precipitation and the slope layer of the user's
 ///   server, and `/avalanche.geojson`, the avalanche danger of today,
+/// - `/3d/…`: the page of the 3D view with its map library and what it shows,
 /// - `/radar/frames` and `/radar/{kind}/{time}/{z}/{x}/{y}.png`: rain radar
 ///   and cloud images with their times.
 ///
@@ -64,6 +66,18 @@ class TileProxy extends Notifier<int?> {
 
   HttpServer? _server;
   HttpClient? _client;
+
+  /// What the 3D view shows (style, camera, track), as JSON; the page asks
+  /// for it as `/3d/scene.json`.
+  String? scene3d;
+
+  static const _pageTypes = {
+    'html': 'text/html',
+    'js': 'text/javascript',
+    'css': 'text/css',
+    'json': 'application/json',
+  };
+  static final _page = RegExp(r'^/3d/([a-z0-9-]+)\.(html|js|css|json)$');
 
   /// The port it listens on, or null while it is not running.
   @override
@@ -249,6 +263,27 @@ class TileProxy extends Notifier<int?> {
         response.statusCode = HttpStatus.notFound;
         return;
       }
+      if (_page.firstMatch(path) case final page?) {
+        // The page of the 3D view and its map library come with the app.
+        final List<int>? body = path == '/3d/scene.json'
+            ? switch (scene3d) {
+                final scene? => utf8.encode(scene),
+                null => null,
+              }
+            : await ref.read(bundledPageProvider)('${page[1]}.${page[2]}');
+        if (body == null) {
+          response.statusCode = HttpStatus.notFound;
+          return;
+        }
+        response.statusCode = HttpStatus.ok;
+        response.headers.set(
+          HttpHeaders.contentTypeHeader,
+          '${_pageTypes[page[2]]}; charset=utf-8',
+        );
+        response.headers.set(HttpHeaders.cacheControlHeader, 'no-store');
+        response.add(body);
+        return;
+      }
       final raster = _raster.firstMatch(path);
       final vector = _vector.firstMatch(path);
       final glyphs = _glyphs.firstMatch(path);
@@ -419,6 +454,19 @@ final bundledGlyphsProvider = Provider<BundledGlyphs>(
     final folder = font.toLowerCase().replaceAll(' ', '-');
     try {
       final data = await rootBundle.load('assets/fonts/$folder/$range.pbf');
+      return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    } on Object {
+      return null;
+    }
+  },
+);
+
+/// Reads a file of the 3D view that comes with the app (`assets/map3d/`);
+/// null if there is none of that name.
+final bundledPageProvider = Provider<Future<List<int>?> Function(String name)>(
+  (ref) => (name) async {
+    try {
+      final data = await rootBundle.load('assets/map3d/$name');
       return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
     } on Object {
       return null;

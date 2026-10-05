@@ -15,6 +15,7 @@ import '../modules/feature_module.dart';
 import '../network/trusted_certificates.dart';
 import '../session/session.dart';
 import 'geo.dart';
+import 'map_3d_screen.dart';
 import 'map_regions.dart';
 import 'maplibre_map_view.dart';
 import 'tile_proxy.dart';
@@ -789,6 +790,7 @@ final mapViewBuilderProvider = Provider<MapViewBuilder>((ref) {
   final tileUrl = ref.watch(mapTileUrlProvider);
   final style = ref.watch(mapStyleProvider).asData?.value;
   final choice = ref.watch(mapLayerChoiceProvider);
+  final port = ref.watch(tileProxyProvider);
   final options = mapLayerOptions(style);
   // The chosen angles and day are part of the addresses the map asks for.
   final shown = style == null ? null : styleWithChoice(style, choice);
@@ -804,6 +806,19 @@ final mapViewBuilderProvider = Provider<MapViewBuilder>((ref) {
     layerSheet: options == null
         ? null
         : (context, part) => MapLayerSheet(options: options, part: part),
+    // The 3D view is a page of the app's own map server.
+    on3D: port == null
+        ? null
+        : (context, scene) {
+            ref.read(tileProxyProvider.notifier).scene3d = jsonEncode(scene);
+            Navigator.of(context, rootNavigator: true).push(
+              MaterialPageRoute<void>(
+                builder: (_) => Map3DScreen(
+                  page: Uri.parse('http://127.0.0.1:$port/3d/index.html'),
+                ),
+              ),
+            );
+          },
     // The search knows the places of the own map.
     onSearch: style == null
         ? null

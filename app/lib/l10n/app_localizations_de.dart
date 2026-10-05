@@ -1715,6 +1715,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get mapLooks => 'Darstellung';
 
   @override
+  String get map3dTitle => '3D-Ansicht';
+
+  @override
+  String get map3dHint =>
+      'Zum Ansehen: mit einem Finger verschieben, mit zwei Fingern drehen, zoomen und kippen.';
+
+  @override
+  String get map3dUnsupported =>
+      'Dieses Gerät kann die 3D-Ansicht nicht darstellen.';
+
+  @override
   String get mapSearch => 'Ort, Gipfel oder Hütte suchen';
 
   @override
