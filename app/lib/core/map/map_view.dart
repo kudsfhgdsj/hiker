@@ -408,6 +408,9 @@ class MapLayerSheet extends ConsumerWidget {
       'map' => l10n.mapBaseMap,
       'winter' => l10n.mapBaseWinter,
       'topo' => l10n.mapBaseTopo,
+      'alpenverein' => l10n.mapBaseAlpenverein,
+      'outdooractive' => l10n.mapBaseOutdooractive,
+      'kompass' => l10n.mapBaseKompass,
       'satellite' => l10n.mapBaseSatellite,
       _ => id,
     };
@@ -452,6 +455,11 @@ class MapLayerSheet extends ConsumerWidget {
                 ),
             ],
           ),
+        ),
+      if (bases.length > 3)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Text(l10n.mapBaseNote, style: theme.textTheme.bodySmall),
         ),
       if (options['legend'] case final List<dynamic> legend
           when legend.isNotEmpty)

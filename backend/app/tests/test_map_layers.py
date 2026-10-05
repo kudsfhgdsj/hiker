@@ -214,7 +214,14 @@ def test_style_offers_the_layers_the_server_has(client, layers, tmp_path, monkey
     assert style["sources"]["satellite"]["tiles"] == [f"{base}/raster/satellite/{{z}}/{{x}}/{{y}}"]
     assert "swisstopo" in style["sources"]["satellite"]["attribution"]
     hiker = style["metadata"]["hiker"]
-    assert [entry["id"] for entry in hiker["bases"]] == ["map", "winter", "topo"]
+    assert [entry["id"] for entry in hiker["bases"]] == [
+        "map",
+        "winter",
+        "topo",
+        "alpenverein",
+        "outdooractive",
+        "kompass",
+    ]
     assert style["sources"]["contours"]["tiles"] == [f"{base}/contours/{{z}}/{{x}}/{{y}}.pbf"]
     # In the order the clients offer them: the ground, then snow, then the weather.
     assert [(entry["id"], entry["group"]) for entry in hiker["overlays"]] == [
@@ -272,7 +279,14 @@ def test_switchable_layers_start_hidden_and_keep_their_place():
     assert layers["contour"]["source-layer"] == "contour"
     assert layers["contour-label"]["filter"] == ["==", ["get", "index"], 1]
     # The user chooses how much of the map shines through the aerial image.
-    assert [base["id"] for base in hiker["bases"]] == ["map", "winter", "topo"]
+    assert [base["id"] for base in hiker["bases"]] == [
+        "map",
+        "winter",
+        "topo",
+        "alpenverein",
+        "outdooractive",
+        "kompass",
+    ]
     # The look "Topo" shows its own ground, relief, contours, paths and summit names
     # instead of the usual ones; everything of it starts hidden.
     topo = hiker["bases"][2]
@@ -281,6 +295,7 @@ def test_switchable_layers_start_hidden_and_keep_their_place():
         "topo-grass",
         "topo-wood",
         "topo-rock",
+        "topo-ice",
         "topo-hillshade",
         "topo-contour",
         "topo-path-casing",
@@ -294,6 +309,29 @@ def test_switchable_layers_start_hidden_and_keep_their_place():
     assert order.index("wood") < order.index("topo-wood") < order.index("topo-hillshade")
     assert order.index("topo-path-casing") < order.index("topo-path") < order.index("peak-name")
     assert layers["topo-path"]["paint"]["line-color"] == "#d0182b"
+    # Every further look has the same parts in its own colours; what one of them shows
+    # is hidden again by the next, because each hides the usual layers it replaces.
+    by_id = {base["id"]: base for base in hiker["bases"]}
+    for name in ("alpenverein", "outdooractive", "kompass"):
+        look = by_id[name]
+        assert {f"{name}-ground", f"{name}-wood", f"{name}-hillshade", f"{name}-contour"} <= set(
+            look["show"]
+        )
+        assert all(layer.startswith(f"{name}-") for layer in look["show"])
+        assert {"wood", "hillshade", "contour", "path", "path-difficulty"} <= set(look["hide"])
+        assert all(layers[layer]["layout"]["visibility"] == "none" for layer in look["show"])
+    # Alpenverein: thin solid red paths and strong blue water.
+    assert "line-dasharray" not in layers["alpenverein-path"]["paint"]
+    assert layers["alpenverein-water"]["paint"]["fill-color"] == "#6db7ee"
+    assert "water" in by_id["alpenverein"]["hide"] and "water" not in by_id["topo"]["hide"]
+    # Outdooractive: plain paths dashed in grey, the marked mountain paths dotted in red.
+    assert layers["outdooractive-path"]["paint"]["line-color"] == "#3a3a3a"
+    marked = layers["outdooractive-path-marked"]
+    assert marked["source-layer"] == "hiking" and marked["paint"]["line-color"] == "#d7262c"
+    assert marked["layout"]["line-cap"] == "round"
+    # Kompass: strong solid red paths and mauve buildings.
+    assert "line-dasharray" not in layers["kompass-path"]["paint"]
+    assert layers["kompass-building"]["paint"]["fill-color"] == "#c7a1c4"
     # The grade next to the path and the via ferratas stay in every look.
     assert "path-difficulty-label" not in topo["hide"] and "via-ferrata" not in topo["hide"]
     assert hiker["overlays"][1] == {
@@ -312,7 +350,13 @@ def test_switchable_layers_start_hidden_and_keep_their_place():
     assert set(plain["sources"]) == {"hiker"}
     # Without elevation data: the usual look and "Topo" without relief and contours.
     bases = plain["metadata"]["hiker"]["bases"]
-    assert [base["id"] for base in bases] == ["map", "topo"]
+    assert [base["id"] for base in bases] == [
+        "map",
+        "topo",
+        "alpenverein",
+        "outdooractive",
+        "kompass",
+    ]
     assert "topo-hillshade" not in bases[1]["show"] and "topo-path" in bases[1]["show"]
     assert plain["metadata"]["hiker"]["overlays"] == []
 

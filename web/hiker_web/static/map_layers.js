@@ -347,6 +347,7 @@ window.hikerMapLayers = (map, texts, options = {}) => {
         );
       }
       setBase(current);
+      if (meta.bases.length > 3) note(looks, texts.looksNote);
       if (meta.legend && meta.legend.length) {
         looks.append(element("hr"));
         const legend = element("div", "map-legend paths");

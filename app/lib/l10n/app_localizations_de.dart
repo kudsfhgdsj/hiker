@@ -1821,6 +1821,19 @@ class AppLocalizationsDe extends AppLocalizations {
   String get mapBaseTopo => 'Topo';
 
   @override
+  String get mapBaseAlpenverein => 'Alpenverein';
+
+  @override
+  String get mapBaseOutdooractive => 'Outdooractive';
+
+  @override
+  String get mapBaseKompass => 'Kompass';
+
+  @override
+  String get mapBaseNote =>
+      'Alle Darstellungen sind selbst aus OpenStreetMap-Daten gezeichnet. „Alpenverein“, „Outdooractive“ und „Kompass“ sind an die Karten dieser Anbieter angelehnt und stammen nicht von ihnen.';
+
+  @override
   String get mapBaseSatellite => 'Luftbild';
 
   @override

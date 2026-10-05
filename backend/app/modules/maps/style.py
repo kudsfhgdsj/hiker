@@ -4,6 +4,8 @@ An own design: paths and tracks stand out, rock, ice and forest are told apart,
 peaks and huts are named. It needs no icon sprite; labels use Noto Sans.
 """
 
+from dataclasses import dataclass
+
 REGULAR = ["Noto Sans Regular"]
 BOLD = ["Noto Sans Bold"]
 ITALIC = ["Noto Sans Italic"]
@@ -173,114 +175,235 @@ def _use_symbols(layers: list[dict]) -> None:
             layers[index] = symbols[layer["id"]]
 
 
-def _add_topo_look(layers: list[dict], hiker: dict, insert_before) -> None:
-    """The look "Topo": a classic topographic hiking map. Strong green forest, grey rock,
-    heavy relief and dense brown contour lines, paths in red, summits in bold black.
+@dataclass(frozen=True)
+class Look:
+    """A look of the map: its own colours for ground, relief, contours, water, paths and
+    summit names. Everything is drawn from the same data; only the paint differs."""
 
-    A look is a set of layers that are shown instead of others (`bases` in the metadata),
-    so the clients switch it like the winter look, without loading another style.
+    id: str
+    ground: str
+    grass: str
+    wood: str
+    rock: str
+    ice: str
+    water: str
+    # Relief: strength (0 to 1), colour of the shadows and of the accents on ridges.
+    shade: tuple[float, str, str]
+    # Contour lines: colour, opacity and width of the index lines and of the others.
+    contour: tuple[str, float, float, float, float]
+    # Paths: colour, dash pattern (None: solid), factor on the usual width.
+    path: tuple[str, list[float] | None, float]
+    # Paths with a grade (the marked mountain paths) drawn again in this colour and dash
+    # pattern, over the plain ones; None: all paths look the same.
+    marked: tuple[str, list[float] | None] | None = None
+    # Summit names: colour, size, font.
+    summit: tuple[str, int, list[str]] = ("#111111", 13, BOLD)
+    building: str | None = None
+
+
+LOOKS = (
+    # A classic topographic hiking map: strong green forest, grey rock, heavy relief,
+    # dense brown contour lines, paths in red, summits in bold black.
+    Look(
+        id="topo",
+        ground="#e6edc4",
+        grass="#d3e6a4",
+        wood="#7fb069",
+        rock="#cbc9c4",
+        ice="#eaf4fb",
+        water=WATER,
+        shade=(0.85, "#1c2a18", "#26331f"),
+        contour=("#5f4320", 0.85, 0.5, 1.3, 0.6),
+        path=("#d0182b", [3, 1.6], 1.0),
+    ),
+    # In the manner of the alpine club maps: almost white ground, pale forest, the rock
+    # carried by a hard grey relief, fine brown contour lines, strong blue water, paths
+    # as thin solid red lines, names in black.
+    Look(
+        id="alpenverein",
+        ground="#fbfaf2",
+        grass="#f3f5df",
+        wood="#dfecc6",
+        rock="#e9e7e1",
+        ice="#e3effb",
+        water="#6db7ee",
+        shade=(1.0, "#111111", "#000000"),
+        contour=("#b06a30", 0.9, 0.55, 1.0, 0.45),
+        path=("#d21f1f", None, 0.8),
+        summit=("#000000", 13, REGULAR),
+    ),
+    # In the manner of a digital outdoor map: soft greens, light grey rock with gentle
+    # relief, orange-brown contours, plain paths dashed in dark grey and the marked
+    # mountain paths dotted in red, names in dark grey.
+    Look(
+        id="outdooractive",
+        ground="#f2f1e4",
+        grass="#dcebbd",
+        wood="#bcdaa3",
+        rock="#e2e2df",
+        ice="#f4f9fd",
+        water="#a9d3ee",
+        shade=(0.6, "#4a4a48", "#6a6a66"),
+        contour=("#c58a4e", 0.8, 0.5, 1.1, 0.5),
+        path=("#3a3a3a", [4, 2.5], 0.75),
+        marked=("#d7262c", [0.4, 2]),
+        summit=("#2b2b2b", 12, REGULAR),
+    ),
+    # In the manner of a printed hiking map: warm light ground, light green forest,
+    # orange contours, paths as strong solid red lines, buildings in mauve.
+    Look(
+        id="kompass",
+        ground="#f6f2d6",
+        grass="#eef2c9",
+        wood="#cfe6ae",
+        rock="#e8e5dc",
+        ice="#edf5fb",
+        water="#8ecbf0",
+        shade=(0.7, "#55524a", "#6f6a5e"),
+        contour=("#d28a36", 0.85, 0.55, 1.1, 0.5),
+        path=("#d4141c", None, 1.25),
+        summit=("#1a1a1a", 12, BOLD),
+        building="#c7a1c4",
+    ),
+)
+
+
+def _add_look(layers: list[dict], hiker: dict, insert_before, look: Look) -> None:
+    """Adds the layers of a look and names it in the metadata.
+
+    A look is a set of layers that are shown instead of others (`bases`), so the clients
+    switch it like the winter look, without loading another style.
     """
     cls = ["get", "class"]
     present = {layer["id"] for layer in layers}
-    hidden = {"layout": {"visibility": "none"}}
     show: list[str] = []
     hide: list[str] = []
 
     def add(before: str, layer: dict, replaces: tuple[str, ...] = ()) -> None:
-        layer["layout"] = {**layer.get("layout", {}), **hidden["layout"]}
+        layer["layout"] = {**layer.get("layout", {}), "visibility": "none"}
         insert_before(before, layer)
         show.append(layer["id"])
-        hide.extend(name for name in replaces if name in present)
+        hide.extend(name for name in replaces if name in present and name not in hide)
 
-    # Ground: meadow as the basic tone, forest clearly darker, rock and scree grey.
+    name = look.id
     add(
         "residential",
-        {"id": "topo-ground", "type": "background", "paint": {"background-color": "#e6edc4"}},
+        {"id": f"{name}-ground", "type": "background", "paint": {"background-color": look.ground}},
     )
-    for name, colour in (("grass", "#d3e6a4"), ("wood", "#7fb069"), ("rock", "#cbc9c4")):
-        add("park", _fill(f"topo-{name}", "landcover", ["==", cls, name], colour), (name,))
+    for kind, colour in (
+        ("grass", look.grass),
+        ("wood", look.wood),
+        ("rock", look.rock),
+        ("ice", look.ice),
+    ):
+        add("park", _fill(f"{name}-{kind}", "landcover", ["==", cls, kind], colour), (kind,))
     if "hillshade" in present:
+        strength, shadow, accent = look.shade
         add(
             "waterway",
             {
-                "id": "topo-hillshade",
+                "id": f"{name}-hillshade",
                 "type": "hillshade",
                 "source": "terrain",
                 "paint": {
-                    "hillshade-exaggeration": 0.85,
-                    "hillshade-shadow-color": "#1c2a18",
+                    "hillshade-exaggeration": strength,
+                    "hillshade-shadow-color": shadow,
                     "hillshade-highlight-color": "#ffffff",
-                    "hillshade-accent-color": "#26331f",
+                    "hillshade-accent-color": accent,
                 },
             },
             ("hillshade",),
         )
     if "contour" in present:
+        colour, strong, weak, wide, thin = look.contour
         add(
             "waterway",
             {
-                "id": "topo-contour",
+                "id": f"{name}-contour",
                 "type": "line",
                 "source": "contours",
                 "source-layer": "contour",
                 "minzoom": 11,
                 "paint": {
-                    "line-color": "#5f4320",
-                    "line-opacity": ["case", ["==", ["get", "index"], 1], 0.85, 0.5],
-                    "line-width": ["case", ["==", ["get", "index"], 1], 1.3, 0.6],
+                    "line-color": colour,
+                    "line-opacity": ["case", ["==", ["get", "index"], 1], strong, weak],
+                    "line-width": ["case", ["==", ["get", "index"], 1], wide, thin],
                 },
             },
             ("contour",),
         )
-    # Paths: red on a light casing, dashed; the grade still stands next to them close up.
+    if look.water != WATER:
+        add("building", _fill(f"{name}-water", "water", None, look.water), ("water",))
+    if look.building:
+        add(
+            "tunnel",
+            _fill(f"{name}-building", "building", None, look.building) | {"minzoom": 13},
+            ("building",),
+        )
+    # Paths on a light casing; the grade still stands next to them close up.
+    colour, dashes, factor = look.path
     path = ["==", cls, "path"]
+
+    def width(*stops: tuple[int, float]) -> list:
+        return _width(*((zoom, round(value * factor, 2)) for zoom, value in stops))
+
     add(
         "boundary",
         _line(
-            "topo-path-casing",
+            f"{name}-path-casing",
             "transportation",
             path,
             {
                 "line-color": "#ffffff",
                 "line-opacity": 0.75,
-                "line-width": _width((11, 1.8), (14, 3.6), (18, 8)),
+                "line-width": width((11, 1.8), (14, 3.6), (18, 8)),
             },
             minzoom=11,
         ),
         ("path-halo", "path", "path-difficulty"),
     )
+    line = {"line-color": colour, "line-width": width((11, 0.9), (14, 1.9), (18, 4.2))}
+    if dashes:
+        line["line-dasharray"] = dashes
     add(
         "boundary",
-        _line(
-            "topo-path",
-            "transportation",
-            path,
-            {
-                "line-color": "#d0182b",
-                "line-width": _width((11, 0.9), (14, 1.9), (18, 4.2)),
-                "line-dasharray": [3, 1.6],
-            },
-            minzoom=11,
-            cap="butt",
-        ),
+        _line(f"{name}-path", "transportation", path, line, minzoom=11, cap="butt"),
     )
+    if look.marked:
+        colour, dashes = look.marked
+        line = {"line-color": colour, "line-width": _width((11, 1.3), (14, 2.6), (18, 5.5))}
+        if dashes:
+            line["line-dasharray"] = dashes
+        add(
+            "boundary",
+            _line(
+                f"{name}-path-marked",
+                "hiking",
+                ["has", "sac_scale"],
+                line,
+                minzoom=11,
+                # Round caps turn a short dash into a dot.
+                cap="round" if dashes and dashes[0] < 1 else "butt",
+            ),
+        )
     if "peak-name" in present:
         summit = next(layer for layer in layers if layer["id"] == "peak-name")
+        colour, size, font = look.summit
         add(
             "peak-name",
             {
                 **summit,
-                "id": "topo-peak-name",
-                "layout": {**summit["layout"], "text-font": BOLD, "text-size": 13},
+                "id": f"{name}-peak-name",
+                "layout": {**summit["layout"], "text-font": font, "text-size": size},
                 "paint": {
-                    "text-color": "#111111",
+                    "text-color": colour,
                     "text-halo-color": "rgba(255, 255, 255, 0.92)",
                     "text-halo-width": 2,
                 },
             },
             ("peak-name",),
         )
-    hiker["bases"].append({"id": "topo", "show": show, "hide": hide})
+    hiker["bases"].append({"id": name, "show": show, "hide": hide})
 
 
 SATELLITE_OPACITY = 0.7
@@ -976,7 +1099,8 @@ def build_style(
         )
     if sprite_url:
         _use_symbols(layers)
-    _add_topo_look(layers, hiker, insert_before)
+    for look in LOOKS:
+        _add_look(layers, hiker, insert_before, look)
     # The order and the groups in which the clients offer the overlays: what belongs to
     # the ground, then everything about snow, then the weather.
     for overlay in hiker["overlays"]:

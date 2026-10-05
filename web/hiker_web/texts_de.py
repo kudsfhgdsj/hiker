@@ -296,6 +296,14 @@ TEXTS = {
     "map.base.map": "Karte",
     "map.base.winter": "Winter",
     "map.base.topo": "Topo",
+    "map.base.alpenverein": "Alpenverein",
+    "map.base.outdooractive": "Outdooractive",
+    "map.base.kompass": "Kompass",
+    "map.base.note": (
+        "Alle Darstellungen sind selbst aus OpenStreetMap-Daten gezeichnet. „Alpenverein“, "
+        "„Outdooractive“ und „Kompass“ sind an die Karten dieser Anbieter angelehnt und "
+        "stammen nicht von ihnen."
+    ),
     "map.base.satellite": "Luftbild",
     "map.search": "Ort, Gipfel oder Hütte suchen",
     "map.search.none": "Nichts gefunden.",

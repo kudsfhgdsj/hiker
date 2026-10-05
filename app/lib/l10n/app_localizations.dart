@@ -3262,6 +3262,30 @@ abstract class AppLocalizations {
   /// **'Topo'**
   String get mapBaseTopo;
 
+  /// No description provided for @mapBaseAlpenverein.
+  ///
+  /// In de, this message translates to:
+  /// **'Alpenverein'**
+  String get mapBaseAlpenverein;
+
+  /// No description provided for @mapBaseOutdooractive.
+  ///
+  /// In de, this message translates to:
+  /// **'Outdooractive'**
+  String get mapBaseOutdooractive;
+
+  /// No description provided for @mapBaseKompass.
+  ///
+  /// In de, this message translates to:
+  /// **'Kompass'**
+  String get mapBaseKompass;
+
+  /// No description provided for @mapBaseNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Alle Darstellungen sind selbst aus OpenStreetMap-Daten gezeichnet. „Alpenverein“, „Outdooractive“ und „Kompass“ sind an die Karten dieser Anbieter angelehnt und stammen nicht von ihnen.'**
+  String get mapBaseNote;
+
   /// No description provided for @mapBaseSatellite.
   ///
   /// In de, this message translates to:

@@ -147,6 +147,9 @@ def test_pages_carry_the_texts_of_the_layer_control(user, fake_api):
         "map": "Karte",
         "winter": "Winter",
         "topo": "Topo",
+        "alpenverein": "Alpenverein",
+        "outdooractive": "Outdooractive",
+        "kompass": "Kompass",
         "satellite": "Luftbild",
     }
     assert texts["overlay"]["slope"] == "Hangneigung" and "3D" in texts["terrain"]

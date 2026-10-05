@@ -64,6 +64,9 @@ def map_config(attribution: str) -> dict:
                 "map": t("map.base.map"),
                 "winter": t("map.base.winter"),
                 "topo": t("map.base.topo"),
+                "alpenverein": t("map.base.alpenverein"),
+                "outdooractive": t("map.base.outdooractive"),
+                "kompass": t("map.base.kompass"),
                 "satellite": t("map.base.satellite"),
             },
             # Search for places of the own map; only a server with a vector map has it.
@@ -98,6 +101,7 @@ def map_config(attribution: str) -> dict:
                 "snowdepth": t("map.note.snowdepth"),
             },
             "looks": t("map.looks"),
+            "looksNote": t("map.base.note"),
             "slope": {
                 "from": t("map.slope.from"),
                 "to": t("map.slope.to"),
