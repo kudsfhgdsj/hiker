@@ -7,6 +7,7 @@
 #
 #   deploy/build-terrain.sh austria
 #   deploy/build-terrain.sh bayern
+#   deploy/build-terrain.sh switzerland
 #
 # Quellen (offene Daten; die Nennung steht danach in der Karte):
 #   austria   BEV, Digitales Geländehöhenmodell, Höhenraster 5 m, CC BY 4.0
@@ -14,6 +15,9 @@
 #   bayern    LDBV (Bayerische Vermessungsverwaltung), DGM5, Gitterweite 5 m, CC BY 4.0
 #             https://geodaten.bayern.de/opengeodata (rund 72.000 Dateien, 13 GB;
 #             sie werden vorab zu einer Rasterdatei zusammengesetzt)
+#   switzerland  swisstopo, swissALTI3D, 2 m (mit Liechtenstein), frei nutzbar mit
+#             Quellenangabe; https://www.swisstopo.admin.ch (rund 44.000 Dateien, 52 GB;
+#             sie werden beim Laden auf 5 m verkleinert und nicht aufbewahrt)
 #
 #   MAP_TERRAIN_ZOOM=14   tiefste Zoomstufe (14 sind rund 6,5 m je Bildpunkt)
 #   MAP_BUILD_CPUS=3      so viele Prozesse rechnen zugleich
@@ -32,6 +36,7 @@ case "$area" in
   austria)
     url="https://data.bev.gv.at/download/DGM/Hoehenraster/DGM_R5.tif"
     metalink=""
+    tiles=""
     file="DGM_R5.tif"
     attribution="Höhendaten Österreich: © BEV (DGM 5 m), CC BY 4.0"
     # Reicht mit gröberen Daten einige Kilometer über die Staatsgrenze.
@@ -41,6 +46,7 @@ case "$area" in
     # Viele kleine Textdateien (x y z) je Quadratkilometer, UTM 32.
     url=""
     metalink="https://geodaten.bayern.de/odd/a/dgm/dgm5xyz/meta/metalink/09.meta4"
+    tiles=""
     srs="EPSG:25832"
     step=5
     file="bayern-dgm5.tif"
@@ -48,7 +54,19 @@ case "$area" in
     # Endet genau an der Landesgrenze: gilt dort vor einem Nachbarn, der hinüberreicht.
     priority=10
     ;;
-  *) echo "Für '$area' ist noch kein Geländemodell hinterlegt (bisher: austria, bayern)." >&2; exit 1 ;;
+  switzerland)
+    # Ein GeoTIFF je Quadratkilometer, LV95. Die Adresse antwortet mit dem Verweis auf
+    # die Liste der aktuellen Dateien.
+    url=""
+    metalink=""
+    tiles="https://ogd.swisstopo.admin.ch/services/swiseld/services/assets/ch.swisstopo.swissalti3d/search?format=image%2Ftiff%3B%20application%3Dgeotiff%3B%20profile%3Dcloud-optimized&resolution=2.0&srid=2056&state=current&csv=true"
+    srs="EPSG:2056"
+    step=5
+    file="switzerland-5m.tif"
+    attribution="Höhendaten Schweiz: © swisstopo (swissALTI3D)"
+    priority=10
+    ;;
+  *) echo "Für '$area' ist noch kein Geländemodell hinterlegt (bisher: austria, bayern, switzerland)." >&2; exit 1 ;;
 esac
 
 DATA_DIR="${DATA_DIR:-$(sed -n 's/^DATA_DIR=//p' .env 2>/dev/null | tail -n 1)}"
@@ -65,6 +83,11 @@ if [ ! -f "$sources/$file" ] && [ -n "$metalink" ]; then
   docker compose --profile mapbuild run --rm --entrypoint python3 terrainbuild \
     /tool/mosaic_xyz.py --metalink "$metalink" --dir "/data/build/sources/${file%.tif}" \
     --out "/data/build/sources/$file" --srs "$srs" --step "$step" --workers "$WORKERS"
+elif [ ! -f "$sources/$file" ] && [ -n "$tiles" ]; then
+  echo "== Lade und verkleinere: $file $(date '+%Y-%m-%d %H:%M') =="
+  docker compose --profile mapbuild run --rm --entrypoint python3 terrainbuild \
+    /tool/mosaic_tiles.py --list "$tiles" --out "/data/build/sources/$file" \
+    --srs "$srs" --step "$step"
 elif [ ! -f "$sources/$file" ]; then
   echo "== Lade $file =="
   # Ein unterbrochener Download wird fortgesetzt; erst die ganze Datei bekommt den Namen.
