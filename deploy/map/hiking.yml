@@ -27,12 +27,31 @@ layers:
             - alpine_hiking
             - demanding_alpine_hiking
             - difficult_alpine_hiking
-          highway: via_ferrata
+          # Klettersteige und Leitern: eigene Wegstücke (highway=ladder) oder ein normaler
+          # Weg, auf dem eine Leiter liegt (ladder=yes).
+          highway:
+            - via_ferrata
+            - ladder
+          ladder: 'yes'
         attributes:
           - key: sac_scale
             tag_value: sac_scale
           - key: highway
             tag_value: highway
+          - key: ladder
+            tag_value: ladder
           - key: name
             tag_value: name
             min_zoom: 14
+      # Leitern, die in OpenStreetMap als einzelner Punkt auf dem Weg eingetragen sind.
+      - source: osm
+        geometry: point
+        min_zoom: 14
+        include_when:
+          highway: ladder
+          ladder: 'yes'
+        attributes:
+          - key: highway
+            tag_value: highway
+          - key: ladder
+            tag_value: ladder

@@ -180,6 +180,38 @@ def _use_symbols(layers: list[dict]) -> None:
     for index, layer in enumerate(layers):
         if layer["id"] in symbols:
             layers[index] = symbols[layer["id"]]
+    # A ladder on an ordinary path: the sign stands on the piece of path or at the point
+    # that OpenStreetMap marks as a ladder.
+    highway = ["get", "highway"]
+    is_ladder = [
+        "all",
+        ["!=", highway, "via_ferrata"],
+        ["any", ["==", ["get", "ladder"], "yes"], ["==", highway, "ladder"]],
+    ]
+    at = next(i for i, layer in enumerate(layers) if layer["id"] == "via-ferrata-rungs")
+    for name, shape, placement in (
+        ("path-ladder", "LineString", "line-center"),
+        ("path-ladder-point", "Point", "point"),
+    ):
+        layers.insert(
+            at + 1,
+            {
+                "id": name,
+                "type": "symbol",
+                "source": "hiker",
+                "source-layer": "hiking",
+                "minzoom": 13,
+                "filter": ["all", ["==", ["geometry-type"], shape], is_ladder],
+                "layout": {
+                    "symbol-placement": placement,
+                    "icon-image": "ladder",
+                    "icon-size": ["interpolate", ["linear"], ["zoom"], 13, 0.7, 16, 1],
+                    "icon-rotation-alignment": "viewport",
+                    "icon-allow-overlap": True,
+                    "icon-ignore-placement": True,
+                },
+            },
+        )
     # A ladder next to via ferratas, again and again along the line.
     at = next(i for i, layer in enumerate(layers) if layer["id"] == "via-ferrata-rungs")
     layers.insert(

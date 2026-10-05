@@ -566,8 +566,37 @@ def test_symbols_are_served_and_used_by_the_topo_look(client, maps):
     assert ladder["layout"]["symbol-placement"] == "line"
     assert ladder["layout"]["icon-rotation-alignment"] == "viewport"
 
+    # A ladder on an ordinary path gets the sign too: on the piece of path or at the
+    # point that is tagged as a ladder, but not a second time on a via ferrata.
+    for name, shape, placement in (
+        ("path-ladder", "LineString", "line-center"),
+        ("path-ladder-point", "Point", "point"),
+    ):
+        sign = layers[name]
+        assert sign["source-layer"] == "hiking" and sign["layout"]["icon-image"] == "ladder"
+        assert sign["layout"]["symbol-placement"] == placement
+        assert sign["filter"][1] == ["==", ["geometry-type"], shape]
+        assert ["!=", ["get", "highway"], "via_ferrata"] in sign["filter"][2]
+        assert ["==", ["get", "ladder"], "yes"] in sign["filter"][2][2]
+        assert ["==", ["get", "highway"], "ladder"] in sign["filter"][2][2]
+
     # Without symbols the map keeps the dots.
     plain = build_style("t", "g", "©", 14)
     plain_layers = {layer["id"]: layer for layer in plain["layers"]}
     assert "sprite" not in plain and plain_layers["peak"]["type"] == "circle"
     assert "via-ferrata-ladder" not in plain_layers
+
+
+def test_the_path_layer_of_the_map_build_takes_ladders_along():
+    from pathlib import Path
+
+    # No YAML reader among the dependencies: the schema is checked as text.
+    schema = (Path(__file__).parents[3] / "deploy/map/hiking.yml").read_text(encoding="utf-8")
+    lines, points = schema.split("geometry: point")
+    # Paths with a grade, via ferratas, and ladders as ways or on ordinary paths.
+    assert "geometry: line" in lines
+    assert "- via_ferrata" in lines and "- ladder" in lines and "ladder: 'yes'" in lines
+    for attribute in ("sac_scale", "highway", "ladder", "name"):
+        assert f"- key: {attribute}" in lines
+    # Ladders that are a single point on the path.
+    assert "highway: ladder" in points and "ladder: 'yes'" in points
