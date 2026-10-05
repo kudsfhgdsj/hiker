@@ -142,6 +142,22 @@ del { color: #c62828; } ins { color: #2e7d32; text-decoration: none; }
 .map-range { display: grid; grid-template-columns: auto 1fr; gap: .15rem .5rem; align-items: center; margin-left: 1.4rem; }
 .map-range span:last-child { grid-column: 1 / -1; color: #555; }
 .map-range input:first-child { grid-column: 1 / -1; }
+/* One track with two handles: two range inputs lie on top of each other. */
+.map-dual { grid-column: 1 / -1; position: relative; height: 1.6rem; }
+.map-dual::before, .map-dual-fill { content: ""; position: absolute; top: calc(50% - 2px); height: 4px; border-radius: 2px; }
+.map-dual::before { left: 0; right: 0; background: #d5d9d6; }
+.map-dual-fill { background: var(--green); }
+.map-dual input { position: absolute; inset: 0; width: 100%; margin: 0; padding: 0; background: none;
+  pointer-events: none; -webkit-appearance: none; appearance: none; }
+.map-dual input:focus { outline: none; }
+.map-dual input:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px #1f5f4555; }
+.map-dual input:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px #1f5f4555; }
+.map-dual input::-webkit-slider-runnable-track { background: none; }
+.map-dual input::-moz-range-track { background: none; }
+.map-dual input::-webkit-slider-thumb { -webkit-appearance: none; pointer-events: auto; width: 1.1rem; height: 1.1rem;
+  border-radius: 50%; border: 2px solid #fff; background: var(--green); box-shadow: 0 0 2px #0008; cursor: grab; }
+.map-dual input::-moz-range-thumb { pointer-events: auto; width: 1.1rem; height: 1.1rem; border-radius: 50%;
+  border: 2px solid #fff; background: var(--green); box-shadow: 0 0 2px #0008; cursor: grab; }
 .map-radar { display: flex; align-items: center; gap: .5rem; margin-left: 1.4rem; }
 .map-radar[hidden] { display: none; }
 .map-radar input { flex: 1; min-width: 6rem; }

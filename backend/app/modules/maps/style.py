@@ -19,7 +19,8 @@ WATER_LINE = "#7db4d8"
 PATH = "#b5342a"
 # Not "#ffffffcc": the map library of the app does not read colours with eight digits.
 # T1 … T6 on the SAC scale, and via ferratas.
-DIFFICULTY = ["#e3b000", "#e2452f", "#a31621", "#2f7fd6", "#17479e", "#111111"]
+# Light blue, dark blue, yellow, orange, red, black: the harder, the warmer and darker.
+DIFFICULTY = ["#38b6ff", "#1d3fa8", "#f2c200", "#f28c1e", "#d92323", "#111111"]
 VIA_FERRATA = "#6b21a8"
 HALO = "rgba(255, 255, 255, 0.8)"
 
@@ -113,6 +114,8 @@ def _roads() -> list[dict]:
 
 
 SATELLITE_OPACITY = 0.7
+# Deepest zoom level of the elevation tiles (see layers.TERRAIN).
+TERRAIN_MAX_ZOOM = 15
 OVERLAY_GROUPS = {
     "terrain": ("slope", "satellite"),
     "snow": ("avalanche", "snow", "snowdepth"),
@@ -241,7 +244,8 @@ def build_style(
             cap="butt",
         ),
         # The difficulty of a path on the SAC hiking scale, where the data names it:
-        # yellow for hiking paths, red for mountain paths, blue for alpine routes.
+        # blue for hiking and mountain paths, yellow to red for mountain tours and alpine
+        # routes, black for the hardest.
         _line(
             "path-difficulty",
             "hiking",
@@ -279,6 +283,67 @@ def build_style(
             },
             minzoom=11,
             cap="butt",
+        ),
+        # Zoomed in closely the grade is written next to the path.
+        _label(
+            "path-difficulty-label",
+            "hiking",
+            ["any", ["has", "sac_scale"], ["==", ["get", "highway"], "via_ferrata"]],
+            {
+                "symbol-placement": "line",
+                "text-field": [
+                    "case",
+                    ["==", ["get", "highway"], "via_ferrata"],
+                    "KS",
+                    [
+                        "match",
+                        ["get", "sac_scale"],
+                        "hiking",
+                        "T1",
+                        "mountain_hiking",
+                        "T2",
+                        "demanding_mountain_hiking",
+                        "T3",
+                        "alpine_hiking",
+                        "T4",
+                        "demanding_alpine_hiking",
+                        "T5",
+                        "difficult_alpine_hiking",
+                        "T6",
+                        "",
+                    ],
+                ],
+                "text-font": BOLD,
+                "text-size": 11,
+                # Beside the line, not on it, and often enough to be seen on a short piece.
+                "text-offset": [0, 0.9],
+                "symbol-spacing": 220,
+                "text-keep-upright": True,
+            },
+            {
+                "text-color": [
+                    "case",
+                    ["==", ["get", "highway"], "via_ferrata"],
+                    VIA_FERRATA,
+                    [
+                        "match",
+                        ["get", "sac_scale"],
+                        "hiking",
+                        "#1479c4",
+                        "mountain_hiking",
+                        DIFFICULTY[1],
+                        "demanding_mountain_hiking",
+                        "#8a6d00",
+                        "alpine_hiking",
+                        "#b55f00",
+                        "demanding_alpine_hiking",
+                        DIFFICULTY[4],
+                        DIFFICULTY[5],
+                    ],
+                ],
+                "text-halo-width": 1.8,
+            },
+            minzoom=15,
         ),
         _line(
             "boundary",
@@ -472,7 +537,9 @@ def build_style(
             "tiles": [terrain_url],
             "tileSize": 256,
             "encoding": "terrarium",
-            "maxzoom": 13,
+            # As fine as the data has it: sharper ridges and faces in the shading and in
+            # the 3D view, instead of the rounded shapes of coarser tiles.
+            "maxzoom": TERRAIN_MAX_ZOOM,
             "attribution": notes.get("terrain", ""),
         }
         # Two sources of the same tiles: one shades the map, one lifts it in the 3D view.

@@ -60,7 +60,9 @@ TERRAIN = Provider(
     attribution="Höhendaten: Mapzen Terrain Tiles (AWS Open Data; SRTM, EU-DEM u. a.)",
     licence="Open data; attribution of the underlying sources required "
     "(https://github.com/tilezen/joerd/blob/master/docs/attribution.md)",
-    max_zoom=13,
+    # The tiles go down to zoom 15; where the sources are finer than 30 m (e.g. Austria),
+    # the deeper levels carry more detail, elsewhere they are interpolated.
+    max_zoom=15,
     media_type="image/png",
 )
 

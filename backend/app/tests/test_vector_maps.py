@@ -225,6 +225,26 @@ def test_paths_are_coloured_by_their_difficulty():
     # What the colours mean travels with the style.
     legend = style["metadata"]["hiker"]["legend"]
     assert [entry["label"] for entry in legend] == ["T1", "T2", "T3", "T4", "T5", "T6", "KS"]
+    # Light blue, dark blue, yellow, orange, red, black.
+    assert [entry["color"] for entry in legend[:6]] == [
+        "#38b6ff",
+        "#1d3fa8",
+        "#f2c200",
+        "#f28c1e",
+        "#d92323",
+        "#111111",
+    ]
+    assert colours[colours.index("hiking") + 1] == "#38b6ff"
+    assert colours[colours.index("difficult_alpine_hiking") + 1] == "#111111"
+
+    # Zoomed in closely the grade stands next to the path.
+    label = layers["path-difficulty-label"]
+    assert label["source-layer"] == "hiking" and label["minzoom"] == 15
+    assert label["layout"]["symbol-placement"] == "line"
+    assert label["layout"]["text-offset"] == [0, 0.9]
+    text = label["layout"]["text-field"]
+    assert text[2] == "KS" and text[3][text[3].index("alpine_hiking") + 1] == "T4"
+    assert order.index("path-difficulty") < order.index("path-difficulty-label")
 
 
 def layer(name: str, features: list[tuple[dict, bytes]], extent: int = 4096) -> bytes:

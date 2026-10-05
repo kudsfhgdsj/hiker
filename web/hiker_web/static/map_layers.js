@@ -148,14 +148,18 @@ window.hikerMapLayers = (map, texts, options = {}) => {
           update();
         }
         if (overlay.range) {
-          // Two sliders: from which angle and up to which angle slopes are coloured.
+          // One slider with two handles: from which angle and up to which angle slopes
+          // are coloured. Two inputs share one track; only their handles take the pointer.
           const range = overlay.range;
           const box = element("div", "map-range");
+          const track = element("div", "map-dual");
+          const fill = element("div", "map-dual-fill");
+          const top = 90;
           const slider = (key, start) => {
             const input = element("input");
             input.type = "range";
             input.min = range.min;
-            input.max = key === "low" ? range.max : 90;
+            input.max = top;
             input.step = range.step;
             input.value = stored(`slope-${key}`, String(start));
             input.setAttribute("aria-label", texts.slope[key]);
@@ -164,23 +168,35 @@ window.hikerMapLayers = (map, texts, options = {}) => {
           const low = slider("low", range.low);
           const high = slider("high", range.high);
           const label = element("span");
-          const update = (changed) => {
+          const show = (changed) => {
             // The ends never cross: the one that was moved pushes the other.
             if (Number(low.value) >= Number(high.value)) {
-              if (changed === low) high.value = String(Math.min(90, Number(low.value) + range.step));
+              if (changed === low) high.value = String(Math.min(top, Number(low.value) + range.step));
               else low.value = String(Math.max(range.min, Number(high.value) - range.step));
+              if (Number(low.value) >= Number(high.value)) low.value = String(Number(high.value) - range.step);
             }
-            const top = Number(high.value) >= 90 ? texts.slope.open : `${high.value}°`;
-            label.textContent = `${low.value}° – ${top}`;
+            const share = (value) => ((Number(value) - range.min) / (top - range.min)) * 100;
+            fill.style.left = `${share(low.value)}%`;
+            fill.style.right = `${100 - share(high.value)}%`;
+            const end = Number(high.value) >= top ? texts.slope.open : `${high.value}°`;
+            label.textContent = `${low.value}° – ${end}`;
+          };
+          const update = (changed) => {
+            show(changed);
             remember("slope-low", low.value);
             remember("slope-high", high.value);
-            const usual = Number(low.value) === range.low && Number(high.value) >= 90;
-            slopeQuery = usual ? "" : `low=${low.value}&high=${Math.min(90, Number(high.value))}`;
+            const usual = Number(low.value) === range.low && Number(high.value) >= top;
+            slopeQuery = usual ? "" : `low=${low.value}&high=${Math.min(top, Number(high.value))}`;
             applySources();
           };
-          low.addEventListener("change", () => update(low));
-          high.addEventListener("change", () => update(high));
-          box.append(element("span", "", texts.slope.from), low, element("span", "", texts.slope.to), high, label);
+          for (const input of [low, high]) {
+            // While dragging only the picture of the slider follows; the tiles are asked
+            // for anew when the handle is let go.
+            input.addEventListener("input", () => show(input));
+            input.addEventListener("change", () => update(input));
+          }
+          track.append(fill, low, high);
+          box.append(track, label);
           layers.append(box);
           update(null);
         }
