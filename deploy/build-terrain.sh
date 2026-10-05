@@ -9,6 +9,7 @@
 #   deploy/build-terrain.sh bayern
 #   deploy/build-terrain.sh switzerland
 #   deploy/build-terrain.sh suedtirol
+#   deploy/build-terrain.sh norditalia
 #
 # Quellen (offene Daten; die Nennung steht danach in der Karte):
 #   austria   BEV, Digitales Geländehöhenmodell, Höhenraster 5 m, CC BY 4.0
@@ -22,6 +23,10 @@
 #   suedtirol Autonome Provinz Bozen – Südtirol, DTM 2,5 m, CC0; nur über den
 #             Abrufdienst (WCS) der Provinz: rund 700 Quadrate zu 5 km, 11 GB, beim
 #             Laden auf 5 m verkleinert und nicht aufbewahrt
+#   norditalia  INGV, TINITALY 1.1, 10 m, CC BY 4.0 (Tarquini et al. 2023,
+#             https://doi.org/10.13127/tinitaly/1.1): Italien nördlich von etwa 43,3° N,
+#             78 Dateien, rund 3 GB. Gröber als die übrigen Modelle; Südtirol behält
+#             sein eigenes (Vorrang).
 #
 #   MAP_TERRAIN_ZOOM=14   tiefste Zoomstufe (14 sind rund 6,5 m je Bildpunkt)
 #   MAP_BUILD_CPUS=3      so viele Prozesse rechnen zugleich
@@ -87,7 +92,20 @@ case "$area" in
     attribution="Höhendaten Südtirol: Autonome Provinz Bozen – Südtirol (DTM 2,5 m), CC0"
     priority=10
     ;;
-  *) echo "Für '$area' ist noch kein Geländemodell hinterlegt (bisher: austria, bayern, switzerland, suedtirol)." >&2; exit 1 ;;
+  norditalia)
+    # Gezippte GeoTIFFs zu 50 km, verlinkt auf einer Seite; genommen werden die mit
+    # Südkante ab 4800 km Nord (UTM 32). Einzelne Zellen ohne Höhe stehen dort als 0.
+    url=""
+    metalink=""
+    tiles=""
+    index="https://tinitaly.pi.ingv.it/Download_Area1_1.html"
+    match='data_1\.1/w(48|49|5[0-2])[0-9]{3}_s10/[^"]+\.zip'
+    file="tinitaly.vrt"
+    attribution="Höhendaten Italien: TINITALY 1.1 © INGV (Tarquini u. a. 2023), CC BY 4.0"
+    # Endet an der Staatsgrenze, ist aber gröber als das Südtiroler Modell.
+    priority=5
+    ;;
+  *) echo "Für '$area' ist noch kein Geländemodell hinterlegt (bisher: austria, bayern, switzerland, suedtirol, norditalia)." >&2; exit 1 ;;
 esac
 
 DATA_DIR="${DATA_DIR:-$(sed -n 's/^DATA_DIR=//p' .env 2>/dev/null | tail -n 1)}"
@@ -104,6 +122,11 @@ if [ ! -f "$sources/$file" ] && [ -n "$metalink" ]; then
   docker compose --profile mapbuild run --rm --entrypoint python3 terrainbuild \
     /tool/mosaic_xyz.py --metalink "$metalink" --dir "/data/build/sources/${file%.tif}" \
     --out "/data/build/sources/$file" --srs "$srs" --step "$step" --workers "$WORKERS"
+elif [ ! -f "$sources/$file" ] && [ -n "${index:-}" ]; then
+  echo "== Lade: $file $(date '+%Y-%m-%d %H:%M') =="
+  docker compose --profile mapbuild run --rm --entrypoint python3 terrainbuild \
+    /tool/fetch_tiffs.py --index "$index" --match "$match" \
+    --dir "/data/build/sources/${file%.vrt}" --out "/data/build/sources/$file" --voids
 elif [ ! -f "$sources/$file" ] && [ -n "$tiles" ]; then
   echo "== Lade und verkleinere: $file $(date '+%Y-%m-%d %H:%M') =="
   if [ "$area" = suedtirol ]; then
