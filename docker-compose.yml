@@ -102,6 +102,8 @@ services:
       TERRAIN_ENABLED: ${TERRAIN_ENABLED:-true}
       AVALANCHE_ENABLED: ${AVALANCHE_ENABLED:-true}
       WEATHER_LAYERS_ENABLED: ${WEATHER_LAYERS_ENABLED:-true}
+      # Anzahl der Prozesse, die Anfragen beantworten (siehe .env.example).
+      API_WORKERS: ${API_WORKERS:-1}
     volumes:
       - ${DATA_DIR:-./data}/files:/data/files
       - ${DATA_DIR:-./data}/tiles:/data/tiles
@@ -115,8 +117,8 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
-    cpus: 1.0
-    mem_limit: 512m
+    cpus: ${API_CPUS:-1.0}
+    mem_limit: ${API_MEMORY:-512m}
 
   web:
     build: ./web
@@ -225,7 +227,8 @@ services:
     volumes:
       - ${DATA_DIR:-./data}/maps:/data
     cpus: ${MAP_BUILD_CPUS:-2.0}
-    mem_limit: 1g
+    # Das Server-Paket rechnet in mehreren Prozessen (deploy/prebuild-layers.sh).
+    mem_limit: 2g
 
   # Baut den Suchindex eines Gebiets aus dessen Karte (deploy/build-map.sh).
   mapsearch:

@@ -263,3 +263,23 @@ Monatlich per cron, als der Benutzer, dem der Stack gehört (`crontab -e`):
 Je Gebiet dauert es 15 bis 30 Minuten und braucht rund 3 GB freien Arbeitsspeicher;
 `MAP_LAYERS=0` lässt die Ebenen-Pakete aus (Höhendaten ändern sich kaum). Die App bietet
 ein Gebiet erneut zum Laden an, wenn die Datei auf dem Server neuer ist.
+
+## Flüssige Karte: Ebenen vorab bauen, mehrere Prozesse
+
+Zwei Dinge machen die Karte beim ersten Ansehen eines Ausschnitts langsam: Höhendaten kommen
+erst aus dem Internet, und Hangneigung und Höhenlinien werden daraus berechnet (eine
+Höhenlinien-Kachel rund 0,4 s). Beides lässt sich vorab erledigen:
+
+```sh
+deploy/prebuild-layers.sh                 # alle Gebiete, bis Zoom 13
+MAP_PREBUILD_ZOOM=14 deploy/prebuild-layers.sh switzerland
+```
+
+Das schreibt je Gebiet `DATA_DIR/maps/<gebiet>.server.sqlite`; die API antwortet daraus,
+ohne zu holen oder zu rechnen (ebenso aus dem Ebenen-Paket für die App). Ein abgebrochener
+Lauf macht beim nächsten Aufruf weiter. Tiefere Stufen, als gebaut wurden, entstehen wie
+bisher beim Ansehen und bleiben danach im Kachel-Zwischenspeicher.
+
+Dazu der API mehr als einen Prozess und Kern geben (`.env`): `API_WORKERS=3`, `API_CPUS=3`,
+`API_MEMORY=1g`. Die Zugriffsbegrenzung zählt je Prozess (siehe `.env.example`).
+

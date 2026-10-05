@@ -15,7 +15,9 @@ providers are deliberately not part of this list.
 
 import io
 import math
+import sqlite3
 import threading
+import time
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from functools import lru_cache
@@ -258,10 +260,73 @@ def slope_tile(
     return result.getvalue()
 
 
+class LayerPacks:
+    """Elevation, slope and contour tiles that were built ahead for the regions of the
+    own map (`pack.py`): the pack for the app (`<region>.layers.sqlite`) and the deeper
+    one for this server (`<region>.server.sqlite`). What they hold is answered at once,
+    without asking a source and without computing anything."""
+
+    _SUFFIXES = (".layers.sqlite", ".server.sqlite")
+    _RESCAN_S = 60
+
+    def __init__(self, folder: str | None):
+        self._folder = Path(folder) if folder else None
+        self._lock = threading.Lock()
+        self._files: list[tuple[Path, float]] = []
+        self._scanned = 0.0
+        self._local = threading.local()
+
+    def _packs(self) -> list[tuple[Path, float]]:
+        now = time.monotonic()
+        with self._lock:
+            if now - self._scanned > self._RESCAN_S or not self._scanned:
+                self._scanned = now
+                found = []
+                if self._folder is not None and self._folder.is_dir():
+                    for path in sorted(self._folder.iterdir()):
+                        if path.name.endswith(self._SUFFIXES) and path.is_file():
+                            found.append((path, path.stat().st_mtime))
+                self._files = found
+            return self._files
+
+    def get(self, layer: str, z: int, x: int, y: int) -> bytes | None:
+        # One connection per thread and version of a file; SQLite objects stay in their thread.
+        connections = self._local.__dict__.setdefault("connections", {})
+        packs = self._packs()
+        for key in [key for key in connections if key not in packs]:
+            connections.pop(key).close()
+        for key in packs:
+            try:
+                if key not in connections:
+                    connections[key] = sqlite3.connect(f"file:{key[0]}?mode=ro", uri=True)
+                row = (
+                    connections[key]
+                    .execute(
+                        "SELECT data FROM layer_tiles"
+                        " WHERE layer = ? AND z = ? AND x = ? AND y = ?",
+                        (layer, z, x, y),
+                    )
+                    .fetchone()
+                )
+            except sqlite3.Error:
+                continue
+            if row is not None:
+                return row[0]
+        return None
+
+
 class Layers:
     """The raster layers of this server and their caches."""
 
-    def __init__(self, cache_path: str, cache_days: float, max_bytes: int, sources: dict):
+    def __init__(
+        self,
+        cache_path: str,
+        cache_days: float,
+        max_bytes: int,
+        sources: dict,
+        packs: LayerPacks | None = None,
+    ):
+        self._packs = packs or LayerPacks(None)
         self._sources: dict[str, TileSource] = sources
         self._root = Path(cache_path)
         self._max_bytes = max_bytes
@@ -287,6 +352,10 @@ class Layers:
         if day is not None and isinstance(source, DatedTileSource):
             # The image of a past day never changes: kept in a folder of its own.
             return self._dated_cache(layer, day).get(source.of_day(day), z, x, y)
+        if layer == "terrain":
+            built = self._packs.get("terrain", z, x, y)
+            if built is not None:
+                return built
         return self._caches[layer].get(source, z, x, y)
 
     def _dated_cache(self, name: str, day: date) -> TileCache:
@@ -305,6 +374,9 @@ class Layers:
         if (low, high) != (SLOPE_LOW, SLOPE_HIGH):
             # Another choice of angles is computed anew; only the usual one is kept as a file.
             return slope_tile(self.raster("terrain", z, x, y), z, y, low, high)
+        built = self._packs.get("slope", z, x, y)
+        if built is not None:
+            return built
         layers = self
 
         class _Computed:
@@ -317,6 +389,9 @@ class Layers:
         """Gzip-compressed vector tile with contour lines, computed once and kept."""
         if "terrain" not in self._sources:
             raise NotFoundError("No such layer")
+        built = self._packs.get("contours", z, x, y)
+        if built is not None:
+            return built
         layers = self
 
         class _Computed:
@@ -366,6 +441,7 @@ def _layers(
     satellite: bool,
     weather: bool,
     public_base_url: str,
+    map_data_path: str = "",
 ) -> Layers:
     user_agent = f"hiker/{__version__} (self-hosted; {public_base_url})"
     sources: dict[str, TileSource] = {}
@@ -382,7 +458,8 @@ def _layers(
         for provider in (SNOW, PRECIPITATION):
             source = DatedTileSource if "{date}" in provider.url else HttpTileSource
             sources[provider.id] = source(provider.url, user_agent, public_base_url)
-    return Layers(cache_path, cache_days, max_mb * 1024 * 1024, sources)
+    packs = LayerPacks(map_data_path or None)
+    return Layers(cache_path, cache_days, max_mb * 1024 * 1024, sources, packs)
 
 
 def get_layers() -> Layers:
@@ -395,6 +472,7 @@ def get_layers() -> Layers:
         settings.satellite_enabled,
         settings.weather_layers_enabled,
         settings.public_base_url,
+        settings.map_data_path,
     )
 
 
