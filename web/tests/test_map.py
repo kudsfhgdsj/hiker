@@ -214,3 +214,28 @@ def test_sun_radar_and_layer_choices_are_passed_on(browser, fake_api):
     assert dict(fake_api.calls[-1].url.params) == {"low": "35", "high": "50"}
     browser.get("/map/raster/snow/7/67/44?date=2026-02-01")
     assert dict(fake_api.calls[-1].url.params) == {"date": "2026-02-01"}
+
+
+def test_search_is_passed_on_and_offered_by_the_map(user, fake_api):
+    planning_api(fake_api, INFO)
+    vector_api(fake_api)
+    found = [{"name": "Säntis", "kind": "peak", "lat": 47.249, "lon": 9.343, "elevation_m": 2502}]
+    fake_api.route("GET", "/maps/search", found)
+
+    texts = plan_data(user.get("/routes/new").get_data(as_text=True))["layerTexts"]
+    assert texts["search"]["url"] == "/map/search"
+    assert (
+        texts["search"]["kinds"]["peak"] == "Gipfel" and texts["search"]["kinds"]["hut"] == "Hütte"
+    )
+
+    answer = user.get("/map/search?q=santis&lat=47.2&lon=9.3&limit=8&other=1")
+    assert answer.get_json() == found
+    assert dict(fake_api.calls[-1].url.params) == {
+        "q": "santis",
+        "lat": "47.2",
+        "lon": "9.3",
+        "limit": "8",
+    }
+    # Too short for the API: no results instead of an error.
+    fake_api.route("GET", "/maps/search", lambda r: httpx2.Response(422, json={}))
+    assert user.get("/map/search?q=s").get_json() == []

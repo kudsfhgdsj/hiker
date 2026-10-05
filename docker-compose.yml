@@ -227,6 +227,20 @@ services:
     cpus: ${MAP_BUILD_CPUS:-2.0}
     mem_limit: 1g
 
+  # Baut den Suchindex eines Gebiets aus dessen Karte (deploy/build-map.sh).
+  mapsearch:
+    build: ./backend
+    profiles: ["mapbuild"]
+    restart: "no"
+    <<: *unprivileged
+    entrypoint: ["python", "-m", "app.modules.maps.search"]
+    tmpfs:
+      - /tmp
+    volumes:
+      - ${DATA_DIR:-./data}/maps:/data
+    cpus: ${MAP_BUILD_CPUS:-2.0}
+    mem_limit: 1g
+
   # Reverse Proxy mit selbst ausgestelltem Zertifikat. Nur mit dem Profil "proxy" aktiv
   # (COMPOSE_PROFILES=proxy in der .env), damit der Stack auf einem Server mit eigenem
   # Proxy keine Ports belegt. Der Port ist einstellbar (HTTPS_PORT).

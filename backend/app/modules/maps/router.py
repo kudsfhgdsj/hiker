@@ -28,6 +28,7 @@ from app.modules.maps.radar import (
     RAIN_MAX_ZOOM,
     RadarLayer,
 )
+from app.modules.maps.search import MAX_RESULTS, search
 from app.modules.maps.style import build_style
 from app.modules.maps.tiles import OSM_ATTRIBUTION, Cache, Tiles
 from app.modules.maps.vector import REGION_NAME, VECTOR_ATTRIBUTION, Vectors
@@ -128,6 +129,9 @@ class RegionInfo(BaseModel):
     max_zoom: int
     layers_size_bytes: int | None = Field(
         description="Size of the layer pack (elevation, slope, contour lines); null if none"
+    )
+    search_size_bytes: int | None = Field(
+        default=None, description="Size of the search index; null if there is none"
     )
 
 
@@ -404,6 +408,7 @@ def list_regions(_user: CurrentUser, vectors: Vectors):
             min_zoom=region.min_zoom,
             max_zoom=region.max_zoom,
             layers_size_bytes=region.layers_size_bytes,
+            search_size_bytes=region.search_size_bytes,
         )
         for region in vectors.regions()
     ]
@@ -442,6 +447,60 @@ def download_region_layers(name: str, _user: CurrentUser, vectors: Vectors):
         media_type="application/octet-stream",
         filename=f"{name}.layers.sqlite",
     )
+
+
+@router.get(
+    "/regions/{name}/search",
+    response_class=FileResponse,
+    responses={200: {"content": {"application/octet-stream": {}}}, **error_responses(401, 404)},
+    dependencies=[Depends(rate_limit("map-download", limit=30))],
+)
+def download_region_search(name: str, _user: CurrentUser, vectors: Vectors):
+    """The search index of a region, for searching without network (SQLite:
+    `places(name, folded, kind, rank, lat, lon, elevation_m)`)."""
+    region = vectors.region(name) if re.match(REGION_NAME, name) else None
+    if region is None or region.search_path is None:
+        raise NotFoundError("No such search index")
+    return FileResponse(
+        region.search_path,
+        media_type="application/octet-stream",
+        filename=f"{name}.search.sqlite",
+    )
+
+
+class PlaceFound(BaseModel):
+    name: str
+    kind: str = Field(
+        description="city, town, village, hamlet, peak, saddle, hut, lake, viewpoint, "
+        "station, parking and other kinds of the map"
+    )
+    lat: float
+    lon: float
+    elevation_m: float | None
+
+
+@router.get(
+    "/search",
+    response_model=list[PlaceFound],
+    dependencies=[Depends(rate_limit("map-search", limit=240))],
+)
+def search_places(
+    vectors: Vectors,
+    q: Annotated[str, Query(min_length=2, max_length=100, description="Part of a name")],
+    lat: Annotated[float | None, Query(ge=-90, le=90)] = None,
+    lon: Annotated[float | None, Query(ge=-180, le=180)] = None,
+    limit: Annotated[int, Query(ge=1, le=MAX_RESULTS)] = 10,
+):
+    """Places of the own map by name: summits, huts, towns, lakes. No login.
+
+    Upper and lower case and accents do not matter ("santis" finds "Säntis"). The name
+    itself comes first, then names that start with the query, then the more important
+    place; with `lat` and `lon` (e.g. the centre of the map) the nearer one wins among
+    equals. Searches the regions whose index was built (`deploy/build-map.sh`).
+    """
+    indexes = [region.search_path for region in vectors.regions() if region.search_path]
+    near = (lat, lon) if lat is not None and lon is not None else None
+    return search(indexes, q, near, limit)
 
 
 class SunDay(BaseModel):

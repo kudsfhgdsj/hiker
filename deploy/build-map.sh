@@ -51,7 +51,9 @@ for area in "$@"; do
   # Zwischenergebnisse und OSM-Auszug werden nicht mehr gebraucht; die Hilfsdaten bleiben.
   rm -f "$DATA_DIR/maps/build/$area.base.mbtiles" "$DATA_DIR/maps/build/$area.paths.mbtiles" \
     "$DATA_DIR/maps/build/sources/$area.osm.pbf"
-  # 4. Ebenen-Paket für die App: Höhendaten, Hangneigung und Höhenlinien des Gebiets.
+  # 4. Suchindex: Gipfel, Hütten, Orte und Seen der Karte nach Namen (Sekunden bis Minuten).
+  docker compose --profile mapbuild run --rm mapsearch "/data/$area.mbtiles"
+  # 5. Ebenen-Paket für die App: Höhendaten, Hangneigung und Höhenlinien des Gebiets.
   #    Dauert je nach Größe einige Minuten bis eine Stunde; MAP_LAYERS=0 lässt es weg.
   if [ "${MAP_LAYERS:-1}" != 0 ]; then
     docker compose --profile mapbuild run --rm mappack "/data/$area.mbtiles"

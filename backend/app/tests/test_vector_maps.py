@@ -321,3 +321,135 @@ def test_a_tile_on_a_border_holds_both_regions(client, maps):
     # A tile that cannot be read does not take the map away: the larger map answers.
     write_map(maps / "bayern.mbtiles", bounds="9.0,47.0,13.9,50.6", data=gzip.compress(b"\xff\xff"))
     assert client.get(f"/api/v1/maps/vector/{Z}/{X}/{Y}.pbf").status_code == 200
+
+
+# --- Search ---
+
+
+def value(item) -> bytes:
+    """A value of a layer: text in field 1, whole numbers in field 4."""
+    if isinstance(item, int):
+        return _varint(4 << 3) + _varint(item)
+    return _bytes_field(1, item.encode())
+
+
+def point_layer(name: str, features: list[tuple[dict, int, int]]) -> bytes:
+    """A layer of point features: (attributes, x, y) in tile coordinates of 0 to 4096."""
+    keys: list[str] = []
+    values: list = []
+    body = _varint(15 << 3) + _varint(2) + _bytes_field(1, name.encode())
+    for attributes, x, y in features:
+        tags = b""
+        for key, item in attributes.items():
+            if key not in keys:
+                keys.append(key)
+            if item not in values:
+                values.append(item)
+            tags += _varint(keys.index(key)) + _varint(values.index(item))
+        # "Move to" once, then both coordinates zigzag encoded.
+        geometry = _varint(9) + _varint(x << 1) + _varint(y << 1)
+        body += _bytes_field(
+            2, _bytes_field(2, tags) + _varint(3 << 3) + _varint(1) + _bytes_field(4, geometry)
+        )
+    for key in keys:
+        body += _bytes_field(3, key.encode())
+    for item in values:
+        body += _bytes_field(4, value(item))
+    return _bytes_field(3, body + _varint(5 << 3) + _varint(4096))
+
+
+def search_map(path, max_zoom=14):
+    """A map whose deepest tile holds a summit, a hut, two places, two lakes and a shop."""
+    tile = point_layer(
+        "mountain_peak",
+        [({"name": "Säntis", "ele": 2502, "class": "peak"}, 2048, 2048)],
+    )
+    tile += point_layer(
+        "poi",
+        [
+            (
+                {"name": "Berggasthaus Alter Säntis", "class": "lodging", "subclass": "alpine_hut"},
+                2100,
+                2000,
+            ),
+            ({"name": "Säntis Souvenirs", "class": "shop", "subclass": "gift"}, 2050, 2050),
+        ],
+    )
+    tile += point_layer(
+        "place",
+        [
+            ({"name": "Schwägalp", "class": "hamlet"}, 100, 3000),
+            ({"name": "Säntisdorf", "class": "village"}, 4000, 100),
+            # In the margin: the neighbouring tile has it.
+            ({"name": "Nebenan", "class": "village"}, 4200, 100),
+        ],
+    )
+    tile += point_layer(
+        "water_name",
+        [
+            ({"name": "Seealpsee", "class": "lake"}, 3900, 3900),
+            ({"name": "Fälensee", "class": "lake"}, 100, 100),
+        ],
+    )
+    write_map(path, tiles=((14, 8617, 5746),), max_zoom=max_zoom, data=gzip.compress(tile))
+
+
+def test_search_finds_the_places_of_the_map(client, maps, anna):
+    from app.modules.maps.search import build_index, fold
+
+    assert fold("Säntis") == "santis" and fold("Großglockner") == "grossglockner"
+    search_map(maps / "switzerland.mbtiles")
+    # Without an index the search answers with nothing.
+    assert client.get("/api/v1/maps/search", params={"q": "santis"}).json() == []
+
+    # Summit, hut, two places and two lakes; not the shop and not the point in the margin.
+    assert build_index(maps / "switzerland.mbtiles") == 6
+
+    found = client.get("/api/v1/maps/search", params={"q": "santis"}).json()
+    # The name itself first, then what starts with it, then what contains it.
+    assert [place["name"] for place in found] == [
+        "Säntis",
+        "Säntisdorf",
+        "Berggasthaus Alter Säntis",
+    ]
+    peak = found[0]
+    assert peak["kind"] == "peak" and peak["elevation_m"] == 2502
+    assert abs(peak["lat"] - 47.249) < 0.02 and abs(peak["lon"] - 9.343) < 0.03
+    assert found[2]["kind"] == "hut"
+    assert client.get("/api/v1/maps/search", params={"q": "SEEALP"}).json()[0]["kind"] == "lake"
+    assert client.get("/api/v1/maps/search", params={"q": "souvenir"}).json() == []
+    assert client.get("/api/v1/maps/search", params={"q": "nebenan"}).json() == []
+    assert client.get("/api/v1/maps/search", params={"q": "100%"}).json() == []
+    assert client.get("/api/v1/maps/search", params={"q": "s"}).status_code == 422
+    assert len(client.get("/api/v1/maps/search", params={"q": "an", "limit": 2}).json()) == 2
+
+    # The app takes the index along with the map.
+    region = client.get("/api/v1/maps/regions", headers=anna).json()[0]
+    assert region["search_size_bytes"] > 0
+    file = client.get("/api/v1/maps/regions/switzerland/search", headers=anna)
+    assert file.status_code == 200 and file.content.startswith(b"SQLite format 3")
+    assert client.get("/api/v1/maps/regions/switzerland/search").status_code == 401
+
+
+def test_search_prefers_the_nearer_place_and_knows_border_places_once(tmp_path):
+    from app.modules.maps.search import build_index, search, search_path
+
+    search_map(tmp_path / "a.mbtiles")
+    search_map(tmp_path / "b.mbtiles")
+    indexes = []
+    for name in ("a", "b"):
+        build_index(tmp_path / f"{name}.mbtiles")
+        indexes.append(search_path(tmp_path / f"{name}.mbtiles"))
+
+    # Both regions carry the same places: each is found once.
+    assert [place["name"] for place in search(indexes, "säntis")] == [
+        "Säntis",
+        "Säntisdorf",
+        "Berggasthaus Alter Säntis",
+    ]
+    # Two lakes whose names only contain the query: the nearer one comes first.
+    lakes = {place["name"]: place for place in search(indexes, "ee")}
+    for name, other in (("Seealpsee", "Fälensee"), ("Fälensee", "Seealpsee")):
+        here = (lakes[name]["lat"], lakes[name]["lon"])
+        assert [place["name"] for place in search(indexes, "ee", near=here)] == [name, other]
+    assert search(indexes + [tmp_path / "missing.sqlite"], "santis")

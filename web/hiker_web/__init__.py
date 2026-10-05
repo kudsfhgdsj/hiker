@@ -234,6 +234,26 @@ def create_app(config: dict | None = None) -> Flask:
         )
         return _passed_on(upstream, "application/geo+json")
 
+    @app.get("/map/search")
+    def map_search():
+        """Places of the own map by name; searched by the API."""
+        try:
+            found = (
+                api()
+                .request(
+                    "GET", "/maps/search", auth=False, params=_query("q", "lat", "lon", "limit")
+                )
+                .json()
+            )
+        except ApiError as error:
+            if error.status != 422:
+                raise
+            # Too short to search for: no results.
+            found = []
+        response = app.json.response(found)
+        response.headers["Cache-Control"] = "public, max-age=300"
+        return response
+
     @app.get("/map/sun")
     def map_sun():
         """Sunrise and sunset at a place; computed by the API."""

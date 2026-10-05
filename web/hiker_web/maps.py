@@ -7,6 +7,31 @@ from flask import current_app, url_for
 from hiker_web.api import ApiError, api
 from hiker_web.texts_de import t
 
+PLACE_KINDS = (
+    "city",
+    "town",
+    "village",
+    "hamlet",
+    "peak",
+    "saddle",
+    "volcano",
+    "hut",
+    "lake",
+    "viewpoint",
+    "station",
+    "halt",
+    "parking",
+    "camp_site",
+    "shelter",
+    "attraction",
+    "castle",
+    "ruins",
+    "cave_entrance",
+    "waterfall",
+    "spring",
+    "other",
+)
+
 # How long the answer of the API about its map is kept.
 _CHECK_EVERY_S = 300
 
@@ -39,6 +64,13 @@ def map_config(attribution: str) -> dict:
                 "map": t("map.base.map"),
                 "winter": t("map.base.winter"),
                 "satellite": t("map.base.satellite"),
+            },
+            # Search for places of the own map; only a server with a vector map has it.
+            "search": {
+                "url": url_for("map_search"),
+                "label": t("map.search"),
+                "none": t("map.search.none"),
+                "kinds": {kind: t(f"map.kind.{kind}") for kind in PLACE_KINDS},
             },
             "group": {
                 "terrain": t("map.group.terrain"),

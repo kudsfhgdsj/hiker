@@ -345,6 +345,80 @@ window.hikerMapLayers = (map, texts, options = {}) => {
       }
     }
 
+    // --- Search for places of the own map ---
+    if (meta && texts.search) {
+      const search = texts.search;
+      const holder = element("div", "map-drop map-search");
+      const input = element("input");
+      input.type = "search";
+      input.placeholder = search.label;
+      input.setAttribute("aria-label", search.label);
+      input.autocomplete = "off";
+      const results = element("div", "map-drop-panel");
+      results.hidden = true;
+      let asked = 0;
+      let timer = null;
+      const pin = element("div", "dot-marker search-pin");
+      const marker = new maplibregl.Marker({ element: pin });
+      const go = (place) => {
+        results.hidden = true;
+        input.value = place.name;
+        marker.setLngLat([place.lon, place.lat]).addTo(map);
+        // Towns from further away, a summit or a hut from close by.
+        const zoom = ["city", "town"].includes(place.kind) ? 12 : place.kind === "village" ? 13 : 14;
+        map.flyTo({ center: [place.lon, place.lat], zoom, speed: 1.6 });
+        if (options.onPlace) options.onPlace(place);
+      };
+      const show = (places) => {
+        results.replaceChildren();
+        if (!places.length) results.append(element("small", "", search.none));
+        for (const place of places) {
+          const button = element("button", "map-result");
+          button.type = "button";
+          const kind = search.kinds[place.kind] || search.kinds.other;
+          const height = place.elevation_m != null ? `, ${Math.round(place.elevation_m).toLocaleString("de-DE")} m` : "";
+          button.append(element("strong", "", place.name), element("span", "", `${kind}${height}`));
+          button.addEventListener("click", () => go(place));
+          results.append(button);
+        }
+        results.hidden = false;
+      };
+      const ask = async () => {
+        const text = input.value.trim();
+        const current = ++asked;
+        if (text.length < 2) {
+          results.hidden = true;
+          return;
+        }
+        const center = map.getCenter();
+        const query = `q=${encodeURIComponent(text)}&lat=${center.lat.toFixed(4)}&lon=${center.lng.toFixed(4)}&limit=8`;
+        try {
+          const response = await fetch(`${search.url}?${query}`);
+          const places = response.ok ? await response.json() : [];
+          // A newer search is already on its way.
+          if (current === asked) show(places);
+        } catch (_error) {
+          if (current === asked) show([]);
+        }
+      };
+      input.addEventListener("input", () => {
+        clearTimeout(timer);
+        timer = setTimeout(ask, 250);
+      });
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          // Enter takes the first result and never sends a form around the map.
+          event.preventDefault();
+          const first = results.querySelector("button");
+          if (first && !results.hidden) first.click();
+        } else if (event.key === "Escape") {
+          results.hidden = true;
+        }
+      });
+      holder.append(input, results);
+      bar.append(holder);
+    }
+
     // --- Fields of the page itself, e.g. the difficulty in the planner ---
     for (const group of options.groups || []) group.build(dropdown(group.title));
 
