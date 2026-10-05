@@ -237,6 +237,19 @@ def test_paths_are_coloured_by_their_difficulty():
     assert colours[colours.index("hiking") + 1] == "#38b6ff"
     assert colours[colours.index("difficult_alpine_hiking") + 1] == "#111111"
 
+    # Names of the paths: the path's own name with the number of its hiking route, or
+    # the route alone; level at the path, in every look.
+    names = layers["path-name"]
+    assert names["source-layer"] == "transportation_name" and names["minzoom"] == 13
+    assert names["layout"]["symbol-placement"] == "point"
+    route = ["in", ["get", "route_1_network"], ["literal", ["iwn", "nwn", "rwn", "lwn"]]]
+    assert names["filter"] == ["any", ["==", ["get", "class"], "path"], route]
+    text = names["layout"]["text-field"]
+    assert text[0] == "case" and text[1] == ["has", "name"]
+    assert ["get", "route_1_name"] in text[3][2][1]
+    for base in style["metadata"]["hiker"]["bases"]:
+        assert "path-name" not in base["hide"]
+
     # Zoomed in closely the grade stands next to the path.
     label = layers["path-difficulty-label"]
     assert label["source-layer"] == "hiking" and label["minzoom"] == 15

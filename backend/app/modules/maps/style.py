@@ -75,6 +75,11 @@ def _label(
     return layer
 
 
+ROUTE_REF = ["to-string", ["get", "route_1_ref"]]
+# A way that carries a hiking route: international, national, regional or local.
+HIKING_ROUTE = ["in", ["get", "route_1_network"], ["literal", ["iwn", "nwn", "rwn", "lwn"]]]
+
+
 def _roads() -> list[dict]:
     roads = [
         # class, colour, widths at zoom 8 / 14 / 18
@@ -678,13 +683,39 @@ def build_style(
             {"text-color": "#5a554c"},
             minzoom=14,
         ),
+        # Names of the paths: the name of the path itself, with the number of the hiking
+        # route that runs over it ("Langer Strich (VA-A64)"), or else the route alone
+        # ("716 Zentralalpenweg"). Routes are also named where they follow a track or a
+        # road. The name stands level at the path, not along it: mountain paths wind
+        # too much for a text to follow them.
         _label(
             "path-name",
             "transportation_name",
-            ["==", cls, "path"],
-            {"symbol-placement": "line", "text-size": 10, "symbol-spacing": 300},
-            {"text-color": PATH},
-            minzoom=14,
+            ["any", ["==", cls, "path"], HIKING_ROUTE],
+            {
+                "symbol-placement": "point",
+                "text-field": [
+                    "case",
+                    ["has", "name"],
+                    [
+                        "concat",
+                        NAME,
+                        ["case", ["has", "route_1_ref"], ["concat", " (", ROUTE_REF, ")"], ""],
+                    ],
+                    [
+                        "concat",
+                        ["case", ["has", "route_1_ref"], ["concat", ROUTE_REF, " "], ""],
+                        ["to-string", ["coalesce", ["get", "route_1_name"], ""]],
+                    ],
+                ],
+                "text-font": ITALIC,
+                "text-size": ["interpolate", ["linear"], ["zoom"], 13, 10, 16, 12],
+                "text-max-width": 9,
+                "text-offset": [0, -0.6],
+                "text-anchor": "bottom",
+            },
+            {"text-color": "#8f1d1d", "text-halo-width": 1.8},
+            minzoom=13,
         ),
         _label(
             "park-name",
