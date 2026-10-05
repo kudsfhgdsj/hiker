@@ -1,7 +1,7 @@
 // The controls of the map: small drop-down fields at its top edge.
 //   "Ebenen":      overlays (slope with its angles, snow, avalanche danger, weather), the
 //                  day they show, rain radar and clouds with their time
-//   "Darstellung": drawn map, winter or aerial image, and what the colours of the paths mean
+//   "Darstellung": the look of the map (standard, winter, topo and others)
 //   further fields a page adds itself (the planner: "Schwierigkeit")
 //   a button that switches between 2D and 3D
 // Which choices exist is written in the style of the server (metadata.hiker), so that web
@@ -437,20 +437,6 @@ window.hikerMapLayers = (map, texts, options = {}) => {
       }
       setBase(current);
       if (meta.bases.length > 3) note(looks, texts.looksNote);
-      if (meta.legend && meta.legend.length) {
-        looks.append(element("hr"));
-        const legend = element("div", "map-legend paths");
-        legend.append(`${texts.paths} `);
-        for (const entry of meta.legend) {
-          const swatch = element("i");
-          swatch.style.background = entry.color;
-          // Via ferratas are drawn with cross strokes: the sample shows them too.
-          if (entry.pattern === "rungs") swatch.className = "rungs";
-          legend.append(swatch, entry.label);
-        }
-        looks.append(legend);
-        note(looks, texts.pathsNote);
-      }
     }
 
     // --- Search for places of the own map ---

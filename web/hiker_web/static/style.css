@@ -238,7 +238,11 @@ body.full main { flex: 1; min-height: 0; max-width: none; width: 100%; padding: 
 .map-info { font-size: .9rem; line-height: 1.5; }
 .map-info .name { font-weight: 600; font-size: 1rem; }
 .map-info .meta { color: #666; font-size: .82rem; }
-.maplibregl-popup-content { color: #222; }
+.maplibregl-popup-content { color: #222; padding-right: 2.4rem; }
+/* The cross that closes the window of a place: large and red, easy to hit. */
+.maplibregl-popup-close-button { font-size: 1.9rem; line-height: 1; width: 2.2rem; height: 2.2rem; padding: 0;
+  color: #c62828; font-weight: 700; border-radius: 0 .4rem 0 .4rem; }
+.maplibregl-popup-close-button:hover { background: #c6282822; color: #a01b1b; }
 @media (max-width: 55rem) {
   body.full { height: auto; }
   .plan { grid-template-columns: 1fr; height: auto; }

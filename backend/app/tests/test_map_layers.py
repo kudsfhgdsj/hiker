@@ -298,17 +298,13 @@ def test_switchable_layers_start_hidden_and_keep_their_place():
         "topo-ice",
         "topo-hillshade",
         "topo-contour",
-        "topo-path-casing",
-        "topo-path",
         "topo-peak-name",
     }
-    assert {"wood", "rock", "hillshade", "contour", "path", "path-difficulty", "peak-name"} <= set(
-        topo["hide"]
-    )
+    assert {"wood", "rock", "hillshade", "contour", "peak-name"} <= set(topo["hide"])
+    # Paths look the same in every look: by their grade, as in the standard one.
+    assert not {"path", "path-halo", "path-difficulty", "via-ferrata"} & set(topo["hide"])
     assert all(layers[name]["layout"]["visibility"] == "none" for name in topo["show"])
     assert order.index("wood") < order.index("topo-wood") < order.index("topo-hillshade")
-    assert order.index("topo-path-casing") < order.index("topo-path") < order.index("peak-name")
-    assert layers["topo-path"]["paint"]["line-color"] == "#d0182b"
     # Every further look has the same parts in its own colours; what one of them shows
     # is hidden again by the next, because each hides the usual layers it replaces.
     by_id = {base["id"]: base for base in hiker["bases"]}
@@ -318,19 +314,12 @@ def test_switchable_layers_start_hidden_and_keep_their_place():
             look["show"]
         )
         assert all(layer.startswith(f"{name}-") for layer in look["show"])
-        assert {"wood", "hillshade", "contour", "path", "path-difficulty"} <= set(look["hide"])
+        assert {"wood", "hillshade", "contour"} <= set(look["hide"])
+        assert "path-difficulty" not in look["hide"] and f"{name}-path" not in look["show"]
         assert all(layers[layer]["layout"]["visibility"] == "none" for layer in look["show"])
-    # Alpenverein: thin solid red paths and strong blue water.
-    assert "line-dasharray" not in layers["alpenverein-path"]["paint"]
+    # Alpenverein: strong blue water. Kompass: mauve buildings.
     assert layers["alpenverein-water"]["paint"]["fill-color"] == "#6db7ee"
     assert "water" in by_id["alpenverein"]["hide"] and "water" not in by_id["topo"]["hide"]
-    # Outdooractive: plain paths dashed in grey, the marked mountain paths dotted in red.
-    assert layers["outdooractive-path"]["paint"]["line-color"] == "#3a3a3a"
-    marked = layers["outdooractive-path-marked"]
-    assert marked["source-layer"] == "hiking" and marked["paint"]["line-color"] == "#d7262c"
-    assert marked["layout"]["line-cap"] == "round"
-    # Kompass: strong solid red paths and mauve buildings.
-    assert "line-dasharray" not in layers["kompass-path"]["paint"]
     assert layers["kompass-building"]["paint"]["fill-color"] == "#c7a1c4"
     # The grade next to the path and the via ferratas stay in every look.
     assert "path-difficulty-label" not in topo["hide"] and "via-ferrata" not in topo["hide"]
@@ -357,7 +346,7 @@ def test_switchable_layers_start_hidden_and_keep_their_place():
         "outdooractive",
         "kompass",
     ]
-    assert "topo-hillshade" not in bases[1]["show"] and "topo-path" in bases[1]["show"]
+    assert "topo-hillshade" not in bases[1]["show"] and "topo-wood" in bases[1]["show"]
     assert plain["metadata"]["hiker"]["overlays"] == []
 
 

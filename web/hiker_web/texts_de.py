@@ -293,7 +293,7 @@ TEXTS = {
     "mapmode.plan_here": "Route hier planen",
     "mapmode.via_ferrata": "Klettersteig",
     "map.layers": "Ebenen",
-    "map.base.map": "Karte",
+    "map.base.map": "Standard",
     "map.base.winter": "Winter",
     "map.base.topo": "Topo",
     "map.base.alpenverein": "Alpenverein",

@@ -144,7 +144,7 @@ def test_pages_carry_the_texts_of_the_layer_control(user, fake_api):
 
     texts = plan_data(page)["layerTexts"]
     assert texts["base"] == {
-        "map": "Karte",
+        "map": "Standard",
         "winter": "Winter",
         "topo": "Topo",
         "alpenverein": "Alpenverein",

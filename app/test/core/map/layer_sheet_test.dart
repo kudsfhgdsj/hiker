@@ -64,7 +64,7 @@ void main() {
     // "Darstellung": how the map is drawn.
     await show(MapSheetPart.looks);
     expect(find.text('Darstellung'), findsOneWidget);
-    expect(find.text('Karte'), findsOneWidget);
+    expect(find.text('Standard'), findsOneWidget);
     expect(find.text('Hangneigung'), findsNothing);
     await tester.tap(find.text('Luftbild'));
     await tester.pump();

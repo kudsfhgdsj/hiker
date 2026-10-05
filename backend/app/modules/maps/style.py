@@ -240,8 +240,9 @@ def _use_symbols(layers: list[dict]) -> None:
 
 @dataclass(frozen=True)
 class Look:
-    """A look of the map: its own colours for ground, relief, contours, water, paths and
-    summit names. Everything is drawn from the same data; only the paint differs."""
+    """A look of the map: its own colours for ground, relief, contours, water and summit
+    names. Everything is drawn from the same data; only the paint differs. Paths look the
+    same in every look: coloured by their grade, as in the standard one."""
 
     id: str
     ground: str
@@ -254,11 +255,6 @@ class Look:
     shade: tuple[float, str, str]
     # Contour lines: colour, opacity and width of the index lines and of the others.
     contour: tuple[str, float, float, float, float]
-    # Paths: colour, dash pattern (None: solid), factor on the usual width.
-    path: tuple[str, list[float] | None, float]
-    # Paths with a grade (the marked mountain paths) drawn again in this colour and dash
-    # pattern, over the plain ones; None: all paths look the same.
-    marked: tuple[str, list[float] | None] | None = None
     # Summit names: colour, size, font.
     summit: tuple[str, int, list[str]] = ("#111111", 13, BOLD)
     building: str | None = None
@@ -266,7 +262,7 @@ class Look:
 
 LOOKS = (
     # A classic topographic hiking map: strong green forest, grey rock, heavy relief,
-    # dense brown contour lines, paths in red, summits in bold black.
+    # dense brown contour lines, summits in bold black.
     Look(
         id="topo",
         ground="#e6edc4",
@@ -277,11 +273,10 @@ LOOKS = (
         water=WATER,
         shade=(0.85, "#1c2a18", "#26331f"),
         contour=("#5f4320", 0.85, 0.5, 1.3, 0.6),
-        path=("#d0182b", [3, 1.6], 1.0),
     ),
     # In the manner of the alpine club maps: almost white ground, pale forest, the rock
-    # carried by a hard grey relief, fine brown contour lines, strong blue water, paths
-    # as thin solid red lines, names in black.
+    # carried by a hard grey relief, fine brown contour lines, strong blue water, names
+    # in black.
     Look(
         id="alpenverein",
         ground="#fbfaf2",
@@ -292,12 +287,10 @@ LOOKS = (
         water="#6db7ee",
         shade=(1.0, "#111111", "#000000"),
         contour=("#b06a30", 0.9, 0.55, 1.0, 0.45),
-        path=("#d21f1f", None, 0.8),
         summit=("#000000", 13, REGULAR),
     ),
     # In the manner of a digital outdoor map: soft greens, light grey rock with gentle
-    # relief, orange-brown contours, plain paths dashed in dark grey and the marked
-    # mountain paths dotted in red, names in dark grey.
+    # relief, orange-brown contours, names in dark grey.
     Look(
         id="outdooractive",
         ground="#f2f1e4",
@@ -308,12 +301,10 @@ LOOKS = (
         water="#a9d3ee",
         shade=(0.6, "#4a4a48", "#6a6a66"),
         contour=("#c58a4e", 0.8, 0.5, 1.1, 0.5),
-        path=("#3a3a3a", [4, 2.5], 0.75),
-        marked=("#d7262c", [0.4, 2]),
         summit=("#2b2b2b", 12, REGULAR),
     ),
     # In the manner of a printed hiking map: warm light ground, light green forest,
-    # orange contours, paths as strong solid red lines, buildings in mauve.
+    # orange contours, buildings in mauve.
     Look(
         id="kompass",
         ground="#f6f2d6",
@@ -324,7 +315,6 @@ LOOKS = (
         water="#8ecbf0",
         shade=(0.7, "#55524a", "#6f6a5e"),
         contour=("#d28a36", 0.85, 0.55, 1.1, 0.5),
-        path=("#d4141c", None, 1.25),
         summit=("#1a1a1a", 12, BOLD),
         building="#c7a1c4",
     ),
@@ -347,23 +337,20 @@ def _key(look: Look | None, *, symbols: bool, contours: bool) -> list[dict]:
     def area(name: str, colour: str) -> dict:
         return {"id": name, "kind": "fill", "color": colour}
 
+    # Paths look the same in every look: by their grade.
+    paths = [
+        line("grade_easy", RED),
+        line("grade_t5", BLACK),
+        line("grade_t6", VIOLET),
+        line("path", PATH, dash=True),
+        line("via_ferrata", VIA_FERRATA, rungs=True),
+    ]
     if look is None:
-        paths = [
-            line("grade_easy", RED),
-            line("grade_t5", BLACK),
-            line("grade_t6", VIOLET),
-            line("path", PATH, dash=True),
-        ]
         ground = ("#c5dfb6", "#dfecc8", "#dcd6cd", "#eaf4fb", WATER)
         contour = "#8a5a2b"
     else:
-        colour, dashes, _factor = look.path
-        paths = [line("path", colour, dash=bool(dashes))]
-        if look.marked:
-            paths.insert(0, line("path_marked", look.marked[0], dots=True))
         ground = (look.wood, look.grass, look.rock, look.ice, look.water)
         contour = look.contour[0]
-    paths.append(line("via_ferrata", VIA_FERRATA, rungs=True))
     lines = [
         line("track", "#8a6a45", dash=True),
         line("road", "#ffffff", casing="#b9b2a6"),
@@ -458,52 +445,6 @@ def _add_look(layers: list[dict], hiker: dict, insert_before, look: Look) -> Non
             "tunnel",
             _fill(f"{name}-building", "building", None, look.building) | {"minzoom": 13},
             ("building",),
-        )
-    # Paths on a light casing; the grade still stands next to them close up.
-    colour, dashes, factor = look.path
-    path = ["==", cls, "path"]
-
-    def width(*stops: tuple[int, float]) -> list:
-        return _width(*((zoom, round(value * factor, 2)) for zoom, value in stops))
-
-    add(
-        "boundary",
-        _line(
-            f"{name}-path-casing",
-            "transportation",
-            path,
-            {
-                "line-color": "#ffffff",
-                "line-opacity": 0.75,
-                "line-width": width((11, 1.8), (14, 3.6), (18, 8)),
-            },
-            minzoom=11,
-        ),
-        ("path-halo", "path", "path-difficulty"),
-    )
-    line = {"line-color": colour, "line-width": width((11, 0.9), (14, 1.9), (18, 4.2))}
-    if dashes:
-        line["line-dasharray"] = dashes
-    add(
-        "boundary",
-        _line(f"{name}-path", "transportation", path, line, minzoom=11, cap="butt"),
-    )
-    if look.marked:
-        colour, dashes = look.marked
-        line = {"line-color": colour, "line-width": _width((11, 1.3), (14, 2.6), (18, 5.5))}
-        if dashes:
-            line["line-dasharray"] = dashes
-        add(
-            "boundary",
-            _line(
-                f"{name}-path-marked",
-                "hiking",
-                ["has", "sac_scale"],
-                line,
-                minzoom=11,
-                # Round caps turn a short dash into a dot.
-                cap="round" if dashes and dashes[0] < 1 else "butt",
-            ),
         )
     if "peak-name" in present:
         summit = next(layer for layer in layers if layer["id"] == "peak-name")
@@ -962,14 +903,6 @@ def build_style(
     hiker: dict = {
         "bases": [{"id": "map", "show": [], "hide": []}],
         "overlays": [],
-        # What the colours of the paths mean.
-        "legend": [
-            {"label": "T1–T4", "color": RED},
-            {"label": "T5", "color": BLACK},
-            {"label": "T6", "color": VIOLET},
-            # Drawn with cross strokes and marked with a ladder.
-            {"label": "KS", "color": VIA_FERRATA, "pattern": "rungs"},
-        ],
     }
 
     def insert_before(layer_id: str, layer: dict) -> None:

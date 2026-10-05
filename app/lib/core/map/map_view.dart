@@ -462,49 +462,6 @@ class MapLayerSheet extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: Text(l10n.mapBaseNote, style: theme.textTheme.bodySmall),
         ),
-      if (options['legend'] case final List<dynamic> legend
-          when legend.isNotEmpty)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 4,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text(l10n.mapPaths),
-              for (final entry in legend.cast<Map<String, dynamic>>())
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (entry['pattern'] == 'rungs')
-                      // Via ferratas are drawn with cross strokes.
-                      Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: Text(
-                          '┼┼┼',
-                          style: TextStyle(
-                            color: _hexColor(entry['color'] as String),
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: -2,
-                          ),
-                        ),
-                      )
-                    else
-                      Container(
-                        width: 14,
-                        height: 14,
-                        margin: const EdgeInsets.only(right: 4),
-                        decoration: BoxDecoration(
-                          color: _hexColor(entry['color'] as String),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                      ),
-                    Text(entry['label'] as String),
-                  ],
-                ),
-            ],
-          ),
-        ),
     ];
 
     String groupLabel(String id) => switch (id) {

@@ -1870,7 +1870,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get mapRadarPlay => 'Zeitverlauf abspielen';
 
   @override
-  String get mapBaseMap => 'Karte';
+  String get mapBaseMap => 'Standard';
 
   @override
   String get mapBaseWinter => 'Winter';

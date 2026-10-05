@@ -222,14 +222,6 @@ def test_paths_are_coloured_by_their_difficulty():
     assert colours[:2] == ["match", ["get", "sac_scale"]]
     assert "difficult_alpine_hiking" in colours and "hiking" in colours
     assert layers["via-ferrata"]["filter"] == ["==", ["get", "highway"], "via_ferrata"]
-    # What the colours mean travels with the style.
-    legend = style["metadata"]["hiker"]["legend"]
-    assert [(entry["label"], entry["color"]) for entry in legend] == [
-        ("T1–T4", "#d92323"),
-        ("T5", "#111111"),
-        ("T6", "#7b2fbf"),
-        ("KS", "#111111"),
-    ]
     # Red up to T4, black for T5, violet for T6: none of them is a colour of water.
     for scale in ("hiking", "mountain_hiking", "demanding_mountain_hiking", "alpine_hiking"):
         assert colours[colours.index(scale) + 1] == "#d92323"
@@ -638,13 +630,11 @@ def test_the_style_carries_the_key_of_the_map_for_every_look():
     ]
     assert [item["id"] for item in usual["areas"]] == ["wood", "grass", "rock", "ice", "water"]
 
-    # Another look: its own colours, one kind of path, or marked paths next to plain ones.
+    # Another look: its own colours for the ground, the same paths by their grade.
     topo = {section["id"]: section["items"] for section in key["topo"]}
-    assert [item["id"] for item in topo["paths"]] == ["path", "via_ferrata"]
-    assert topo["paths"][0]["color"] == "#d0182b" and topo["areas"][0]["color"] == "#7fb069"
-    outdoor = {section["id"]: section["items"] for section in key["outdooractive"]}
-    assert [item["id"] for item in outdoor["paths"]] == ["path_marked", "path", "via_ferrata"]
-    assert outdoor["paths"][0]["dots"] is True
+    assert topo["paths"] == usual["paths"]
+    assert topo["areas"][0]["color"] == "#7fb069" and usual["areas"][0]["color"] == "#c5dfb6"
+    assert "legend" not in style["metadata"]["hiker"]
 
     # Without symbols and contour lines the key leaves them out.
     plain = build_style("t", "g", "©", 14)["metadata"]["hiker"]["key"]["map"]

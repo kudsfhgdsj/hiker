@@ -3277,7 +3277,7 @@ abstract class AppLocalizations {
   /// No description provided for @mapBaseMap.
   ///
   /// In de, this message translates to:
-  /// **'Karte'**
+  /// **'Standard'**
   String get mapBaseMap;
 
   /// No description provided for @mapBaseWinter.

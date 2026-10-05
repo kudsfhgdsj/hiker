@@ -135,6 +135,17 @@ class PlaceSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // A large red cross closes the sheet.
+            Align(
+              alignment: Alignment.topRight,
+              child: IconButton(
+                tooltip: l10n.close,
+                iconSize: 32,
+                color: const Color(0xFFC62828),
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
             for (final (index, line) in found.lines.indexed)
               Text(
                 line,
