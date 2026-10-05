@@ -20,7 +20,9 @@
 #
 # Aufwand für Österreich, grob: 19 GB Download (bleibt unter maps/build/sources und kann
 # danach gelöscht werden), 5 bis 7 GB Ergebnis, ein bis zwei Stunden mit drei Kernen.
-# Ein abgebrochener Lauf macht beim nächsten Aufruf weiter.
+# Ein abgebrochener Lauf macht beim nächsten Aufruf weiter. Das Zusammenführen der
+# Grenzkacheln schreibt in Pakete, die die API gerade liest: diesen Schritt nicht
+# abbrechen (sonst das Skript einfach noch einmal starten).
 set -eu
 
 cd "$(dirname "$0")/.."
@@ -32,6 +34,8 @@ case "$area" in
     metalink=""
     file="DGM_R5.tif"
     attribution="Höhendaten Österreich: © BEV (DGM 5 m), CC BY 4.0"
+    # Reicht mit gröberen Daten einige Kilometer über die Staatsgrenze.
+    priority=0
     ;;
   bayern)
     # Viele kleine Textdateien (x y z) je Quadratkilometer, UTM 32.
@@ -41,6 +45,8 @@ case "$area" in
     step=5
     file="bayern-dgm5.tif"
     attribution="Höhendaten Bayern: © Bayerische Vermessungsverwaltung (DGM5), CC BY 4.0"
+    # Endet genau an der Landesgrenze: gilt dort vor einem Nachbarn, der hinüberreicht.
+    priority=10
     ;;
   *) echo "Für '$area' ist noch kein Geländemodell hinterlegt (bisher: austria, bayern)." >&2; exit 1 ;;
 esac
@@ -69,11 +75,28 @@ fi
 echo "== Höhenkacheln $area $(date '+%Y-%m-%d %H:%M') =="
 docker compose --profile mapbuild run --rm terrainbuild \
   --source "/data/build/sources/$file" --out "/data/$area.hires.sqlite" \
-  --max-zoom "$ZOOM" --workers "$WORKERS" --attribution "$attribution"
+  --max-zoom "$ZOOM" --workers "$WORKERS" --attribution "$attribution" --priority "$priority"
+
+# Kacheln an der Grenze zweier Gebiete liegen in beiden Paketen, jeweils nur auf der
+# eigenen Seite fein: beide Hälften zusammenführen.
+packs=""
+for pack in "$DATA_DIR"/maps/*.hires.sqlite; do
+  case "$pack" in *.derived.hires.sqlite) continue ;; esac
+  packs="$packs /data/$(basename "$pack")"
+done
+echo "== Grenzkacheln zusammenführen $(date '+%Y-%m-%d %H:%M') =="
+# shellcheck disable=SC2086
+docker compose --profile mapbuild run --rm --entrypoint python3 terrainbuild \
+  /tool/join_packs.py $packs
 
 echo "== Hangneigung und Höhenlinien $(date '+%Y-%m-%d %H:%M') =="
-docker compose --profile mapbuild run --rm --build mappack \
-  "/data/$area.hires.sqlite" --derive "--workers=$WORKERS"
+# Für alle Gebiete: Was schon da ist, bleibt; neu gerechnet wird nur, was fehlt, also
+# auch die eben zusammengeführten Kacheln der Nachbarn.
+build="--build"
+for pack in $packs; do
+  docker compose --profile mapbuild run --rm $build mappack "$pack" --derive "--workers=$WORKERS"
+  build=""
+done
 
 echo "== fertig $(date '+%Y-%m-%d %H:%M') =="
 ls -lh "$DATA_DIR/maps/$area.hires.sqlite" "$DATA_DIR/maps/$area.derived.hires.sqlite"

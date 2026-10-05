@@ -179,6 +179,12 @@ def main() -> None:
     parser.add_argument("--workers", type=int, default=3)
     parser.add_argument("--attribution", default="")
     parser.add_argument("--fill-url", default=FILL_URL)
+    parser.add_argument(
+        "--priority",
+        type=int,
+        default=0,
+        help="which model wins where two overlap (join_packs.py); higher for one that ends at its border",
+    )
     arguments = parser.parse_args()
     start_worker(arguments)
 
@@ -199,6 +205,7 @@ def main() -> None:
     db.execute("CREATE TABLE IF NOT EXISTS seen (z INTEGER, x INTEGER, y INTEGER, PRIMARY KEY (z, x, y))")
     db.execute("INSERT OR REPLACE INTO metadata VALUES ('attribution', ?)", (arguments.attribution,))
     db.execute("INSERT OR REPLACE INTO metadata VALUES ('source', ?)", (os.path.basename(arguments.source),))
+    db.execute("INSERT OR REPLACE INTO metadata VALUES ('priority', ?)", (str(arguments.priority),))
     db.commit()
 
     with Pool(arguments.workers, initializer=start_worker, initargs=(arguments,)) as pool:
