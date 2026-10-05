@@ -285,6 +285,42 @@ TEXTS = {
     "tour.gpx_download": "GPX herunterladen",
     "tour.track_remove": "Track entfernen",
     "nav.map": "Karte",
+    "nav.stats": "Statistik",
+    "mapmode.wish": "Als Wunschgipfel merken",
+    "stats.totals": "Alle Touren zusammen",
+    "stats.tours": "Touren",
+    "stats.days": "Tage unterwegs",
+    "stats.moving_time": "Zeit in Bewegung",
+    "stats.peaks": "Gipfel",
+    "stats.year": "Jahr",
+    "stats.without_track": (
+        "{count} Touren haben keinen Track; sie zählen als Tour und Tag, aber nicht bei "
+        "Strecke und Höhenmetern."
+    ),
+    "stats.calendar": "Tage unterwegs {year}",
+    "stats.calendar_note": "Farbe nach Höhenmetern im Aufstieg. Ein Klick öffnet die Tour.",
+    "stats.less": "weniger",
+    "stats.more": "mehr",
+    "stats.map": "Wo ich war",
+    "stats.map_note": (
+        "Alle eigenen Tracks auf einer Karte. Oft begangene Strecken erscheinen dunkler; "
+        "ein Klick auf eine Linie nennt die Tour."
+    ),
+    "stats.climbed": "Bestiegene Gipfel ({count})",
+    "stats.no_peaks": "Noch keine Gipfel. Sie kommen aus den Gipfeln deiner Touren.",
+    "stats.peak": "Gipfel",
+    "stats.elevation": "Höhe (m)",
+    "stats.visits": "Besuche",
+    "stats.last": "Zuletzt",
+    "stats.wishes": "Wunschgipfel",
+    "stats.no_wishes": "Noch keine Wunschgipfel.",
+    "stats.wish_new": "Wunschgipfel hinzufügen",
+    "stats.wish_done": "bestiegen",
+    "stats.wish_hint": (
+        "Mit Koordinaten erkennt hiker von selbst, wenn eine Tour den Gipfel erreicht hat "
+        "(sonst am Namen). In der Karte lässt sich ein Gipfel per Klick vormerken."
+    ),
+    "stats.note": "Notiz",
     "mapmode.needs_script": "Die Karte braucht JavaScript.",
     "mapmode.sun_loading": "Sonnenzeiten werden berechnet …",
     "mapmode.sun_none": "Heute geht die Sonne hier nicht auf oder nicht unter.",

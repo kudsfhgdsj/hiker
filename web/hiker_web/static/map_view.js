@@ -70,13 +70,17 @@
     const seen = new Set();
     const things = [];
     let summit = null;
+    let summitName = null;
     for (const feature of map.queryRenderedFeatures(box)) {
       const properties = feature.properties || {};
       const layer = feature.sourceLayer;
       let text = null;
       if (layer === "mountain_peak" && properties.name) {
         text = properties.ele ? `${properties.name}, ${number(Number(properties.ele))} m` : properties.name;
-        if (properties.ele && !summit) summit = Number(properties.ele);
+        if (properties.ele && !summit) {
+          summit = Number(properties.ele);
+          summitName = properties.name;
+        }
       } else if (layer === "hiking") {
         const grade = properties.highway === "via_ferrata" ? texts.via_ferrata : texts.sac[properties.sac_scale];
         if (grade) text = properties.name ? `${properties.name}: ${grade}` : grade;
@@ -90,7 +94,7 @@
         things.push(text);
       }
     }
-    return { things: things.slice(0, 6), summit };
+    return { things: things.slice(0, 6), summit, summitName };
   };
 
   let popup = null;
@@ -98,7 +102,7 @@
   map.on("click", async (event) => {
     const current = ++asked;
     const { lat, lng } = event.lngLat;
-    const { things, summit } = thingsAt(event.point);
+    const { things, summit, summitName } = thingsAt(event.point);
     const content = document.createElement("div");
     content.className = "map-info";
     for (const [index, thing] of things.entries()) content.append(line(thing, index === 0 ? "name" : ""));
@@ -109,6 +113,19 @@
     plan.href = `${data.planUrl}?lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}&zoom=${Math.max(12, Math.round(map.getZoom()))}`;
     plan.textContent = texts.plan_here;
     if (data.planUrl) content.append(plan);
+    if (data.wishUrl && summitName) {
+      // A summit can be put on the list of peaks the user wishes for.
+      const wish = document.createElement("a");
+      const query = new URLSearchParams({
+        wish_name: summitName,
+        wish_ele: String(Math.round(summit)),
+        wish_lat: lat.toFixed(5),
+        wish_lon: lng.toFixed(5),
+      });
+      wish.href = `${data.wishUrl}?${query}#wishes`;
+      wish.textContent = texts.wish;
+      content.append(document.createElement("br"), wish);
+    }
     if (popup) popup.remove();
     popup = new maplibregl.Popup({ maxWidth: "20rem" }).setLngLat(event.lngLat).setDOMContent(content).addTo(map);
 

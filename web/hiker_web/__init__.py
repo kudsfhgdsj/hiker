@@ -28,6 +28,7 @@ NAVIGATION = (
     ("protocols", "protocols.tour_list", "nav.tours"),
     ("planning", "planning.route_list", "nav.planning"),
     ("maps", "map_page", "nav.map"),
+    ("reports", "reports.stats", "nav.stats"),
     ("gear", "gear.item_list", "nav.gear"),
     ("nutrition", "nutrition.food_list", "nav.food"),
 )
@@ -281,6 +282,7 @@ def create_app(config: dict | None = None) -> Flask:
             **map_config(OSM_ATTRIBUTION),
             "sunUrl": url_for("map_sun"),
             "planUrl": url_for("planning.route_new") if "planning" in modules else None,
+            "wishUrl": url_for("reports.stats") if "reports" in modules else None,
             "texts": {
                 "sunrise": t("plan.js.sunrise"),
                 "sunset": t("plan.js.sunset"),
@@ -289,6 +291,7 @@ def create_app(config: dict | None = None) -> Flask:
                 "sun_summit": t("mapmode.sun_summit"),
                 "sun_light": t("mapmode.sun_light"),
                 "plan_here": t("mapmode.plan_here"),
+                "wish": t("mapmode.wish"),
                 "via_ferrata": t("mapmode.via_ferrata"),
                 "sac": {scale: t(f"plan.difficulty.{level}") for level, scale in SAC_SCALE},
             },
@@ -343,7 +346,16 @@ def create_app(config: dict | None = None) -> Flask:
         upstream = api().request("GET", f"/maps/fonts/{fontstack}/{glyphs}.pbf", auth=False)
         return _passed_on(upstream, "application/x-protobuf")
 
-    from hiker_web.views import admin, auth, gear, nutrition, planning, protocols, public
+    from hiker_web.views import (
+        admin,
+        auth,
+        gear,
+        nutrition,
+        planning,
+        protocols,
+        public,
+        reports,
+    )
 
     app.register_blueprint(auth.blueprint)
     app.register_blueprint(admin.blueprint)
@@ -351,6 +363,7 @@ def create_app(config: dict | None = None) -> Flask:
     app.register_blueprint(nutrition.blueprint)
     app.register_blueprint(protocols.blueprint)
     app.register_blueprint(planning.blueprint)
+    app.register_blueprint(reports.blueprint)
     app.register_blueprint(public.blueprint)
 
     @app.get("/")

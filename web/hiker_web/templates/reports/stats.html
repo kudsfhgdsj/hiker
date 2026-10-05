@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% from "macros.html" import field, csrf, when %}
+{% block title %}{{ t('nav.stats') }} – {{ t('app.title') }}{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/maplibre-gl/maplibre-gl.css') }}">
+<h1>{{ t('nav.stats') }}</h1>
+
+<section>
+  <h2>{{ t('stats.totals') }}</h2>
+  {% set total = summary.total %}
+  <dl class="facts card stats-total">
+    <dt>{{ t('stats.tours') }}</dt><dd>{{ total.tours }}</dd>
+    <dt>{{ t('stats.days') }}</dt><dd>{{ total.days }}</dd>
+    <dt>{{ t('plan.distance') }}</dt><dd>{{ total.distance_m|distance }}</dd>
+    <dt>{{ t('plan.ascent') }}</dt><dd>{{ total.ascent_m|meters }}</dd>
+    <dt>{{ t('plan.descent') }}</dt><dd>{{ total.descent_m|meters }}</dd>
+    <dt>{{ t('stats.moving_time') }}</dt><dd>{{ (total.moving_time_s / 60)|duration }}</dd>
+    <dt>{{ t('stats.peaks') }}</dt><dd>{{ total.peaks }}</dd>
+  </dl>
+  {% if total.tours != total.tours_with_track %}
+  <p class="meta">{{ t('stats.without_track', count=total.tours - total.tours_with_track) }}</p>
+  {% endif %}
+  {% if summary.years %}
+  <table>
+    <thead><tr><th>{{ t('stats.year') }}</th><th>{{ t('stats.tours') }}</th><th>{{ t('stats.days') }}</th>
+      <th>{{ t('plan.distance') }}</th><th>{{ t('plan.ascent') }}</th><th>{{ t('plan.descent') }}</th><th>{{ t('stats.peaks') }}</th></tr></thead>
+    <tbody>
+      {% for year in summary.years %}
+      <tr><th><a href="{{ url_for('reports.stats', year=year.year) }}#calendar">{{ year.year }}</a></th><td>{{ year.tours }}</td><td>{{ year.days }}</td>
+        <td>{{ year.distance_m|distance }}</td><td>{{ year.ascent_m|meters }}</td><td>{{ year.descent_m|meters }}</td><td>{{ year.peaks }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+<section id="calendar">
+  <div class="toolbar">
+    <h2>{{ t('stats.calendar', year=calendar.year) }}</h2><span class="spacer"></span>
+    {% for year in calendar.years %}
+    <a class="chip" href="{{ url_for('reports.stats', year=year) }}#calendar"{% if year == calendar.year %} aria-current="true"{% endif %}>{{ year }}</a>
+    {% endfor %}
+  </div>
+  <div class="heat-days" role="img" aria-label="{{ t('stats.calendar', year=calendar.year) }}">
+    {% for week in weeks %}
+    <div class="heat-week">
+      {% for cell in week %}
+      {% if cell is none %}<i class="out"></i>
+      {% elif cell.day %}<a class="l{{ cell.level }}" href="{{ url_for('protocols.tour_detail', tour_id=cell.day.tour_ids[0]) }}" title="{{ cell.date|date }}: {{ cell.day.distance_m|distance }}, ↑ {{ cell.day.ascent_m|meters }}"></a>
+      {% else %}<i title="{{ cell.date|date }}"></i>{% endif %}
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  <p class="meta heat-key">{{ t('stats.less') }} <i></i><i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i> {{ t('stats.more') }} · {{ t('stats.calendar_note') }}</p>
+</section>
+
+<section>
+  <h2>{{ t('stats.map') }}</h2>
+  <p class="meta">{{ t('stats.map_note') }}</p>
+  <div id="map" class="plan"></div>
+</section>
+
+<section id="peaks">
+  <h2>{{ t('stats.climbed', count=peaks|length) }}</h2>
+  {% if peaks %}
+  <table>
+    <thead><tr><th>{{ t('stats.peak') }}</th><th>{{ t('stats.elevation') }}</th><th>{{ t('stats.visits') }}</th><th>{{ t('stats.last') }}</th></tr></thead>
+    <tbody>
+      {% for peak in peaks %}
+      <tr><th>{{ peak.name }}</th><td>{{ peak.elevation_m|meters if peak.elevation_m is not none else '–' }}</td>
+        <td>{{ peak.count }}</td>
+        <td>{% if peak.visits %}<a href="{{ url_for('protocols.tour_detail', tour_id=peak.visits[0].tour_id) }}">{{ peak.last|date if peak.last else peak.visits[0].title }}</a>{% endif %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="meta">{{ t('stats.no_peaks') }}</p>
+  {% endif %}
+</section>
+
+<section id="wishes">
+  <h2>{{ t('stats.wishes') }}</h2>
+  {% if wishes %}
+  <ul class="list">
+    {% for item in wishes %}
+    <li>
+      <span class="grow"><strong>{{ item.name }}</strong>{% if item.elevation_m is not none %}, {{ item.elevation_m|meters }}{% endif %}
+        {% if item.climbed %}<span class="chip">{{ t('stats.wish_done') }}{% if item.climbed_on %} {{ item.climbed_on|date }}{% endif %}</span>{% endif %}
+        {% if item.note %}<br><span class="meta">{{ item.note }}</span>{% endif %}</span>
+      {% if item.lat is not none %}<a class="button" href="{{ url_for('map_page') }}#14/{{ item.lat }}/{{ item.lon }}">{{ t('nav.map') }}</a>{% endif %}
+      <form method="post" action="{{ url_for('reports.wish_delete', wish_id=item.id) }}">{{ csrf() }}<button class="danger">{{ t('action.delete') }}</button></form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="meta">{{ t('stats.no_wishes') }}</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('reports.wish_create') }}" class="card stack">
+    {{ csrf() }}
+    <h3>{{ t('stats.wish_new') }}</h3>
+    <div class="row">
+      {{ field('name', t('stats.peak'), wish.name, required=True, attrs='maxlength="200"') }}
+      {{ field('elevation_m', t('stats.elevation'), wish.elevation_m, type='number', attrs='min="-500" max="9000"') }}
+    </div>
+    <div class="row">
+      {{ field('lat', t('map.lat'), wish.lat, attrs='inputmode="decimal"') }}
+      {{ field('lon', t('map.lon'), wish.lon, attrs='inputmode="decimal"') }}
+    </div>
+    {{ field('note', t('stats.note'), '', attrs='maxlength="2000"') }}
+    <p class="meta">{{ t('stats.wish_hint') }}</p>
+    <div><button class="primary">{{ t('action.save') }}</button></div>
+  </form>
+</section>
+
+<script type="application/json" id="stats-data">{{ stats_data|tojson }}</script>
+<script src="{{ url_for('static', filename='vendor/maplibre-gl/maplibre-gl-csp.js') }}" defer></script>
+<script src="{{ url_for('static', filename='map_layers.js') }}" defer></script>
+<script src="{{ url_for('static', filename='stats.js') }}" defer></script>
+{% endblock %}
