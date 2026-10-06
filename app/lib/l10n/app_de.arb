@@ -709,5 +709,16 @@
   "mapWeatherNote": "Vorhersage je Ort: Wetter, höchste/tiefste Temperatur, Niederschlag oder Neuschnee. Ab mittlerer Zoomstufe.",
   "mapSnowDepthNote": "Schneehöhe laut Wettermodell, keine Messung.",
   "offlineMapOnly": "Karte (ohne Höhendaten)",
-  "offlineMapWithLayers": "Karte mit Schummerung, Höhenlinien und Hangneigung"
+  "offlineMapWithLayers": "Karte mit Schummerung, Höhenlinien und Hangneigung",
+  "offlineDetailTitle": "Wie fein ohne Netz?",
+  "offlineDetailLoaded": "Höhendaten ohne Netz: {level}",
+  "@offlineDetailLoaded": {"placeholders": {"level": {"type": "String"}}},
+  "offlineDetailBase": "Grob",
+  "offlineDetailSmall": "Klein",
+  "offlineDetailMedium": "Mittel",
+  "offlineDetailFull": "Voll",
+  "offlineDetailBaseNote": "Höhen mit rund 50 m je Bildpunkt, Höhenlinien alle 50 m. Reicht für die Schummerung.",
+  "offlineDetailSmallNote": "Höhen mit rund 25 m je Bildpunkt, Höhenlinien alle 20 m, Hangneigung feiner.",
+  "offlineDetailMediumNote": "Höhen mit rund 13 m je Bildpunkt. Schummerung und 3D fast so scharf wie mit Netz.",
+  "offlineDetailFullNote": "Höhen mit rund 6,5 m je Bildpunkt – dasselbe wie mit Netz."
 }

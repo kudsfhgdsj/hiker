@@ -52,11 +52,32 @@ class _OfflineDataScreenState extends ConsumerState<OfflineDataScreen> {
     }
   }
 
-  Future<void> _loadMap(MapRegion region) =>
+  /// Loads the map; where the server offers finer elevation, asks first how
+  /// fine it should be without network. [loaded] is what the device has.
+  Future<void> _chooseAndLoadMap(MapRegion region, MapRegion? loaded) async {
+    var detail = 0;
+    if (region.layersSizeBytes != null && region.detailSizes.isNotEmpty) {
+      final chosen = await showDialog<int>(
+        context: context,
+        builder: (context) =>
+            _DetailDialog(region: region, current: loaded?.detail),
+      );
+      if (chosen == null) return;
+      detail = chosen;
+    }
+    await _loadMap(region, detail);
+  }
+
+  Future<void> _loadMap(MapRegion region, int detail) =>
       _load('map:${region.name}', (cancel, progress) async {
         await ref
             .read(mapRegionStoreProvider)
-            .download(region, cancel: cancel, onProgress: progress);
+            .download(
+              region,
+              detail: detail,
+              cancel: cancel,
+              onProgress: progress,
+            );
         // Style and fonts too, so that the map is complete without network.
         await prepareOfflineMap(ref);
         ref.read(mapRegionGenerationProvider.notifier).bump();
@@ -227,15 +248,28 @@ class _OfflineDataScreenState extends ConsumerState<OfflineDataScreen> {
                     _card(
                       progressKey: 'map:${region.name}',
                       title: region.name,
-                      description: region.layersSizeBytes == null
-                          ? l10n.offlineMapOnly
-                          : l10n.offlineMapWithLayers,
-                      sizeBytes: region.totalBytes,
+                      description: [
+                        region.layersSizeBytes == null
+                            ? l10n.offlineMapOnly
+                            : l10n.offlineMapWithLayers,
+                        if (localMaps[region.name] case final local?
+                            when region.detailSizes.isNotEmpty ||
+                                local.detail > 0)
+                          l10n.offlineDetailLoaded(
+                            detailName(l10n, local.detail),
+                          ),
+                      ].join('\n'),
+                      // What is on the device, else the map with its layer pack.
+                      sizeBytes: switch (localMaps[region.name]) {
+                        final local? => local.bytesWith(local.detail),
+                        null => region.totalBytes,
+                      },
                       loaded: localMaps[region.name]?.modified,
                       isLoaded: localMaps.containsKey(region.name),
                       offered: offered.any((o) => o.name == region.name),
-                      onLoad: () => _loadMap(
+                      onLoad: () => _chooseAndLoadMap(
                         offered.firstWhere((o) => o.name == region.name),
+                        localMaps[region.name],
                       ),
                       onRemove: () => _removeMap(region.name),
                     ),
@@ -275,6 +309,86 @@ class _OfflineDataScreenState extends ConsumerState<OfflineDataScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The name of a level of detail: 0 is the layer pack alone.
+String detailName(AppLocalizations l10n, int level) => switch (level) {
+  0 => l10n.offlineDetailBase,
+  1 => l10n.offlineDetailSmall,
+  2 => l10n.offlineDetailMedium,
+  3 => l10n.offlineDetailFull,
+  _ => '$level',
+};
+
+/// Asks how fine elevation, slope and contour lines of a map should be
+/// without network; answers with the level, or nothing when it is closed.
+class _DetailDialog extends StatefulWidget {
+  const _DetailDialog({required this.region, this.current});
+
+  final MapRegion region;
+
+  /// The level that is on the device; null if the map is not loaded yet.
+  final int? current;
+
+  @override
+  State<_DetailDialog> createState() => _DetailDialogState();
+}
+
+class _DetailDialogState extends State<_DetailDialog> {
+  // Medium by default: close to what the map shows with network.
+  late int _level =
+      widget.current ??
+      (widget.region.detailSizes.length >= 2
+          ? 2
+          : widget.region.detailSizes.length);
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final region = widget.region;
+    String note(int level) => switch (level) {
+      0 => l10n.offlineDetailBaseNote,
+      1 => l10n.offlineDetailSmallNote,
+      2 => l10n.offlineDetailMediumNote,
+      3 => l10n.offlineDetailFullNote,
+      _ => '',
+    };
+    return AlertDialog(
+      title: Text(l10n.offlineDetailTitle),
+      contentPadding: const EdgeInsets.only(top: AppSpacing.s),
+      content: SingleChildScrollView(
+        child: RadioGroup<int>(
+          groupValue: _level,
+          onChanged: (level) => setState(() => _level = level ?? _level),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var level = 0; level <= region.detailSizes.length; level++)
+                RadioListTile<int>(
+                  key: ValueKey('detail-$level'),
+                  value: level,
+                  title: Text(
+                    '${detailName(l10n, level)} · '
+                    '${Format.number((region.bytesWith(level) / 1e6).round())} MB',
+                  ),
+                  subtitle: Text(note(level)),
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.cancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_level),
+          child: Text(l10n.offlineDownload),
+        ),
+      ],
     );
   }
 }

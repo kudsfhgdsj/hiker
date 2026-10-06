@@ -121,6 +121,11 @@ SPRITES = FilePath(__file__).parent / "sprite"
 GLYPH_RANGE = r"^\d{1,5}-\d{1,5}$"
 
 
+class RegionDetail(BaseModel):
+    level: int
+    size_bytes: int
+
+
 class RegionInfo(BaseModel):
     name: str
     size_bytes: int
@@ -133,6 +138,12 @@ class RegionInfo(BaseModel):
     )
     search_size_bytes: int | None = Field(
         default=None, description="Size of the search index; null if there is none"
+    )
+    details: list[RegionDetail] = Field(
+        default_factory=list,
+        description="Further packs with finer elevation for use without network, each on "
+        "top of the layer pack and of the levels before it: 1 small (about 25 m per "
+        "pixel), 2 medium (13 m), 3 full (6.5 m, as with network)",
     )
 
 
@@ -439,6 +450,9 @@ def list_regions(_user: CurrentUser, vectors: Vectors):
             max_zoom=region.max_zoom,
             layers_size_bytes=region.layers_size_bytes,
             search_size_bytes=region.search_size_bytes,
+            details=[
+                RegionDetail(level=level, size_bytes=size) for level, _path, size in region.details
+            ],
         )
         for region in vectors.regions()
     ]
@@ -476,6 +490,29 @@ def download_region_layers(name: str, _user: CurrentUser, vectors: Vectors):
         region.layers_path,
         media_type="application/octet-stream",
         filename=f"{name}.layers.sqlite",
+    )
+
+
+@router.get(
+    "/regions/{name}/layers/{level}",
+    response_class=FileResponse,
+    responses={200: {"content": {"application/octet-stream": {}}}, **error_responses(401, 404)},
+    dependencies=[Depends(rate_limit("map-download", limit=30))],
+)
+def download_region_detail(
+    name: str, level: Annotated[int, Path(ge=1, le=9)], _user: CurrentUser, vectors: Vectors
+):
+    """A detail pack of a region: finer elevation, slope and contour lines on top of the
+    layer pack (same format). `GET /maps/regions` lists the levels. Supports range requests."""
+    region = vectors.region(name) if re.match(REGION_NAME, name) else None
+    details = region.details if region is not None else ()
+    found = next((path for number, path, _size in details if number == level), None)
+    if found is None:
+        raise NotFoundError("No such detail pack")
+    return FileResponse(
+        found,
+        media_type="application/octet-stream",
+        filename=f"{name}.detail{level}.layers.sqlite",
     )
 
 

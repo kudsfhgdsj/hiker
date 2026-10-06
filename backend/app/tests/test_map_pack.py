@@ -210,3 +210,115 @@ def test_a_fine_elevation_model_comes_first_and_is_named(client, maps, monkeypat
     named = style["sources"]["terrain"]["attribution"]
     assert "Mapzen" in named and "© BEV (DGM 5 m), CC BY 4.0" in named
     layers_module._layers.cache_clear()
+
+
+def test_detail_packs_take_finer_levels_from_what_was_built_ahead(client, maps, anna, monkeypatch):
+    import io
+
+    from PIL import Image
+
+    from app.modules.maps.pack import build_details, coarser_steps
+
+    write_map(maps / "alps.mbtiles", bounds="9.30,47.20,9.31,47.21")
+    fine = terrain_png(lambda column, row: 2000 + column * 4.3 + row * 0.11)
+
+    class Inline:
+        def __init__(self, max_workers):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *error):
+            return False
+
+        def map(self, function, jobs, chunksize=1):
+            return [function(job) for job in jobs]
+
+    monkeypatch.setattr("app.modules.maps.pack.ProcessPoolExecutor", Inline)
+
+    def tile(z: int) -> tuple[int, int, int]:
+        return z, int((9.305 + 180) / 360 * 2**z), next(iter(pack_tiles(z)))
+
+    def pack_tiles(z: int):
+        from app.modules.maps.pack import tiles_in
+
+        return [y for _x, y in tiles_in((9.30, 47.20, 9.31, 47.21), z)]
+
+    def store(name: str, rows: list[tuple]) -> None:
+        with sqlite3.connect(maps / name) as db:
+            db.execute(
+                "CREATE TABLE layer_tiles (layer TEXT, z INTEGER, x INTEGER, y INTEGER,"
+                " data BLOB, PRIMARY KEY (layer, z, x, y)) WITHOUT ROWID"
+            )
+            db.executemany("INSERT INTO layer_tiles VALUES (?, ?, ?, ?, ?)", rows)
+
+    # A fine model with elevation for 12 to 14 and what was derived from it; the pack
+    # of the server has zoom 12 too, but the fine model comes first.
+    store("alps.hires.sqlite", [("terrain", *tile(z), fine) for z in (12, 13, 14)])
+    store(
+        "alps.derived.hires.sqlite",
+        [("slope", *tile(13), b"slope 13"), ("slope", *tile(14), b"slope 14")]
+        + [("contours", *tile(13), b"lines 13")],
+    )
+    store("alps.server.sqlite", [("terrain", *tile(12), terrain_png(lambda c, r: 500))])
+
+    # Without the pack of the app there is nothing to add to: no levels are offered.
+    lines: list[str] = []
+    written = build_details(maps / "alps.mbtiles", report=lines.append)
+    assert [path.name for path in written] == [
+        "alps.detail1.layers.sqlite",
+        "alps.detail2.layers.sqlite",
+        "alps.detail3.layers.sqlite",
+    ]
+    assert client.get("/api/v1/maps/regions", headers=anna).json()[0]["details"] == []
+    store("alps.layers.sqlite", [])
+
+    def held(level: int) -> dict:
+        with sqlite3.connect(maps / f"alps.detail{level}.layers.sqlite") as db:
+            return {
+                f"{layer}{z}": data
+                for layer, z, data in db.execute("SELECT layer, z, data FROM layer_tiles")
+            }
+
+    small, medium, full = held(1), held(2), held(3)
+    assert set(small) == {"terrain12", "slope13", "contours13"}
+    assert set(medium) == {"terrain13", "slope14"} and set(full) == {"terrain14"}
+    assert small["slope13"] == b"slope 13" and small["contours13"] == b"lines 13"
+
+    # Heights in steps of 25 cm: smaller, and never more than 25 cm lower.
+    def heights(png: bytes) -> list[float]:
+        pixels = Image.open(io.BytesIO(png)).convert("RGB").tobytes()
+        return [
+            pixels[i] * 256 + pixels[i + 1] + pixels[i + 2] / 256 - 32768
+            for i in range(0, len(pixels), 3)
+        ]
+
+    assert small["terrain12"] == coarser_steps(fine) and len(small["terrain12"]) < len(fine)
+    for before, after in zip(heights(fine), heights(small["terrain12"]), strict=True):
+        assert 0 <= before - after < 0.25 and after * 4 == int(after * 4)
+
+    regions = client.get("/api/v1/maps/regions", headers=anna).json()
+    assert regions[0]["details"] == [
+        {"level": level, "size_bytes": (maps / f"alps.detail{level}.layers.sqlite").stat().st_size}
+        for level in (1, 2, 3)
+    ]
+    download = client.get("/api/v1/maps/regions/alps/layers/2", headers=anna)
+    assert download.status_code == 200
+    assert download.content == (maps / "alps.detail2.layers.sqlite").read_bytes()
+    assert 'filename="alps.detail2.layers.sqlite"' in download.headers["content-disposition"]
+    assert client.get("/api/v1/maps/regions/alps/layers/2").status_code == 401
+    assert client.get("/api/v1/maps/regions/alps/layers/4", headers=anna).status_code == 404
+    assert client.get("/api/v1/maps/regions/none/layers/1", headers=anna).status_code == 404
+
+    # A level counts only with those before it: the app loads them one on top of the other.
+    (maps / "alps.detail2.layers.sqlite").unlink()
+    (maps / "alps.mbtiles").touch()
+    assert [
+        d["level"] for d in client.get("/api/v1/maps/regions", headers=anna).json()[0]["details"]
+    ] == [1]
+
+    # A region for which nothing was built ahead gets no detail packs.
+    write_map(maps / "elsewhere.mbtiles", bounds="20.0,40.0,20.01,40.01")
+    assert build_details(maps / "elsewhere.mbtiles", report=lines.append) == []
+    assert not list(maps.glob("elsewhere.detail*"))

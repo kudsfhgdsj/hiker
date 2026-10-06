@@ -271,8 +271,10 @@ class LayerPacks:
     _SUFFIXES = (".hires.sqlite", ".server.sqlite", ".layers.sqlite")
     _RESCAN_S = 60
 
-    def __init__(self, folder: str | None):
+    def __init__(self, folder: str | None, suffixes: tuple[str, ...] | None = None):
         self._folder = Path(folder) if folder else None
+        # Other kinds of packs than the usual ones, in the order they are asked.
+        self._suffixes = suffixes or self._SUFFIXES
         self._lock = threading.Lock()
         self._files: list[tuple[Path, float]] = []
         self._scanned = 0.0
@@ -285,7 +287,7 @@ class LayerPacks:
                 self._scanned = now
                 found = []
                 if self._folder is not None and self._folder.is_dir():
-                    for suffix in self._SUFFIXES:
+                    for suffix in self._suffixes:
                         for path in sorted(self._folder.glob(f"*{suffix}")):
                             if path.is_file():
                                 found.append((path, path.stat().st_mtime))

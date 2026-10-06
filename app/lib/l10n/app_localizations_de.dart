@@ -2060,4 +2060,40 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get offlineMapWithLayers =>
       'Karte mit Schummerung, Höhenlinien und Hangneigung';
+
+  @override
+  String get offlineDetailTitle => 'Wie fein ohne Netz?';
+
+  @override
+  String offlineDetailLoaded(String level) {
+    return 'Höhendaten ohne Netz: $level';
+  }
+
+  @override
+  String get offlineDetailBase => 'Grob';
+
+  @override
+  String get offlineDetailSmall => 'Klein';
+
+  @override
+  String get offlineDetailMedium => 'Mittel';
+
+  @override
+  String get offlineDetailFull => 'Voll';
+
+  @override
+  String get offlineDetailBaseNote =>
+      'Höhen mit rund 50 m je Bildpunkt, Höhenlinien alle 50 m. Reicht für die Schummerung.';
+
+  @override
+  String get offlineDetailSmallNote =>
+      'Höhen mit rund 25 m je Bildpunkt, Höhenlinien alle 20 m, Hangneigung feiner.';
+
+  @override
+  String get offlineDetailMediumNote =>
+      'Höhen mit rund 13 m je Bildpunkt. Schummerung und 3D fast so scharf wie mit Netz.';
+
+  @override
+  String get offlineDetailFullNote =>
+      'Höhen mit rund 6,5 m je Bildpunkt – dasselbe wie mit Netz.';
 }

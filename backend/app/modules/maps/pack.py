@@ -14,6 +14,12 @@ the map enlarges what the pack has. The elevation tiles are open data (see
 
     python -m app.modules.maps.pack /data/switzerland.mbtiles
 
+Who wants it finer without network loads detail packs on top, each a step deeper
+(`<region>.detail1.layers.sqlite` and so on, see `DETAILS`). They are filled from what
+the server has built ahead, the fine elevation models first.
+
+    python -m app.modules.maps.pack /data/switzerland.mbtiles --details
+
 The server itself gets a second, deeper pack (`<region>.server.sqlite`): the levels
 below those of the app, built once ahead, so that it never has to fetch or compute
 elevation, slope or contour lines while someone looks at the map.
@@ -21,15 +27,19 @@ elevation, slope or contour lines while someone looks at the map.
     python -m app.modules.maps.pack /data/switzerland.mbtiles --server --max-zoom=13
 """
 
+import io
 import math
 import sqlite3
 import sys
 from collections.abc import Callable, Iterator
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from itertools import islice
 from pathlib import Path
 
+from PIL import Image
+
 from app.modules.maps.contours import contour_tile
-from app.modules.maps.layers import TERRAIN, slope_tile
+from app.modules.maps.layers import TERRAIN, LayerPacks, slope_tile
 from app.modules.maps.tiles import HttpTileSource, TileSourceError
 
 PACK_SUFFIX = ".layers.sqlite"
@@ -331,6 +341,94 @@ def derive(pack: Path, *, workers: int = 3, report: Callable[[str], None] = prin
     return done
 
 
+# --- Detail packs for the app ---
+
+# What each detail pack adds to the pack of the app: layer → zoom levels. A level needs
+# those before it. 1 "small": elevation at about 25 m per pixel; 2 "medium": 13 m;
+# 3 "full": 6.5 m, the same as with network.
+DETAILS: dict[int, dict[str, tuple[int, ...]]] = {
+    1: {"terrain": (12,), "slope": (13,), "contours": (13,)},
+    2: {"terrain": (13,), "slope": (14,)},
+    3: {"terrain": (14,)},
+}
+
+
+def detail_path(map_path: Path, level: int) -> Path:
+    return map_path.with_name(f"{map_path.stem}.detail{level}{PACK_SUFFIX}")
+
+
+def coarser_steps(terrain_png: bytes) -> bytes:
+    """An elevation tile with its heights in steps of 25 cm instead of 4 mm: about half
+    the size, and nothing of it can be seen in shading, slope or the 3D view."""
+    red, green, blue = Image.open(io.BytesIO(terrain_png)).convert("RGB").split()
+    out = io.BytesIO()
+    Image.merge("RGB", (red, green, blue.point(lambda value: value & 0xC0))).save(
+        out, format="PNG", optimize=True
+    )
+    return out.getvalue()
+
+
+def build_details(
+    map_path: Path,
+    *,
+    levels: tuple[int, ...] = tuple(DETAILS),
+    workers: int = 3,
+    report: Callable[[str], None] = print,
+) -> list[Path]:
+    """Writes the detail packs of a region from what the server has built ahead: the fine
+    elevation models (`*.hires.sqlite`) first, then its own deeper pack
+    (`*.server.sqlite`). Nothing is fetched or computed; a tile that neither has is left
+    out, and the app asks the server for it. Returns the packs that were written."""
+    with sqlite3.connect(f"file:{map_path}?mode=ro", uri=True) as source:
+        meta = dict(source.execute("SELECT name, value FROM metadata"))
+    bounds = tuple(float(part) for part in meta["bounds"].split(","))
+    built = LayerPacks(str(map_path.parent), (HIRES_SUFFIX, SERVER_SUFFIX))
+    written = []
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        for level in levels:
+            out = detail_path(map_path, level)
+            part = out.with_name(out.name + ".part")
+            part.unlink(missing_ok=True)
+            db = sqlite3.connect(part)
+            db.execute(
+                "CREATE TABLE layer_tiles (layer TEXT, z INTEGER, x INTEGER, y INTEGER,"
+                " data BLOB, PRIMARY KEY (layer, z, x, y)) WITHOUT ROWID"
+            )
+            db.execute("CREATE TABLE metadata (name TEXT, value TEXT)")
+            db.execute("INSERT INTO metadata VALUES ('bounds', ?)", (meta["bounds"],))
+            db.execute("INSERT INTO metadata VALUES ('detail', ?)", (str(level),))
+            count = 0
+            try:
+                for layer, zooms in DETAILS[level].items():
+                    for z in zooms:
+                        found = ((x, y, built.get(layer, z, x, y)) for x, y in tiles_in(bounds, z))
+                        tiles = ((x, y, data) for x, y, data in found if data is not None)
+                        while batch := list(islice(tiles, 400)):
+                            blobs = [data for _x, _y, data in batch]
+                            if layer == "terrain":
+                                blobs = list(pool.map(coarser_steps, blobs, chunksize=16))
+                            db.executemany(
+                                "INSERT INTO layer_tiles VALUES (?, ?, ?, ?, ?)",
+                                [
+                                    (layer, z, x, y, blob)
+                                    for (x, y, _data), blob in zip(batch, blobs, strict=True)
+                                ],
+                            )
+                            db.commit()
+                            count += len(batch)
+                        report(f"detail {level}: {layer} zoom {z} done, {count} tiles so far")
+            finally:
+                db.close()
+            if count:
+                part.replace(out)
+                written.append(out)
+            else:
+                # Nothing built ahead for this region: no pack to offer.
+                part.unlink()
+                out.unlink(missing_ok=True)
+    return written
+
+
 if __name__ == "__main__":
     arguments = [argument for argument in sys.argv[1:] if not argument.startswith("--")]
     options = dict(
@@ -338,8 +436,13 @@ if __name__ == "__main__":
         for argument in sys.argv[1:]
         if argument.startswith("--")
     )
-    if len(arguments) != 1 or set(options) - {"server", "derive", "max-zoom", "workers"}:
+    known = {"server", "derive", "details", "max-zoom", "workers"}
+    if len(arguments) != 1 or set(options) - known:
         sys.exit(__doc__)
+    if "details" in options:
+        for path in build_details(Path(arguments[0]), workers=int(options.get("workers") or 3)):
+            print(f"{path} ({path.stat().st_size // 1_000_000} MB)")
+        sys.exit(0)
     if "derive" in options:
         count = derive(Path(arguments[0]), workers=int(options.get("workers") or 3))
         print(f"{arguments[0]}: slope and contours for {count} tiles")

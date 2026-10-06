@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hiker/core/map/map_regions.dart';
 import 'package:hiker/core/map/elevation_profile.dart';
 import 'package:hiker/core/map/geo.dart';
 import 'package:hiker/core/network/api_exception.dart';
@@ -932,6 +933,139 @@ void main() {
       expect(find.text('E10_N45'), findsOneWidget);
       expect(find.text('Vom Gerät entfernen'), findsNWidgets(2));
       expect(find.text('Laden'), findsNothing);
+    });
+
+    // The levels of detail packs the server was asked for.
+    final asked = <int>[];
+    FakeApi mapApi() {
+      final api = offlineApi();
+      api.routes['GET /maps/regions'] = (_, _) => ok([
+        {
+          'name': 'austria',
+          'size_bytes': 700000000,
+          'modified': '2026-10-06T08:00:00Z',
+          'layers_size_bytes': 270000000,
+          'search_size_bytes': 6000000,
+          'details': [
+            {'level': 1, 'size_bytes': 470000000},
+            {'level': 2, 'size_bytes': 1050000000},
+            {'level': 3, 'size_bytes': 2500000000},
+          ],
+        },
+      ]);
+      api.routes['GET /maps/regions/austria'] = (_, _) => ok('map');
+      api.routes['GET /maps/regions/austria/layers'] = (_, _) => ok('layers');
+      api.routes['GET /maps/regions/austria/search'] = (_, _) => ok('index');
+      for (final level in [1, 2, 3]) {
+        api.routes['GET /maps/regions/austria/layers/$level'] = (_, _) {
+          asked.add(level);
+          return ok('detail $level');
+        };
+      }
+      return api;
+    }
+
+    test(
+      'a map is loaded with finer elevation up to the chosen level',
+      () async {
+        final api = mapApi();
+        final container = createContainer(
+          api: api,
+          store: MemoryKeyValueStore(signedInStore),
+        );
+        await container.read(sessionProvider.notifier).restore();
+        final store = container.read(mapRegionStoreProvider);
+        final region = (await store.available()).single;
+        Future<List<String>> files() async => [
+          for (final file in (await store.directory).listSync())
+            file.uri.pathSegments.last,
+        ]..sort();
+
+        expect(region.detailSizes, [470000000, 1050000000, 2500000000]);
+        // Map, layer pack and index, and the detail packs on top of each other.
+        expect(region.bytesWith(0), 976000000);
+        expect(region.bytesWith(2), 976000000 + 470000000 + 1050000000);
+
+        final progress = <double>[];
+        await store.download(region, detail: 2, onProgress: progress.add);
+        expect(await files(), [
+          'austria.detail1.layers.sqlite',
+          'austria.detail2.layers.sqlite',
+          'austria.layers.sqlite',
+          'austria.mbtiles',
+          'austria.search.sqlite',
+        ]);
+        expect((await store.installed()).single.detail, 2);
+        expect(asked, isNot(contains(3)));
+
+        // Loaded again with a coarser choice: what lies above it goes.
+        await store.download(region, detail: 1);
+        expect((await store.installed()).single.detail, 1);
+        expect(await files(), isNot(contains('austria.detail2.layers.sqlite')));
+        // More than the server offers is as much as it offers.
+        await store.download(region, detail: 7);
+        expect((await store.installed()).single.detail, 3);
+
+        await store.delete('austria');
+        expect(await files(), isEmpty);
+      },
+    );
+
+    testWidgets('loading a map asks how fine it should be without network', (
+      tester,
+    ) async {
+      final map = FakeMap();
+      final Override local = installedMapRegionsProvider.overrideWith(
+        (ref) async => [
+          MapRegion(
+            name: 'austria',
+            sizeBytes: 700000000,
+            modified: DateTime(2026, 10, 6),
+            layersSizeBytes: 270000000,
+            detailSizes: const [470000000],
+            detail: 1,
+          ),
+        ],
+      );
+      await pumpApp(
+        tester,
+        api: mapApi(),
+        store: MemoryKeyValueStore(signedInStore),
+        overrides: [map.override, local],
+        modules: [planningModule],
+        size: const Size(420, 1800),
+      );
+      await tester.tap(find.byTooltip('Offline-Daten'));
+      await tester.pumpAndSettle();
+
+      // What is on the device: the map with its layer pack and one detail pack.
+      expect(
+        find.textContaining('Höhendaten ohne Netz: Klein'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('1.440 MB'), findsOneWidget);
+
+      await tester.tap(find.text('Neu laden').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Wie fein ohne Netz?'), findsOneWidget);
+      expect(find.text('Grob · 976 MB'), findsOneWidget);
+      expect(find.text('Klein · 1.446 MB'), findsOneWidget);
+      expect(find.text('Mittel · 2.496 MB'), findsOneWidget);
+      expect(find.text('Voll · 4.996 MB'), findsOneWidget);
+      // The level that is on the device is chosen.
+      final small = tester.widget<RadioListTile<int>>(
+        find.byKey(const ValueKey('detail-1')),
+      );
+      expect(small.value, 1);
+      expect(
+        tester.widget<RadioGroup<int>>(find.byType(RadioGroup<int>)).groupValue,
+        1,
+      );
+      // Closed without a choice: nothing is loaded.
+      await tester.tap(find.text('Abbrechen'));
+      await tester.pumpAndSettle();
+      expect(find.text('Wie fein ohne Netz?'), findsNothing);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
     });
 
     testWidgets('the planner saves the line as a GPX file', (tester) async {

@@ -3567,6 +3567,66 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Karte mit Schummerung, Höhenlinien und Hangneigung'**
   String get offlineMapWithLayers;
+
+  /// No description provided for @offlineDetailTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Wie fein ohne Netz?'**
+  String get offlineDetailTitle;
+
+  /// No description provided for @offlineDetailLoaded.
+  ///
+  /// In de, this message translates to:
+  /// **'Höhendaten ohne Netz: {level}'**
+  String offlineDetailLoaded(String level);
+
+  /// No description provided for @offlineDetailBase.
+  ///
+  /// In de, this message translates to:
+  /// **'Grob'**
+  String get offlineDetailBase;
+
+  /// No description provided for @offlineDetailSmall.
+  ///
+  /// In de, this message translates to:
+  /// **'Klein'**
+  String get offlineDetailSmall;
+
+  /// No description provided for @offlineDetailMedium.
+  ///
+  /// In de, this message translates to:
+  /// **'Mittel'**
+  String get offlineDetailMedium;
+
+  /// No description provided for @offlineDetailFull.
+  ///
+  /// In de, this message translates to:
+  /// **'Voll'**
+  String get offlineDetailFull;
+
+  /// No description provided for @offlineDetailBaseNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Höhen mit rund 50 m je Bildpunkt, Höhenlinien alle 50 m. Reicht für die Schummerung.'**
+  String get offlineDetailBaseNote;
+
+  /// No description provided for @offlineDetailSmallNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Höhen mit rund 25 m je Bildpunkt, Höhenlinien alle 20 m, Hangneigung feiner.'**
+  String get offlineDetailSmallNote;
+
+  /// No description provided for @offlineDetailMediumNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Höhen mit rund 13 m je Bildpunkt. Schummerung und 3D fast so scharf wie mit Netz.'**
+  String get offlineDetailMediumNote;
+
+  /// No description provided for @offlineDetailFullNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Höhen mit rund 6,5 m je Bildpunkt – dasselbe wie mit Netz.'**
+  String get offlineDetailFullNote;
 }
 
 class _AppLocalizationsDelegate

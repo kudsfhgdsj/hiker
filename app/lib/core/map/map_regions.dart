@@ -21,6 +21,8 @@ class MapRegion {
     this.modified,
     this.layersSizeBytes,
     this.searchSizeBytes,
+    this.detailSizes = const [],
+    this.detail = 0,
   });
 
   factory MapRegion.fromJson(Map<String, dynamic> json) => MapRegion(
@@ -29,6 +31,12 @@ class MapRegion {
     modified: DateTime.tryParse(json['modified'] as String? ?? ''),
     layersSizeBytes: json['layers_size_bytes'] as int?,
     searchSizeBytes: json['search_size_bytes'] as int?,
+    detailSizes: [
+      for (final entry
+          in (json['details'] as List<dynamic>? ?? const [])
+              .cast<Map<String, dynamic>>())
+        entry['size_bytes'] as int,
+    ],
   );
 
   final String name;
@@ -42,9 +50,21 @@ class MapRegion {
   /// Size of the search index of the region; null if there is none.
   final int? searchSizeBytes;
 
+  /// Sizes of the detail packs with finer elevation, the first level first:
+  /// small (about 25 m per pixel), medium (13 m), full (6.5 m). Each level
+  /// needs those before it.
+  final List<int> detailSizes;
+
+  /// Up to which level the detail packs are on the device; 0: none.
+  final int detail;
+
   /// Map, layer pack and search index together.
   int get totalBytes =>
       sizeBytes + (layersSizeBytes ?? 0) + (searchSizeBytes ?? 0);
+
+  /// Everything together with the detail packs up to [level].
+  int bytesWith(int level) =>
+      totalBytes + detailSizes.take(level).fold(0, (sum, size) => sum + size);
 }
 
 /// A place found by its name: summit, hut, town, lake and the like.
@@ -172,8 +192,18 @@ class MapRegionStore {
     final files = (await directory).listSync().whereType<File>().where(
       (file) => file.path.endsWith('.mbtiles'),
     );
-    return [
-      for (final file in files)
+    final regions = <MapRegion>[];
+    for (final file in files) {
+      // The detail packs that are there, one level on top of the other.
+      final details = <int>[];
+      for (var level = 1; ; level++) {
+        final pack = File(
+          file.path.replaceAll('.mbtiles', _detailSuffix(level)),
+        );
+        if (!pack.existsSync()) break;
+        details.add(pack.lengthSync());
+      }
+      regions.add(
         MapRegion(
           name: file.uri.pathSegments.last.replaceAll('.mbtiles', ''),
           sizeBytes: file.lengthSync(),
@@ -184,9 +214,15 @@ class MapRegionStore {
             final pack when pack.existsSync() => pack.lengthSync(),
             _ => null,
           },
+          detailSizes: details,
+          detail: details.length,
         ),
-    ]..sort((a, b) => a.name.compareTo(b.name));
+      );
+    }
+    return regions..sort((a, b) => a.name.compareTo(b.name));
   }
+
+  static String _detailSuffix(int level) => '.detail$level$_packSuffix';
 
   /// What the server offers; offline the last known answer.
   Future<List<MapRegion>> available() async {
@@ -220,16 +256,19 @@ class MapRegionStore {
     _openPacks = null;
   }
 
-  /// Downloads a map and, if the server has one, its layer pack;
-  /// [onProgress] gets the share of both that is done (0 to 1). A file only
-  /// appears when it is complete.
+  /// Downloads a map and, if the server has one, its layer pack, and the
+  /// detail packs with finer elevation up to level [detail] (0: none);
+  /// [onProgress] gets the share of all that is done (0 to 1). A file only
+  /// appears when it is complete. Detail packs above [detail] are removed.
   Future<void> download(
     MapRegion region, {
+    int detail = 0,
     void Function(double share)? onProgress,
     CancelToken? cancel,
   }) async {
     final folder = (await directory).path;
-    final total = region.totalBytes;
+    final levels = detailLevels(region, detail);
+    final total = region.bytesWith(levels);
     var done = 0;
     Future<void> fetch(String path, String fileName, int size) async {
       final target = File('$folder/$fileName');
@@ -265,7 +304,28 @@ class MapRegionStore {
     if (index != null) {
       await fetch('/maps/regions/$name/search', '$name$_searchSuffix', index);
     }
+    for (var level = 1; level <= levels; level++) {
+      await fetch(
+        '/maps/regions/$name/layers/$level',
+        '$name${_detailSuffix(level)}',
+        region.detailSizes[level - 1],
+      );
+    }
+    // A coarser choice than before: what lies above it goes.
+    _closeAll();
+    for (var level = levels + 1; ; level++) {
+      final file = File('$folder/$name${_detailSuffix(level)}');
+      if (!file.existsSync()) break;
+      await file.delete();
+    }
   }
+
+  /// The level that can be had: detail packs only come on top of the layer
+  /// pack, and only as far as the server offers them.
+  static int detailLevels(MapRegion region, int detail) =>
+      region.layersSizeBytes == null
+      ? 0
+      : detail.clamp(0, region.detailSizes.length);
 
   /// Places by name. The server searches all its regions; without network
   /// the search indexes of the maps on the device answer.
@@ -390,6 +450,11 @@ class MapRegionStore {
       File('$folder/$name$_searchSuffix'),
     ]) {
       if (file.existsSync()) await file.delete();
+    }
+    for (var level = 1; ; level++) {
+      final file = File('$folder/$name${_detailSuffix(level)}');
+      if (!file.existsSync()) break;
+      await file.delete();
     }
   }
 

@@ -46,6 +46,9 @@ class VectorRegion:
     # The search index of the region (see search.py), if it was built.
     search_path: Path | None = None
     search_size_bytes: int | None = None
+    # Detail packs with finer elevation for the app (pack.py), by their level; a level
+    # counts only if those before it are there too.
+    details: tuple[tuple[int, Path, int], ...] = ()
 
 
 def _tile_bounds(z: int, x: int, y: int) -> tuple[float, float, float, float]:
@@ -71,6 +74,12 @@ class VectorMaps:
         stat = path.stat()
         pack = path.with_name(path.stem + ".layers.sqlite")
         index = path.with_name(path.stem + ".search.sqlite")
+        details = []
+        for level in range(1, 10):
+            detail = path.with_name(f"{path.stem}.detail{level}.layers.sqlite")
+            if not detail.is_file():
+                break
+            details.append((level, detail, detail.stat().st_size))
         try:
             with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as db:
                 meta = dict(db.execute("SELECT name, value FROM metadata"))
@@ -89,6 +98,7 @@ class VectorMaps:
                 layers_size_bytes=pack.stat().st_size if pack.is_file() else None,
                 search_path=index if index.is_file() else None,
                 search_size_bytes=index.stat().st_size if index.is_file() else None,
+                details=tuple(details) if pack.is_file() else (),
             )
         except (sqlite3.Error, KeyError, ValueError):
             # Half-written or foreign file: not a map.
