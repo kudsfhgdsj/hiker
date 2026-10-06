@@ -3,6 +3,7 @@
 {% block head %}{% if on_map %}
 <link rel="stylesheet" href="{{ url_for('static', filename='vendor/maplibre-gl/maplibre-gl.css') }}">
 {% endif %}{% endblock %}
+{% block body_class %}{% if on_map %}wide{% endif %}{% endblock %}
 {% block content %}
 <div class="toolbar">
   <h1>{{ t('nav.tours') }}</h1><span class="spacer"></span>
@@ -38,7 +39,7 @@
 {% endif %}
 {% if on_map %}
 <p class="meta">{{ t('tour.map_note') }}</p>
-<div id="map" class="plan"></div>
+<div id="map" class="wide"></div>
 <p id="tours-map-note" class="meta" hidden></p>
 <script type="application/json" id="tours-map-data">{{ map_data|tojson }}</script>
 <script src="{{ url_for('static', filename='vendor/maplibre-gl/maplibre-gl-csp.js') }}" defer></script>

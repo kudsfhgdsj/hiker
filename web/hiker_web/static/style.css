@@ -263,3 +263,7 @@ a.chip[aria-current="true"] { background: var(--green); color: var(--snow); }
   .mapmode { height: calc(100vh - 6rem); }
 }
 .tag-filter { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin: 0 0 var(--gap); }
+/* The map of all tours: over the whole width of the window and down to its lower edge. */
+body.wide { overflow-x: clip; }
+#map.wide { width: 100vw; margin-left: calc(50% - 50vw); height: max(24rem, calc(100vh - 20rem));
+  border-radius: 0; border-left: 0; border-right: 0; }
