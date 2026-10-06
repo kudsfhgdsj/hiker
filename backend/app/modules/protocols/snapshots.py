@@ -16,6 +16,7 @@ from app.modules.protocols.schemas import (
 SCALAR_FIELDS = (
     "title",
     "summary",
+    "tags",
     "start_time",
     "end_time",
     "duration_minutes",

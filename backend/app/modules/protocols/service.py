@@ -1,3 +1,4 @@
+import math
 import uuid
 from datetime import datetime
 
@@ -31,6 +32,7 @@ from app.modules.protocols.models import (
     TourPeak,
     TourShare,
     TourWaypoint,
+    TrackSeries,
 )
 from app.modules.protocols.schemas import (
     CaloriesEstimate,
@@ -38,6 +40,7 @@ from app.modules.protocols.schemas import (
     OverviewFacts,
     OverviewStation,
     PointsIn,
+    TagCount,
     TourBase,
     TourCreate,
     TourFoodIn,
@@ -183,6 +186,10 @@ def _sync_partners(db: Session, tour: Tour, user: User, incoming: list[TourPartn
 def _apply_document(db: Session, tour: Tour, user: User, data: TourIn, *, owner: bool) -> None:
     for field in TEXT_FIELDS:
         setattr(tour, field, getattr(data, field))
+    if data.tags is not None:
+        tour.tags = list(data.tags)
+    elif tour.tags is None:
+        tour.tags = []
     if owner:
         for field in OWNER_ONLY_FIELDS:
             setattr(tour, field, getattr(data, field))
@@ -234,6 +241,85 @@ def delete_tour(db: Session, storage: Storage, access: TourAccess) -> None:
     track_service.delete_all_files(db, storage, tour)
 
 
+def _visible(user: User, scope: str) -> list:
+    """The conditions for the tours a user sees: own ones, shared ones or both."""
+    shared = select(TourShare.tour_id).where(TourShare.user_id == user.id)
+    visible = {
+        "mine": Tour.owner_id == user.id,
+        "shared": Tour.id.in_(shared),
+        "all": or_(Tour.owner_id == user.id, Tour.id.in_(shared)),
+    }[scope]
+    return [visible, Tour.deleted_at.is_(None)]
+
+
+def _has_tag(tour: Tour, tag: str) -> bool:
+    return tag.casefold() in (own.casefold() for own in tour.tags or [])
+
+
+def list_tags(db: Session, user: User, scope: str) -> list[TagCount]:
+    """The tags in use with the number of tours that carry each, the most used first."""
+    counts: dict[str, list] = {}
+    for tags in db.scalars(select(Tour.tags).where(*_visible(user, scope))):
+        for tag in tags or []:
+            entry = counts.setdefault(tag.casefold(), [tag, 0])
+            entry[1] += 1
+    ordered = sorted(counts.values(), key=lambda entry: (-entry[1], entry[0].casefold()))
+    return [TagCount(tag=tag, count=count) for tag, count in ordered]
+
+
+# Points per line on the map of all tours: enough for the course of a day's walk.
+MAP_POINTS = 200
+
+
+def tour_lines(db: Session, user: User, scope: str, tag: str | None) -> dict:
+    """The tracks of all tours the user sees as GeoJSON lines, thinned out: for one map
+    of everything walked. A tour without a track but with a start point is a point."""
+    tours = [
+        tour
+        for tour in db.scalars(select(Tour).where(*_visible(user, scope)))
+        if not tag or _has_tag(tour, tag)
+    ]
+    series = {}
+    if tours:
+        ids = [tour.id for tour in tours]
+        rows = db.scalars(select(TrackSeries).where(TrackSeries.tour_id.in_(ids)))
+        series = {row.tour_id: row.data for row in rows}
+    features = []
+    for tour in tours:
+        data = series.get(tour.id) or {}
+        lat, lon = data.get("lat") or [], data.get("lon") or []
+        if len(lat) >= 2:
+            step = max(1, math.ceil(len(lat) / MAP_POINTS))
+            picked = list(range(0, len(lat), step))
+            if picked[-1] != len(lat) - 1:
+                picked.append(len(lat) - 1)
+            geometry = {
+                "type": "LineString",
+                "coordinates": [[round(lon[i], 5), round(lat[i], 5)] for i in picked],
+            }
+        elif tour.start_lat is not None and tour.start_lon is not None:
+            geometry = {"type": "Point", "coordinates": [tour.start_lon, tour.start_lat]}
+        else:
+            continue
+        stats = tour.track_stats or {}
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "tour_id": str(tour.id),
+                    "title": tour.title,
+                    "date": tour.start_time.date().isoformat() if tour.start_time else None,
+                    "tags": list(tour.tags or []),
+                    "own": tour.owner_id == user.id,
+                    "distance_m": stats.get("distance_m"),
+                    "ascent_m": stats.get("ascent_m"),
+                },
+                "geometry": geometry,
+            }
+        )
+    return {"type": "FeatureCollection", "features": features}
+
+
 def list_tours(
     db: Session,
     user: User,
@@ -244,14 +330,9 @@ def list_tours(
     start_to: datetime | None,
     limit: int,
     offset: int,
+    tag: str | None = None,
 ) -> tuple[list[TourListItem], int]:
-    shared = select(TourShare.tour_id).where(TourShare.user_id == user.id)
-    visible = {
-        "mine": Tour.owner_id == user.id,
-        "shared": Tour.id.in_(shared),
-        "all": or_(Tour.owner_id == user.id, Tour.id.in_(shared)),
-    }[scope]
-    conditions = [visible, Tour.deleted_at.is_(None)]
+    conditions = _visible(user, scope)
     if q:
         pattern = q.lower()
         conditions.append(
@@ -264,11 +345,16 @@ def list_tours(
         conditions.append(Tour.start_time >= start_from)
     if start_to is not None:
         conditions.append(Tour.start_time <= start_to)
-    total = db.scalar(select(func.count()).select_from(Tour).where(*conditions))
     # Newest first; tours without a date at the end.
     order_by = (Tour.start_time.is_(None), Tour.start_time.desc(), Tour.created_at.desc(), Tour.id)
     query = select(Tour).where(*conditions).order_by(*order_by).options(selectinload(Tour.peaks))
-    tours = list(db.scalars(query.limit(limit).offset(offset)))
+    if tag:
+        # Tags are a list inside the row: looked through here, not by the database.
+        carrying = [tour for tour in db.scalars(query) if _has_tag(tour, tag)]
+        total, tours = len(carrying), carrying[offset : offset + limit]
+    else:
+        total = db.scalar(select(func.count()).select_from(Tour).where(*conditions))
+        tours = list(db.scalars(query.limit(limit).offset(offset)))
 
     ids = [tour.id for tour in tours]
     permissions = dict(
@@ -330,7 +416,9 @@ def set_points(db: Session, access: TourAccess, data: PointsIn) -> None:
 def _base(tour: Tour, permission: str, names: dict) -> dict:
     owner = TourOwner(id=tour.owner_id, display_name=names.get(tour.owner_id))
     fields = set(TourBase.model_fields) - {"owner", "permission"}
-    return {"owner": owner, "permission": permission} | {f: getattr(tour, f) for f in fields}
+    values = {f: getattr(tour, f) for f in fields}
+    values["tags"] = list(tour.tags or [])
+    return {"owner": owner, "permission": permission} | values
 
 
 def _point(lat: float | None, lon: float | None, name: str | None) -> GeoPoint | None:

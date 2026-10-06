@@ -42,6 +42,7 @@ from app.modules.protocols.schemas import (
     ShareIn,
     ShareOut,
     SharePatch,
+    TagCount,
     TourCreate,
     TourExport,
     TourListItem,
@@ -69,6 +70,35 @@ router = APIRouter(responses=error_responses(401))
 public_router = APIRouter()
 
 
+Scope = Annotated[
+    Literal["all", "mine", "shared"], Query(description="Own tours, tours shared with me")
+]
+TagFilter = Annotated[
+    str | None,
+    Query(
+        min_length=1, max_length=40, description="Only tours with this tag; case does not matter"
+    ),
+]
+
+
+@router.get("/tours/tags", response_model=list[TagCount])
+def list_tour_tags(user: CurrentUser, db: DbSession, scope: Scope = "all"):
+    """The tags of the tours the caller sees, the most used first: for choosing a filter
+    and for offering known tags while typing."""
+    return service.list_tags(db, user, scope)
+
+
+@router.get("/tours/tracks")
+def read_tour_lines(
+    user: CurrentUser, db: DbSession, scope: Scope = "all", tag: TagFilter = None
+) -> dict:
+    """All tours the caller sees on one map: a GeoJSON FeatureCollection with the track
+    of each tour as a thinned-out line (at most 200 points), or its start point where
+    there is no track. Properties: `tour_id`, `title`, `date`, `tags`, `own`,
+    `distance_m`, `ascent_m`. Tours without track and start point are left out."""
+    return service.tour_lines(db, user, scope, tag)
+
+
 @router.get("/tours", response_model=Page[TourListItem])
 def list_tours(
     user: CurrentUser,
@@ -82,12 +112,14 @@ def list_tours(
     ] = None,
     start_from: Annotated[AwareDatetime | None, Query(description="start_time not before")] = None,
     start_to: Annotated[AwareDatetime | None, Query(description="start_time not after")] = None,
+    tag: TagFilter = None,
 ):
     items, total = service.list_tours(
         db,
         user,
         scope=scope,
         q=q,
+        tag=tag,
         start_from=start_from,
         start_to=start_to,
         limit=paging.limit,

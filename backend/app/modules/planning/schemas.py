@@ -12,7 +12,7 @@ from pydantic import (
     field_validator,
 )
 
-from app.core.fields import Name, optional_text
+from app.core.fields import Name, Tag, optional_text, unique_tags
 from app.modules.planning.estimate import PRESETS, Pace
 
 Latitude = Annotated[float, Field(ge=-90, le=90, allow_inf_nan=False)]
@@ -107,9 +107,6 @@ class RouteWaypoint(BaseModel):
 Waypoints = Annotated[list[RouteWaypoint], Field(min_length=2, max_length=MAX_WAYPOINTS)]
 
 
-Tag = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=40)]
-
-
 class RoutePreviewIn(PathChoice):
     profile: Profile = "hiking"
     waypoints: Waypoints
@@ -188,11 +185,7 @@ class RouteIn(PathChoice):
     @field_validator("tags")
     @classmethod
     def _unique_tags(cls, tags: list[str]) -> list[str]:
-        # The same tag twice says nothing new; the first spelling stays.
-        seen: dict[str, str] = {}
-        for tag in tags:
-            seen.setdefault(tag.casefold(), tag)
-        return list(seen.values())
+        return unique_tags(tags)
 
 
 class RouteCreate(RouteIn):

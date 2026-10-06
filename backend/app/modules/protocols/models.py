@@ -269,6 +269,8 @@ class Tour(TimestampMixin, Base):
     )
     title: Mapped[str] = mapped_column(String(200))
     summary: Mapped[str | None] = mapped_column(Text)
+    # Free words to sort tours by ("Skitour", "mit Kindern").
+    tags: Mapped[list] = mapped_column(JSON, default=list)
     start_time: Mapped[datetime | None] = mapped_column(UTCDateTime)
     end_time: Mapped[datetime | None] = mapped_column(UTCDateTime)
     # Manual overrides; empty means "use the computed value".

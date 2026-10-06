@@ -35,6 +35,7 @@ def export_tour(db: Session, access: TourAccess) -> TourExport:
             id=tour.id,
             title=tour.title,
             summary=tour.summary,
+            tags=list(tour.tags or []),
             owner_name=auth_service.get_display_names(db, {tour.owner_id}).get(tour.owner_id),
             start_time=tour.start_time,
             end_time=tour.end_time,

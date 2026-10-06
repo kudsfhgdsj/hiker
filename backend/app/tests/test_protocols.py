@@ -1137,3 +1137,160 @@ def test_deleted_contact_stays_visible_in_old_tours(client, anna):
         headers=anna.headers,
     )
     assert again.json()["error"]["code"] == "unknown_contact"
+
+
+# --- Tags and the map of all tours ---
+
+
+def _gpx(points) -> bytes:
+    body = "".join(f'<trkpt lat="{lat}" lon="{lon}"><ele>1000</ele></trkpt>' for lat, lon in points)
+    return (
+        '<?xml version="1.0"?><gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1">'
+        f"<trk><trkseg>{body}</trkseg></trk></gpx>"
+    ).encode()
+
+
+def _add_track(client, person, tour, points) -> None:
+    files = {"file": ("t.gpx", _gpx(points), "application/gpx+xml")}
+    response = client.put(f"{TOURS}/{tour['id']}/gpx", files=files, headers=person.headers)
+    assert response.status_code == 200, response.text
+
+
+def test_tours_carry_tags_and_keep_them_when_a_client_does_not_send_any(client, anna):
+    tour = create_tour(client, anna, tags=[" Skitour ", "skitour", "mit Kindern"])
+    # Trimmed; the same tag in another case counts once, the first spelling stays.
+    assert tour["tags"] == ["Skitour", "mit Kindern"]
+    listed = client.get(TOURS, headers=anna.headers).json()["items"][0]
+    assert listed["tags"] == ["Skitour", "mit Kindern"]
+
+    # An older app does not know tags and sends none: they stay.
+    renamed = put(client, anna, tour, title="Säntis im Winter").json()
+    assert renamed["tags"] == ["Skitour", "mit Kindern"] and renamed["version"] == 2
+    # An empty list removes them.
+    cleared = put(client, anna, renamed, tags=[]).json()
+    assert cleared["tags"] == []
+    assert create_tour(client, anna, title="Ohne")["tags"] == []
+
+    for bad in ([""], ["x" * 41], ["tag"] * 0 + [str(i) for i in range(21)]):
+        assert put(client, anna, cleared, tags=bad).status_code == 422
+
+
+def test_tags_are_part_of_history_and_may_be_set_with_edit_rights(client, anna, bea, shared_tour):
+    tagged = put(client, bea, shared_tour, tags=["Hochtour"])
+    assert tagged.status_code == 200 and tagged.json()["tags"] == ["Hochtour"]
+    again = put(client, anna, tagged.json(), tags=["Hochtour", "Gletscher"]).json()
+
+    assert [r["change_summary"] for r in revisions(client, anna, shared_tour)["items"]][:2] == [
+        "tags",
+        "tags",
+    ]
+    assert revision(client, anna, shared_tour, 3)["diff"]["tags"] == {
+        "old": ["Hochtour"],
+        "new": ["Hochtour", "Gletscher"],
+    }
+    # Setting the first tags is a change from none, not from "unknown".
+    assert revision(client, anna, shared_tour, 2)["diff"]["tags"] == {
+        "old": [],
+        "new": ["Hochtour"],
+    }
+
+    # Restoring the version before brings its tags back, as a new revision.
+    restored = restore(client, anna, shared_tour, 2)
+    assert restored.status_code == 200, restored.text
+    assert restored.json()["tags"] == ["Hochtour"]
+    assert restored.json()["version"] == again["version"] + 1
+
+
+def test_list_filters_by_tag_and_names_the_tags_in_use(client, db, anna, bea, dora):
+    ski = create_tour(client, anna, title="Piz Palü", tags=["Skitour", "Gletscher"])
+    create_tour(client, anna, title="Alpstein", tags=["Wandern"])
+    create_tour(client, anna, title="Tödi", tags=["skitour"])
+    create_tour(client, anna, title="Ohne")
+    theirs = create_tour(client, bea, title="Beas Tour", tags=["Skitour", "Privat"])
+    share(db, theirs, anna, "read")
+
+    def titles(person=anna, **params):
+        page = client.get(TOURS, params=params, headers=person.headers).json()
+        return sorted(item["title"] for item in page["items"]), page["total"]
+
+    # Case does not matter; shared tours count too.
+    assert titles(tag="SKITOUR") == (["Beas Tour", "Piz Palü", "Tödi"], 3)
+    assert titles(tag="skitour", scope="mine") == (["Piz Palü", "Tödi"], 2)
+    assert titles(tag="Gletscher", q="palü") == (["Piz Palü"], 1)
+    assert titles(tag="Nichts") == ([], 0)
+    # Paging counts the tours that carry the tag.
+    page = client.get(TOURS, params={"tag": "skitour", "limit": 2}, headers=anna.headers).json()
+    assert len(page["items"]) == 2 and page["total"] == 3
+
+    tags = client.get(f"{TOURS}/tags", headers=anna.headers).json()
+    # The most used first, then by name; one entry whatever the case.
+    assert tags == [
+        {"tag": "Skitour", "count": 3},
+        {"tag": "Gletscher", "count": 1},
+        {"tag": "Privat", "count": 1},
+        {"tag": "Wandern", "count": 1},
+    ]
+    mine = client.get(f"{TOURS}/tags", params={"scope": "mine"}, headers=anna.headers).json()
+    assert {"tag": "Privat", "count": 1} not in mine and mine[0] == {"tag": "Skitour", "count": 2}
+    assert client.get(f"{TOURS}/tags", headers=dora.headers).json() == []
+    assert client.get(f"{TOURS}/tags").status_code == 401
+    assert ski["tags"] == ["Skitour", "Gletscher"]
+
+
+def test_all_tours_come_as_lines_for_one_map(client, db, anna, bea, dora):
+    long_walk = [(47.0 + i * 0.0001, 9.0) for i in range(900)]
+    walked = create_tour(
+        client, anna, title="Lang", tags=["Wandern"], start_time="2026-07-18T07:00:00Z"
+    )
+    _add_track(client, anna, walked, long_walk)
+    create_tour(client, anna, title="Ohne alles")
+    # No track, but a start point set by hand: a point on the map.
+    pointed = create_tour(client, anna, title="Nur Start", tags=["Skitour"])
+    points = {"start": {"lat": 46.5, "lon": 9.9, "name": "Diavolezza"}, "end": None}
+    assert (
+        client.put(f"{TOURS}/{pointed['id']}/points", json=points, headers=anna.headers).status_code
+        == 200
+    )
+    theirs = create_tour(client, bea, title="Beas Tour")
+    _add_track(client, bea, theirs, [(46.0, 8.0), (46.01, 8.0)])
+    share(db, theirs, anna, "read")
+    hidden = create_tour(client, dora, title="Doras Tour")
+    _add_track(client, dora, hidden, [(45.0, 7.0), (45.01, 7.0)])
+
+    body = client.get(f"{TOURS}/tracks", headers=anna.headers).json()
+    assert body["type"] == "FeatureCollection"
+    by_title = {f["properties"]["title"]: f for f in body["features"]}
+    assert set(by_title) == {"Lang", "Nur Start", "Beas Tour"}
+
+    line = by_title["Lang"]
+    assert line["properties"] == {
+        "tour_id": walked["id"],
+        "title": "Lang",
+        "date": "2026-07-18",
+        "tags": ["Wandern"],
+        "own": True,
+        "distance_m": line["properties"]["distance_m"],
+        "ascent_m": line["properties"]["ascent_m"],
+    }
+    assert line["properties"]["distance_m"] > 9000
+    coordinates = line["geometry"]["coordinates"]
+    # Thinned out, but from the first to the last point.
+    assert line["geometry"]["type"] == "LineString" and len(coordinates) <= 201
+    assert coordinates[0] == [9.0, 47.0] and coordinates[-1] == [9.0, 47.0899]
+    assert by_title["Nur Start"]["geometry"] == {"type": "Point", "coordinates": [9.9, 46.5]}
+    assert by_title["Beas Tour"]["properties"]["own"] is False
+
+    def shown(**params):
+        found = client.get(f"{TOURS}/tracks", params=params, headers=anna.headers).json()
+        return sorted(f["properties"]["title"] for f in found["features"])
+
+    assert shown(scope="mine") == ["Lang", "Nur Start"]
+    assert shown(tag="skitour") == ["Nur Start"]
+    assert shown(scope="shared") == ["Beas Tour"]
+    assert (
+        client.get(f"{TOURS}/tracks", headers=dora.headers).json()["features"][0]["properties"][
+            "title"
+        ]
+        == "Doras Tour"
+    )
+    assert client.get(f"{TOURS}/tracks").status_code == 401

@@ -83,8 +83,12 @@ def diff_snapshots(old: dict, new: dict) -> dict:
     """Field-wise difference: scalars as old/new, lists as added/removed/changed."""
     result = {}
     for field in SCALAR_FIELDS:
-        if old.get(field) != new.get(field):
-            result[field] = {"old": old.get(field), "new": new.get(field)}
+        before, after = old.get(field), new.get(field)
+        if field == "tags":
+            # Revisions from before tours had tags have none: that is no change.
+            before, after = before or [], after or []
+        if before != after:
+            result[field] = {"old": before, "new": after}
     for field in LIST_FIELDS:
         entries = _diff_entries(old.get(field) or [], new.get(field) or [])
         if entries:
@@ -213,7 +217,8 @@ def restore(
         tour.gpx_file_id = state.gpx_file_id
         track_service.rebuild_from_file(db, storage, tour, user)
     for field in SCALAR_FIELDS:
-        setattr(tour, field, getattr(state, field))
+        value = getattr(state, field)
+        setattr(tour, field, list(value) if field == "tags" else value)
 
     # References to gear and food that no longer exist are dropped, the snapshot stays.
     gear_ids = gear_service.existing_item_ids(db, {e.gear_item_id for e in state.gear})
