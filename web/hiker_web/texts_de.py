@@ -245,7 +245,8 @@ TEXTS = {
     "tour.tag_empty": "Keine Tour mit dem Tag „{tag}“.",
     "tour.view.list": "Liste",
     "tour.view.map": "Karte",
-    "tour.map_note": "Alle Touren der Auswahl auf einer Karte. Ein Klick auf eine Linie öffnet die Tour; Touren ohne Track erscheinen als Punkt am Start.",
+    "tour.map_note": "Alle Touren der Auswahl auf einer Karte. Ein Klick auf eine Linie "
+    "öffnet die Tour; Touren ohne Track erscheinen als Punkt am Start.",
     "tour.map_empty": "Keine Tour der Auswahl hat einen Track oder einen Startpunkt.",
     "tour.map_shared": "mit mir geteilt",
     "tour.create": "Tour anlegen",
