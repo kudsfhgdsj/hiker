@@ -362,8 +362,9 @@ def coarser_steps(terrain_png: bytes) -> bytes:
     the size, and nothing of it can be seen in shading, slope or the 3D view."""
     red, green, blue = Image.open(io.BytesIO(terrain_png)).convert("RGB").split()
     out = io.BytesIO()
+    # Not `optimize`: that packs 8 % smaller, but takes ten times as long.
     Image.merge("RGB", (red, green, blue.point(lambda value: value & 0xC0))).save(
-        out, format="PNG", optimize=True
+        out, format="PNG", compress_level=6
     )
     return out.getvalue()
 
