@@ -62,7 +62,7 @@ form.inline { display: inline; }
 .chip { display: inline-block; padding: .1rem .6rem; border-radius: 1rem; background: var(--green-soft); font-size: .85rem; }
 .chip.estimate { background: var(--orange); color: #fff; }
 .toolbar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: var(--gap); }
-.toolbar .spacer { flex: 1; }
+.toolbar .spacer, .tabs .spacer { flex: 1; }
 .tabs { display: flex; gap: .25rem; border-bottom: 1px solid var(--border); margin-bottom: var(--gap); }
 .tabs a { padding: .5rem 1rem; text-decoration: none; border-bottom: 3px solid transparent; }
 .tabs a[aria-current="page"] { border-color: var(--green); font-weight: 600; }
@@ -262,3 +262,4 @@ a.chip[aria-current="true"] { background: var(--green); color: var(--snow); }
   .plan-side { border-left: 0; border-top: 1px solid var(--border); }
   .mapmode { height: calc(100vh - 6rem); }
 }
+.tag-filter { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin: 0 0 var(--gap); }

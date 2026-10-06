@@ -277,6 +277,67 @@ def test_list_shows_tours_and_passes_scope_and_search(user, fake_api):
     assert fake_api.last("GET", "/tours").url.params["scope"] == "all"
 
 
+def test_list_filters_by_tag_and_offers_the_tags_in_use(user, fake_api):
+    fake_api.route("GET", "/tours", page([{**TOUR, "peaks": [], "tags": ["Skitour", "Gletscher"]}]))
+    fake_api.route(
+        "GET", "/tours/tags", [{"tag": "Skitour", "count": 3}, {"tag": "Wandern", "count": 1}]
+    )
+
+    listing = text(user.get("/tours/?scope=mine&tag=skitour"))
+
+    params = fake_api.last("GET", "/tours").url.params
+    assert (params["scope"], params["tag"]) == ("mine", "skitour")
+    assert fake_api.last("GET", "/tours/tags").url.params["scope"] == "mine"
+    # The tags in use with their count; the chosen one is marked and a click takes it away.
+    assert "Skitour · 3" in listing and "Wandern · 1" in listing
+    assert 'class="chip chosen" aria-current="true" href="/tours/?scope=mine"' in listing
+    assert 'href="/tours/?scope=mine&amp;tag=Wandern"' in listing
+    # The tags of a tour lead to the tours with the same tag.
+    assert '<a class="chip" href="/tours/?scope=mine&amp;tag=Gletscher">Gletscher</a>' in listing
+
+    fake_api.route("GET", "/tours", page([]))
+    assert "Keine Tour mit dem Tag „Nichts“." in text(user.get("/tours/?tag=Nichts"))
+    # Without a tag nothing is sent as a filter.
+    user.get("/tours/")
+    assert "tag" not in fake_api.last("GET", "/tours").url.params
+
+
+def test_all_tours_are_shown_on_one_map(user, fake_api):
+    fake_api.route("GET", "/tours/tags", [{"tag": "Skitour", "count": 3}])
+    lines = {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "properties": {"tour_id": TOUR_ID, "title": "Säntis", "own": True},
+                "geometry": {"type": "LineString", "coordinates": [[9.3, 47.2], [9.34, 47.25]]},
+            }
+        ],
+    }
+    fake_api.route("GET", "/tours/tracks", lines)
+
+    page_ = text(user.get("/tours/?view=map&scope=mine&tag=Skitour"))
+
+    # The map instead of the list: the tours themselves are not asked for.
+    assert 'id="map"' in page_ and "tours_map.js" in page_ and "maplibre-gl-csp.js" in page_
+    assert "GET /tours" not in fake_api.requested()
+    data = json.loads(page_.split('id="tours-map-data">')[1].split("</script>")[0])
+    assert data["tracksUrl"] == "/tours/lines.geojson?scope=mine&tag=Skitour"
+    assert data["tourUrl"] == "/tours/00000000-0000-0000-0000-000000000000"
+    assert data["texts"]["empty"].startswith("Keine Tour")
+    # Scope and tag stay when the view changes; the search belongs to the list.
+    assert 'href="/tours/?scope=mine&amp;tag=Skitour"' in page_ and 'role="search"' not in page_
+    assert 'href="/tours/?scope=all&amp;tag=Skitour&amp;view=map"' in page_
+
+    answer = user.get("/tours/lines.geojson?scope=mine&tag=Skitour")
+    assert answer.get_json() == lines
+    params = fake_api.last("GET", "/tours/tracks").url.params
+    assert (params["scope"], params["tag"]) == ("mine", "Skitour")
+    # In the list the way to the map is offered.
+    fake_api.route("GET", "/tours", page([]))
+    assert 'href="/tours/?scope=all&amp;view=map"' in text(user.get("/tours/"))
+
+
 def test_new_tour_is_created_and_opened_for_editing(user, fake_api):
     fake_api.route("POST", "/tours", lambda r: httpx2.Response(201, json={**TOUR, "version": 1}))
 
@@ -286,7 +347,10 @@ def test_new_tour_is_created_and_opened_for_editing(user, fake_api):
     assert json.loads(fake_api.last("POST", "/tours").content) == {
         "title": "Säntis",
         "summary": None,
+        "tags": [],
     }
+    user.post("/tours/new", {"title": "Piz Palü", "tags": " Skitour, Gletscher ,, "})
+    assert json.loads(fake_api.last("POST", "/tours").content)["tags"] == ["Skitour", "Gletscher"]
 
 
 # --- Detail ---

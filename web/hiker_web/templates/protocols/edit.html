@@ -34,6 +34,7 @@
   <input type="hidden" name="base" value="{{ base|tojson|forceescape }}">
   {{ field('title', t('tour.title'), tour.title, required=True, attrs='maxlength="200"') }}
   <label class="field"><span>{{ t('tour.summary') }}</span><textarea name="summary" rows="8">{{ tour.summary or '' }}</textarea></label>
+  {{ field('tags', t('tour.tags'), (tour.tags or [])|join(', '), hint=t('tour.tags_hint'), attrs='maxlength="900"') }}
 
   {# The server gets UTC through the hidden fields; the visible inputs hold local time. #}
   <input type="hidden" name="start_time" id="start_time" value="{{ tour.start_time or '' }}">

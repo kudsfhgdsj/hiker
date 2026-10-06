@@ -24,6 +24,7 @@ tour_page = module_required("protocols")
 SCALARS = (
     "title",
     "summary",
+    "tags",
     "start_time",
     "end_time",
     "duration_minutes",
@@ -32,6 +33,8 @@ SCALARS = (
 )
 SCOPES = ("all", "mine", "shared")
 OSM_ATTRIBUTION = "© OpenStreetMap-Mitwirkende"
+# Stands for the id of a tour in an address that the page fills in itself.
+NO_TOUR = "00000000-0000-0000-0000-000000000000"
 
 
 def _back(tour_id, anchor: str | None = None):
@@ -47,17 +50,67 @@ def tour_list():
     scope = request.args.get("scope", "all")
     scope = scope if scope in SCOPES else "all"
     query = request.args.get("q", "").strip()
-    tours = api().pages("/tours", scope=scope, q=query)
+    tag = request.args.get("tag", "").strip()[:40]
+    on_map = request.args.get("view") == "map"
+    client = api()
+    # The map shows all tours of the choice at once; the search is for the list.
+    tours = [] if on_map else client.pages("/tours", scope=scope, q=query, tag=tag or None)
+    map_data = None
+    if on_map:
+        map_data = {
+            **map_config(OSM_ATTRIBUTION),
+            "tracksUrl": url_for("protocols.tour_lines", scope=scope, tag=tag or None),
+            "tourUrl": url_for("protocols.tour_detail", tour_id=NO_TOUR),
+            "texts": {"empty": t("tour.map_empty"), "shared": t("tour.map_shared")},
+        }
     return render_template(
-        "protocols/list.html", tours=tours, scope=scope, scopes=SCOPES, query=query
+        "protocols/list.html",
+        tours=tours,
+        scope=scope,
+        scopes=SCOPES,
+        query=query,
+        tag=tag,
+        tags=_known_tags(client, scope),
+        on_map=on_map,
+        map_data=map_data,
     )
+
+
+def _known_tags(client, scope: str) -> list[dict]:
+    """The tags in use, for the filter; the list works without them."""
+    try:
+        return client.get("/tours/tags", scope=scope)
+    except ApiError as error:
+        if error.status == 401:
+            raise
+        return []
+
+
+@blueprint.get("/lines.geojson")
+@tour_page
+def tour_lines():
+    """The tracks of all tours of the choice as lines, for the map of the list."""
+    scope = request.args.get("scope", "all")
+    tag = request.args.get("tag", "").strip()[:40]
+    return jsonify(
+        api().get("/tours/tracks", scope=scope if scope in SCOPES else "all", tag=tag or None)
+    )
+
+
+def _tags() -> list[str]:
+    """Tags as typed into the form: separated by commas."""
+    return [tag.strip() for tag in (request.form.get("tags") or "").split(",") if tag.strip()]
 
 
 @blueprint.route("/new", methods=["GET", "POST"])
 @tour_page
 def tour_new():
     if request.method == "POST":
-        document = {"title": forms.text("title") or "", "summary": forms.text("summary")}
+        document = {
+            "title": forms.text("title") or "",
+            "summary": forms.text("summary"),
+            "tags": _tags(),
+        }
         try:
             tour = api().send("POST", "/tours", document)
         except ApiError as error:
@@ -252,6 +305,7 @@ def _document() -> dict:
         "version": forms.number("version", int),
         "title": forms.text("title") or "",
         "summary": forms.text("summary"),
+        "tags": _tags(),
         "start_time": forms.text("start_time"),
         "end_time": forms.text("end_time"),
         "duration_minutes": forms.number("duration_minutes", int),

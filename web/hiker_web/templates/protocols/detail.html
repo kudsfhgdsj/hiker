@@ -14,6 +14,7 @@
 {% if not is_owner %}
 <p class="meta">{{ t('tour.by', name=tour.owner.display_name or '?') }} · {{ t('tour.permission.' ~ tour.permission) }}</p>
 {% endif %}
+{% if tour.tags %}<p>{% for name in tour.tags %}<a class="chip" href="{{ url_for('protocols.tour_list', tag=name) }}">{{ name }}</a> {% endfor %}</p>{% endif %}
 {% if tour.summary %}<p style="white-space:pre-line">{{ tour.summary }}</p>{% endif %}
 
 <section class="card">
