@@ -145,6 +145,14 @@ def main() -> None:
         return
 
     select = "SELECT data FROM layer_tiles WHERE layer = 'terrain' AND z = ? AND x = ? AND y = ?"
+    # Tiles that are the same in every pack were joined by an earlier run.
+    same = "SELECT data FROM layer_tiles WHERE layer = 'terrain' AND z = ? AND x = ? AND y = ?"
+    shared = [
+        tile
+        for tile in shared
+        if len({packs[path].execute(same, tile).fetchone()[0] for path in holders[tile]}) > 1
+    ]
+    print(f"{len(shared)} of them differ between the packs", flush=True)
     changed: dict[str, list[tuple[int, int, int]]] = {path: [] for path in packs}
     skipped = 0
     with ThreadPoolExecutor(6) as pool:
