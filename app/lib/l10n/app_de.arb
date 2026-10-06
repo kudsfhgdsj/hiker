@@ -270,6 +270,14 @@
   "tourSearchHint": "Titel oder Fazit",
   "tourTitleField": "Titel",
   "tourSummary": "Fazit",
+  "tourTags": "Tags",
+  "tourTagsHint": "Durch Komma getrennt, z. B. Skitour, Hochtour, mit Kindern",
+  "toursShowMap": "Alle Touren auf der Karte",
+  "toursShowList": "Als Liste",
+  "toursMapEmpty": "Keine Tour dieser Auswahl hat einen Track oder einen Startpunkt.",
+  "toursMapHint": "Tippe auf eine Markierung, um die Tour zu öffnen.",
+  "toursTagEmpty": "Keine Tour mit dem Tag „{tag}“.",
+  "@toursTagEmpty": {"placeholders": {"tag": {"type": "String"}}},
   "tourSharedBy": "von {name}",
   "@tourSharedBy": {
     "placeholders": {

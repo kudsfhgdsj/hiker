@@ -773,6 +773,32 @@ class AppLocalizationsDe extends AppLocalizations {
   String get tourSummary => 'Fazit';
 
   @override
+  String get tourTags => 'Tags';
+
+  @override
+  String get tourTagsHint =>
+      'Durch Komma getrennt, z. B. Skitour, Hochtour, mit Kindern';
+
+  @override
+  String get toursShowMap => 'Alle Touren auf der Karte';
+
+  @override
+  String get toursShowList => 'Als Liste';
+
+  @override
+  String get toursMapEmpty =>
+      'Keine Tour dieser Auswahl hat einen Track oder einen Startpunkt.';
+
+  @override
+  String get toursMapHint =>
+      'Tippe auf eine Markierung, um die Tour zu öffnen.';
+
+  @override
+  String toursTagEmpty(String tag) {
+    return 'Keine Tour mit dem Tag „$tag“.';
+  }
+
+  @override
   String tourSharedBy(String name) {
     return 'von $name';
   }

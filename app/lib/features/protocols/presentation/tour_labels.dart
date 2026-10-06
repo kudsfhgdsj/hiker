@@ -4,6 +4,7 @@ import '../../../l10n/app_localizations.dart';
 String fieldLabel(AppLocalizations l10n, String field) => switch (field) {
   'title' => l10n.fieldTitle,
   'summary' => l10n.fieldSummary,
+  'tags' => l10n.tourTags,
   'start_time' => l10n.fieldStartTime,
   'end_time' => l10n.fieldEndTime,
   'duration_minutes' => l10n.fieldDuration,

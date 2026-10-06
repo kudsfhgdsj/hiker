@@ -427,6 +427,23 @@ class _TourDetailScreenState extends ConsumerState<TourDetailScreen> {
         ),
         if (tour.summary != null)
           _Section(title: l10n.tourSummary, children: [Text(tour.summary!)]),
+        if (tour.tags.isNotEmpty)
+          _Section(
+            title: l10n.tourTags,
+            children: [
+              Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  for (final tag in tour.tags)
+                    Chip(
+                      label: Text(tag),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                ],
+              ),
+            ],
+          ),
       ],
     );
   }

@@ -14,6 +14,14 @@ class Tour {
   String get id => json['id'] as String;
   String get title => json['title'] as String;
   String? get summary => json['summary'] as String?;
+
+  /// Free words to sort tours by; none for tours loaded before tags existed.
+  List<String> get tags => [
+    ...?(json['tags'] as List<dynamic>?)?.cast<String>(),
+  ];
+
+  bool hasTag(String tag) =>
+      tags.any((own) => own.toLowerCase() == tag.toLowerCase());
   int get version => json['version'] as int;
   String get permission => json['permission'] as String? ?? 'owner';
   bool get isOwner => permission == 'owner';
@@ -92,6 +100,8 @@ class Tour {
 const documentFields = [
   'title',
   'summary',
+  // Null (a tour loaded before tags existed) leaves them as they are.
+  'tags',
   'start_time',
   'end_time',
   'duration_minutes',
@@ -118,7 +128,10 @@ Map<String, dynamic> documentOf(Map<String, dynamic> tour) => {
     field: switch (tour[field]) {
       final List<dynamic> list => [
         for (final entry in list)
-          Map<String, dynamic>.of(entry as Map<String, dynamic>),
+          // Entries of the lists are documents; tags are plain words.
+          entry is Map<String, dynamic>
+              ? Map<String, dynamic>.of(entry)
+              : entry,
       ],
       final value => value,
     },
@@ -156,6 +169,72 @@ MergeResult mergeDocuments(
     }
   }
   return MergeResult(merged, conflicts);
+}
+
+/// Tags as typed into one field, separated by commas: trimmed, without empty
+/// ones, and the same word only once whatever its case.
+List<String> parseTags(String text) {
+  final seen = <String>{};
+  return [
+    for (final tag in text.split(',').map((tag) => tag.trim()))
+      if (tag.isNotEmpty && seen.add(tag.toLowerCase())) tag,
+  ];
+}
+
+/// The tags of some tours (one list per tour) with the number of tours that
+/// carry each, the most used first.
+List<(String tag, int count)> countTags(Iterable<List<String>> tours) {
+  final counts = <String, (String, int)>{};
+  for (final tags in tours) {
+    for (final tag in tags) {
+      final entry = counts[tag.toLowerCase()];
+      counts[tag.toLowerCase()] = (entry?.$1 ?? tag, (entry?.$2 ?? 0) + 1);
+    }
+  }
+  return counts.values.toList()..sort(
+    (a, b) => a.$2 != b.$2
+        ? b.$2.compareTo(a.$2)
+        : a.$1.toLowerCase().compareTo(b.$1.toLowerCase()),
+  );
+}
+
+/// A tour on the map of all tours: its line, or only its start.
+class TourLine {
+  const TourLine({
+    required this.tourId,
+    required this.title,
+    required this.points,
+    this.date,
+    this.tags = const [],
+  });
+
+  factory TourLine.fromFeature(Map<String, dynamic> feature) {
+    final properties = feature['properties'] as Map<String, dynamic>;
+    final geometry = feature['geometry'] as Map<String, dynamic>;
+    GeoPoint point(List<dynamic> pair) =>
+        GeoPoint((pair[1] as num).toDouble(), (pair[0] as num).toDouble());
+    final coordinates = geometry['coordinates'] as List<dynamic>;
+    return TourLine(
+      tourId: properties['tour_id'] as String,
+      title: properties['title'] as String,
+      date: DateTime.tryParse(properties['date'] as String? ?? ''),
+      tags: [...?(properties['tags'] as List<dynamic>?)?.cast<String>()],
+      points: geometry['type'] == 'Point'
+          ? [point(coordinates)]
+          : [for (final pair in coordinates) point(pair as List<dynamic>)],
+    );
+  }
+
+  final String tourId;
+  final String title;
+  final DateTime? date;
+  final List<String> tags;
+
+  /// The thinned-out track; a single point for a tour without one.
+  final List<GeoPoint> points;
+
+  bool hasTag(String tag) =>
+      tags.any((own) => own.toLowerCase() == tag.toLowerCase());
 }
 
 /// The track series of a tour: columns of equal length.

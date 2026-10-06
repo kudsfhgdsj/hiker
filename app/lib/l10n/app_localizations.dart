@@ -1504,6 +1504,48 @@ abstract class AppLocalizations {
   /// **'Fazit'**
   String get tourSummary;
 
+  /// No description provided for @tourTags.
+  ///
+  /// In de, this message translates to:
+  /// **'Tags'**
+  String get tourTags;
+
+  /// No description provided for @tourTagsHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Durch Komma getrennt, z. B. Skitour, Hochtour, mit Kindern'**
+  String get tourTagsHint;
+
+  /// No description provided for @toursShowMap.
+  ///
+  /// In de, this message translates to:
+  /// **'Alle Touren auf der Karte'**
+  String get toursShowMap;
+
+  /// No description provided for @toursShowList.
+  ///
+  /// In de, this message translates to:
+  /// **'Als Liste'**
+  String get toursShowList;
+
+  /// No description provided for @toursMapEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Tour dieser Auswahl hat einen Track oder einen Startpunkt.'**
+  String get toursMapEmpty;
+
+  /// No description provided for @toursMapHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Tippe auf eine Markierung, um die Tour zu öffnen.'**
+  String get toursMapHint;
+
+  /// No description provided for @toursTagEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Tour mit dem Tag „{tag}“.'**
+  String toursTagEmpty(String tag);
+
   /// No description provided for @tourSharedBy.
   ///
   /// In de, this message translates to:

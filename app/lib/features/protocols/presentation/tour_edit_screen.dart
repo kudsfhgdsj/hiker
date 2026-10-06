@@ -59,6 +59,9 @@ class _TourFormState extends ConsumerState<_TourForm> {
   late final Json _doc = documentOf(_base);
   late final _title = TextEditingController(text: _doc['title'] as String?);
   late final _summary = TextEditingController(text: _doc['summary'] as String?);
+  late final _tags = TextEditingController(
+    text: ((_doc['tags'] as List<dynamic>?) ?? const []).join(', '),
+  );
   late final _duration = TextEditingController(
     text: Format.input(_doc['duration_minutes'] as num?),
   );
@@ -77,7 +80,7 @@ class _TourFormState extends ConsumerState<_TourForm> {
     for (final field in documentFields)
       field: const {'gear', 'food', 'peaks', 'partners'}.contains(field)
           ? <Json>[]
-          : null,
+          : (field == 'tags' ? <String>[] : null),
   };
 
   List<Json> _entries(String field) =>
@@ -85,7 +88,14 @@ class _TourFormState extends ConsumerState<_TourForm> {
 
   @override
   void dispose() {
-    for (final c in [_title, _summary, _duration, _packWeight, _calories]) {
+    for (final c in [
+      _title,
+      _summary,
+      _tags,
+      _duration,
+      _packWeight,
+      _calories,
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -96,6 +106,7 @@ class _TourFormState extends ConsumerState<_TourForm> {
     ..._doc,
     'title': _title.text.trim(),
     'summary': _summary.text.trim().isEmpty ? null : _summary.text.trim(),
+    'tags': parseTags(_tags.text),
     if (_isOwner) ...{
       'duration_minutes': Format.parseNumber(_duration.text)?.round(),
       'pack_weight_start_g': Format.parseNumber(_packWeight.text)?.round(),
@@ -496,6 +507,16 @@ class _TourFormState extends ConsumerState<_TourForm> {
             decoration: InputDecoration(labelText: l10n.tourSummary),
             maxLines: null,
             minLines: 3,
+          ),
+          gap,
+          TextFormField(
+            key: const ValueKey('tour-tags'),
+            controller: _tags,
+            decoration: InputDecoration(
+              labelText: l10n.tourTags,
+              helperText: l10n.tourTagsHint,
+            ),
+            textInputAction: TextInputAction.done,
           ),
           gap,
           if (!_isOwner) ...[

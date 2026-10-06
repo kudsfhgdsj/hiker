@@ -27,6 +27,7 @@ class TourRepository {
   static const _tours = 'tours';
   static const _list = 'tour_list';
   static const _tracks = 'tour_tracks';
+  static const _lines = 'tour_lines';
   static const _photos = 'tour_photos';
   static const _overviews = 'tour_overviews';
 
@@ -93,6 +94,28 @@ class TourRepository {
               ),
             );
       return Loaded(cached, offline: true);
+    }
+  }
+
+  /// All tours of a scope as lines for one map; without network the lines
+  /// as last loaded.
+  Future<Loaded<List<TourLine>>> lines({required String scope}) async {
+    List<TourLine> parse(Json document) => [
+      for (final feature
+          in (document['features'] as List<dynamic>).cast<Json>())
+        TourLine.fromFeature(feature),
+    ];
+    try {
+      final response = await apiCall(
+        () =>
+            _dio.get<Json>('/tours/tracks', queryParameters: {'scope': scope}),
+      );
+      await _db.putDocument(_lines, scope, response.data!);
+      return Loaded(parse(response.data!));
+    } on ApiException catch (error) {
+      final cached = await _db.getDocument(_lines, scope);
+      if (error.code != ApiException.network || cached == null) rethrow;
+      return Loaded(parse(cached), offline: true);
     }
   }
 
@@ -444,6 +467,12 @@ final tourListProvider = FutureProvider.autoDispose
       return ref
           .watch(tourRepositoryProvider)
           .list(scope: request.scope, query: request.query);
+    });
+
+final tourLinesProvider = FutureProvider.autoDispose
+    .family<Loaded<List<TourLine>>, String>((ref, scope) {
+      ref.watch(syncGenerationProvider);
+      return ref.watch(tourRepositoryProvider).lines(scope: scope);
     });
 
 final tourProvider = FutureProvider.autoDispose.family<Loaded<Tour>, String>((
